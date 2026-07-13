@@ -1,0 +1,62 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Dasbor Pengawasan{% endblock %}
+{% block topbar_actions %}<div class="pantau-btn-dark">Ekspor log audit</div>{% endblock %}
+{% block content %}
+<div class="pantau-purpose-banner">
+  <strong>Pernyataan tujuan (FR-29.5):</strong> Platform ini adalah alat pemantauan sentimen publik &amp; pelaporan naratif netral. Penggunaan untuk menargetkan, menekan, atau memprofilkan individu — termasuk warga sipil, jurnalis, atau lawan politik — dilarang keras dan melanggar kebijakan penggunaan.
+</div>
+
+<div class="pantau-kpi-row-4">
+  <div class="pantau-card">
+    <div class="pantau-kpi-label">Pengguna dgn Izin Pemantauan Politik</div>
+    <div class="pantau-kpi-value">{{ permission_count }}</div>
+    <div class="mono-muted">dari {{ total_users }} pengguna total</div>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-kpi-label">Kueri Aktor/Kubu Politik</div>
+    <div class="pantau-kpi-value">{{ political_query_count }}</div>
+    <div class="mono-muted">seluruhnya tercatat immutable (FR-29.2)</div>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-kpi-label">Profil Individu Ditolak Otomatis</div>
+    <div class="pantau-kpi-value pantau-kpi-positive">{{ excluded_profile_count }}</div>
+    <div class="mono-muted">dikecualikan dari penandaan aktor (FR-29.3)</div>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-kpi-label">Mode Periode Pemilu</div>
+    <div class="pantau-election-toggle">Nonaktif</div>
+    <div class="mono-muted">saat aktif: konfigurasi aktor dibekukan (§8.5)</div>
+  </div>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-title">Pengguna dengan Izin Pemantauan Politik</div>
+  {% for permission in permissions %}
+    <div class="pantau-permission-row">
+      <span>{{ permission.user.get_full_name|default:permission.user.username }}</span>
+      <span class="mono-muted">{{ permission.approved_by }}</span>
+      <span class="mono">{{ permission.approved_at|date:"d M y" }}</span>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-title">Log Audit — Aktivitas Pemantauan Politik (append-only)</div>
+  {% for entry in audit_entries %}
+    <div class="pantau-audit-row">
+      <span class="mono">{{ entry.timestamp|date:"d M H:i" }}</span>
+      <span>{{ entry.actor_label }}</span>
+      <span>{{ entry.action }}</span>
+      <span class="mono-strong">{{ entry.target }}</span>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="pantau-card pantau-policy-ack">
+  <div>
+    <div class="pantau-card-title">Kebijakan Penggunaan &amp; Persetujuan Tahunan (FR-29.6)</div>
+    <div class="mono-muted">disetujui oleh {{ policy_ack.approved_by }} pada {{ policy_ack.approved_at|date:"d M Y" }} · tinjauan berikutnya jatuh tempo {{ policy_ack.next_review_at|date:"d M Y" }}</div>
+  </div>
+  <span class="pantau-badge pantau-badge-positive">✓ Berlaku</span>
+</div>
+{% endblock %}

@@ -1,7 +1,9 @@
-from django.http import HttpResponse
 from django.shortcuts import render
 
-from .models import ApifyCredential, MonitoredDomain, PlatformIntegration
+from .models import (
+    ApifyCredential, AuditLogEntry, MonitoredDomain, PlatformIntegration,
+    PoliticalMonitoringPermission, PolicyAcknowledgment,
+)
 
 
 def konfigurasi(request):
@@ -17,4 +19,22 @@ def konfigurasi(request):
 
 
 def pengawasan(request):
-    return HttpResponse("Dasbor Pengawasan — coming soon")
+    from apps.core.models import AnalystProfile
+
+    permissions = PoliticalMonitoringPermission.objects.filter(active=True).select_related("user")
+    total_users = AnalystProfile.objects.count()
+    political_query_count = AuditLogEntry.objects.filter(action__icontains="kueri").count()
+    excluded_profile_count = AuditLogEntry.objects.filter(action__icontains="dikecualikan").count()
+    audit_entries = AuditLogEntry.objects.all()[:20]
+    policy_ack = PolicyAcknowledgment.objects.order_by("-approved_at").first()
+
+    return render(request, "governance/pengawasan.html", {
+        "active_nav": "pengawasan",
+        "permissions": permissions,
+        "permission_count": permissions.count(),
+        "total_users": total_users,
+        "political_query_count": political_query_count,
+        "excluded_profile_count": excluded_profile_count,
+        "audit_entries": audit_entries,
+        "policy_ack": policy_ack,
+    })

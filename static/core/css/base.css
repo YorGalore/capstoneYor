@@ -238,3 +238,11 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-hint { padding: 10px 12px; border-radius: 8px; background: #F8FAFB; border: 1px solid #EEF2F5; font: 400 10.5px 'IBM Plex Sans', sans-serif; color: var(--text-faint); }
 .pantau-hint-highlight { background: #EAF4F5; border-color: #D3E8EA; color: var(--teal); }
 .pantau-domain-row { display: grid; grid-template-columns: 1.6fr 1fr 110px 110px; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #F5F7F8; font: 500 12px 'IBM Plex Sans', sans-serif; }
+
+.pantau-purpose-banner { padding: 10px 24px; background: #EAF4F5; border-bottom: 1px solid #D3E8EA; font: 400 11px/1.6 'IBM Plex Sans', sans-serif; color: #0B4A52; }
+.pantau-kpi-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.pantau-kpi-positive { color: var(--positive); }
+.pantau-election-toggle { font: 600 13px 'IBM Plex Sans', sans-serif; color: var(--text-muted); margin: 10px 0 2px; }
+.pantau-permission-row, .pantau-audit-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #F5F7F8; font: 500 12px 'IBM Plex Sans', sans-serif; }
+.pantau-audit-row { grid-template-columns: 120px 1fr 1.3fr 110px; }
+.pantau-policy-ack { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
