@@ -185,3 +185,35 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-region-name { font: 700 20px Archivo, sans-serif; color: #fff; margin-top: 4px; }
 .pantau-region-kpis { display: flex; gap: 16px; }
 .pantau-kpi-value.light { color: #fff; font: 600 18px Archivo, sans-serif; }
+
+.pantau-heat-card { grid-column: 1 / -1; }
+.pantau-heat-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.pantau-heat-title { margin-bottom: 0; }
+.pantau-heat-legend { display: flex; align-items: center; gap: 6px; font: 400 10px 'IBM Plex Sans', sans-serif; color: var(--text-faint); }
+.pantau-heat-legend-swatch { width: 70px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #E3EEF0, #0E7C86, #0B4A52); }
+.pantau-heat-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 14px; }
+.pantau-heat-tile { border-radius: 8px; padding: 10px 11px; }
+.pantau-heat-tile-name { font: 600 10px 'IBM Plex Mono', monospace; }
+.pantau-heat-tile-count { font: 600 14px Archivo, sans-serif; margin-top: 3px; }
+.pantau-heat-1 { background: #E7F0F2; }
+.pantau-heat-1 .pantau-heat-tile-name { color: #4A707A; }
+.pantau-heat-1 .pantau-heat-tile-count { color: #2E5864; }
+.pantau-heat-2 { background: #CDE3E7; }
+.pantau-heat-2 .pantau-heat-tile-name { color: #35606C; }
+.pantau-heat-2 .pantau-heat-tile-count { color: #224E5A; }
+.pantau-heat-3 { background: #B8D9DE; }
+.pantau-heat-3 .pantau-heat-tile-name { color: #2E5A66; }
+.pantau-heat-3 .pantau-heat-tile-count { color: #1D4A56; }
+.pantau-heat-4 { background: #4E96A2; }
+.pantau-heat-4 .pantau-heat-tile-name { color: #E7F3F5; }
+.pantau-heat-4 .pantau-heat-tile-count { color: #fff; }
+.pantau-heat-5 { background: #1E6572; }
+.pantau-heat-5 .pantau-heat-tile-name { color: #CFE7EB; }
+.pantau-heat-5 .pantau-heat-tile-count { color: #fff; }
+.pantau-heat-flagged { outline: 2px solid var(--negative); outline-offset: 1px; }
+.pantau-heat-caption { margin-top: 12px; font: 400 10.5px 'IBM Plex Sans', sans-serif; color: var(--text-faint); }
+
+.pantau-subissue-tag { padding: 5px 11px; border-radius: 20px; font: 500 11.5px 'IBM Plex Sans', sans-serif; background: #EEF2F5; color: var(--text-muted); }
+.pantau-subissue-tag-primary { background: #FBEDEC; color: #A93B33; }
+
+.pantau-trend-axis { display: flex; justify-content: space-between; font: 400 10px 'IBM Plex Mono', monospace; color: var(--text-faint); margin-top: 4px; }

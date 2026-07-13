@@ -257,6 +257,45 @@ def _overlay_trend(coalitions, issue, days=30, width=1160, height=150):
     return {"series": series, "width": width, "height": height}
 
 
+_ID_MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+
+
+def _id_date_label(d):
+    return f"{d.day} {_ID_MONTHS[d.month - 1]}"
+
+
+def _heat_intensity_band(intensity):
+    # Bucket a 0..1 intensity value into 5 discrete bands for CSS-class-based shading,
+    # mirroring the small number of distinct tile shades in the design mockup.
+    band = min(4, int(intensity * 5))
+    return band + 1
+
+
+def _province_trend(qs, days=30, width=360, height=90):
+    since = timezone.now() - timezone.timedelta(days=days)
+    daily = [0] * days
+    for mention in qs.filter(posted_at__gte=since).only("posted_at"):
+        offset = (mention.posted_at - since).days
+        if 0 <= offset < days:
+            daily[offset] += 1
+    max_value = max(daily) or 1
+    points = _scale_points(daily, width, height, max_value)
+    area_path = ""
+    if points:
+        area_path = "M" + " L".join(points.split(" ")) + f" L{width},{height} L0,{height} Z"
+
+    start_date = since.date()
+    mid_date = (since + timezone.timedelta(days=days // 2)).date()
+    end_date = (since + timezone.timedelta(days=days - 1)).date()
+    return {
+        "points": points,
+        "area_path": area_path,
+        "width": width,
+        "height": height,
+        "labels": [_id_date_label(start_date), _id_date_label(mid_date), _id_date_label(end_date)],
+    }
+
+
 def regional_summary(project, selected_province=None):
     rows = (
         Mention.objects.filter(project=project, is_political=False, province__isnull=False)
@@ -282,6 +321,18 @@ def regional_summary(project, selected_province=None):
             "flagged": negative_pct > 50,
         })
 
+    max_count = max((r["count"] for r in province_rows), default=0) or 1
+    heat_tiles = [
+        {
+            "name": r["name"],
+            "count": r["count"],
+            "intensity": round(r["count"] / max_count, 3),
+            "intensity_band": _heat_intensity_band(r["count"] / max_count),
+            "flagged": r["flagged"],
+        }
+        for r in province_rows
+    ]
+
     selected = None
     if province_rows:
         target_name = selected_province or max(province_rows, key=lambda r: r["negative_pct"])["name"]
@@ -295,12 +346,15 @@ def regional_summary(project, selected_province=None):
         )
         regency_rows = list(regency_rows)
         max_regency = regency_rows[0]["n"] if regency_rows else 1
+        province_qs = Mention.objects.filter(project=project, province=province)
         selected = {
             **selected_row,
             "regencies": [
                 {"name": r["regency__name"], "count": r["n"], "pct": round((r["n"] / max_regency) * 100)}
                 for r in regency_rows
             ],
+            "dominant_themes": _dominant_themes(province_qs),
+            "trend_chart": _province_trend(province_qs),
         }
 
-    return {"province_rows": province_rows[:10], "selected": selected}
+    return {"province_rows": province_rows[:10], "heat_tiles": heat_tiles, "selected": selected}

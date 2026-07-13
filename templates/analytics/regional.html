@@ -3,6 +3,21 @@
 {% block content %}
 <div class="pantau-page-title">Distribusi Narasi Regional</div>
 <div class="pantau-grid-regional">
+  <div class="pantau-card pantau-heat-card">
+    <div class="pantau-heat-header">
+      <div class="pantau-card-title pantau-heat-title">Peta Panas Provinsi <span class="mono-muted">— intensitas = volume sebutan</span></div>
+      <div class="pantau-heat-legend"><span>Rendah</span><span class="pantau-heat-legend-swatch"></span><span>Tinggi</span></div>
+    </div>
+    <div class="pantau-heat-grid">
+      {% for tile in summary.heat_tiles %}
+        <div class="pantau-heat-tile pantau-heat-{{ tile.intensity_band }}{% if tile.flagged %} pantau-heat-flagged{% endif %}">
+          <div class="pantau-heat-tile-name">{{ tile.name }}</div>
+          <div class="pantau-heat-tile-count">{{ tile.count }}{% if tile.flagged %} ⚠{% endif %}</div>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="pantau-heat-caption">⚠ garis merah: rasio sentimen negatif &gt; 50%. Klik provinsi pada peringkat di bawah untuk rincian kabupaten/kota.</div>
+  </div>
   <div class="pantau-card">
     <div class="pantau-card-title">10 Provinsi Teratas — volume &amp; komposisi sentimen</div>
     {% for row in summary.province_rows %}
@@ -36,6 +51,26 @@
         <span class="mono">{{ regency.count }}</span>
       </div>
     {% endfor %}
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Sub-isu dominan di {{ summary.selected.name }}</div>
+    <div class="narasi-theme-tags">
+      {% for theme in summary.selected.dominant_themes %}
+        <span class="pantau-subissue-tag{% if forloop.counter <= 2 %} pantau-subissue-tag-primary{% endif %}">{{ theme.theme }} · {{ theme.pct }}%</span>
+      {% empty %}
+        <span class="mono-muted">Belum ada sub-isu teridentifikasi untuk provinsi ini.</span>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Tren 30 hari — {{ summary.selected.name }}</div>
+    <svg width="100%" height="{{ summary.selected.trend_chart.height }}" viewBox="0 0 {{ summary.selected.trend_chart.width }} {{ summary.selected.trend_chart.height }}" preserveAspectRatio="none">
+      <path d="{{ summary.selected.trend_chart.area_path }}" fill="rgba(198,72,63,.1)"></path>
+      <polyline points="{{ summary.selected.trend_chart.points }}" fill="none" stroke="#C6483F" stroke-width="2.5"></polyline>
+    </svg>
+    <div class="pantau-trend-axis">
+      {% for label in summary.selected.trend_chart.labels %}<span>{{ label }}</span>{% endfor %}
+    </div>
   </div>
 </div>
 {% endblock %}

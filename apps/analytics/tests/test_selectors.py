@@ -112,3 +112,46 @@ class RegionalSummaryTest(TestCase):
 
         summary = selectors.regional_summary(project, selected_province="Maluku")
         self.assertEqual(summary["selected"]["name"], "Maluku")
+
+    def test_regional_summary_heat_tiles_cover_all_provinces_with_real_variation(self):
+        tenant, project = seed_core()
+        seed_analytics(project, mention_count=300)
+
+        summary = selectors.regional_summary(project)
+        heat_tiles = summary["heat_tiles"]
+        # every province with any mentions is present, not just the top 10
+        self.assertGreater(len(heat_tiles), 10)
+        for tile in heat_tiles:
+            self.assertIn("name", tile)
+            self.assertGreater(tile["count"], 0)
+            self.assertGreaterEqual(tile["intensity"], 0)
+            self.assertLessEqual(tile["intensity"], 1)
+            self.assertIn("flagged", tile)
+        # the highest-volume tile should have full intensity, showing real variation
+        self.assertAlmostEqual(max(t["intensity"] for t in heat_tiles), 1.0)
+        intensities = {t["intensity"] for t in heat_tiles}
+        self.assertGreater(len(intensities), 1, "expected varied intensity across provinces")
+
+    def test_regional_summary_selected_includes_trend_chart(self):
+        tenant, project = seed_core()
+        seed_analytics(project, mention_count=300)
+
+        summary = selectors.regional_summary(project, selected_province="Maluku")
+        trend_chart = summary["selected"]["trend_chart"]
+        self.assertIn("points", trend_chart)
+        self.assertIn("area_path", trend_chart)
+        self.assertIn("labels", trend_chart)
+        self.assertEqual(len(trend_chart["labels"]), 3)
+        self.assertTrue(trend_chart["points"], "expected non-degenerate trend points")
+
+    def test_regional_summary_selected_dominant_themes_exclude_blank(self):
+        tenant, project = seed_core()
+        seed_analytics(project, mention_count=300)
+
+        summary = selectors.regional_summary(project, selected_province="Maluku")
+        themes = summary["selected"]["dominant_themes"]
+        self.assertIsInstance(themes, list)
+        for entry in themes:
+            self.assertIn("theme", entry)
+            self.assertIn("pct", entry)
+            self.assertTrue(entry["theme"])
