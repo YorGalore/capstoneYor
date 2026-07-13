@@ -1,0 +1,113 @@
+:root {
+  --navy: #0B1F33;
+  --navy-2: #16283B;
+  --teal: #0E7C86;
+  --teal-light: #2FD4C4;
+  --bg: #EBEEF1;
+  --content-bg: #F3F5F7;
+  --border: #E2E8EE;
+  --text-muted: #64748B;
+  --text-faint: #8A97A6;
+  --positive: #178A5C;
+  --negative: #C6483F;
+  --neutral: #AEBBC7;
+  --warning: #B07818;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  color: var(--navy-2);
+}
+
+a { color: var(--teal); text-decoration: none; }
+a:hover { color: #0A5C64; text-decoration: underline; }
+
+.pantau-shell {
+  display: grid;
+  grid-template-columns: 208px 1fr;
+  min-height: 100vh;
+}
+
+.pantau-sidebar {
+  background: var(--navy);
+  display: flex;
+  flex-direction: column;
+}
+
+.pantau-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 18px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.pantau-logo {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--teal), var(--teal-light));
+  display: grid; place-items: center;
+  font: 700 13px Archivo, sans-serif; color: #fff;
+}
+
+.pantau-brand-name { font: 700 14px Archivo, sans-serif; color: #fff; letter-spacing: .04em; }
+.pantau-brand-sub { font: 400 9px 'IBM Plex Mono', monospace; color: #5F7A93; letter-spacing: .04em; }
+
+.pantau-nav { padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; }
+.pantau-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 7px;
+  color: #8FA3B8; font: 500 12.5px 'IBM Plex Sans', sans-serif;
+  cursor: pointer;
+}
+.pantau-nav-item.active { background: rgba(47,212,196,.14); color: var(--teal-light); font-weight: 600; }
+.pantau-nav-item.disabled { opacity: .45; cursor: default; }
+.pantau-nav-footer { margin-top: auto; padding: 14px 10px; border-top: 1px solid rgba(255,255,255,.08); display: flex; flex-direction: column; gap: 2px; }
+
+.pantau-user { display: flex; align-items: center; gap: 10px; padding: 12px 10px 4px; }
+.pantau-user-avatar {
+  width: 28px; height: 28px; border-radius: 50%; background: #1E3A55;
+  display: grid; place-items: center; font: 600 11px Archivo, sans-serif; color: #7FD1C8;
+}
+.pantau-user-name { font: 600 11.5px 'IBM Plex Sans', sans-serif; color: #D7E3F0; }
+.pantau-user-role { font: 400 10px 'IBM Plex Sans', sans-serif; color: #5F7A93; }
+
+.pantau-main { display: flex; flex-direction: column; background: var(--content-bg); }
+
+.pantau-topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 24px; background: #fff; border-bottom: 1px solid var(--border);
+}
+.pantau-project-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px; background: #F8FAFB;
+  font: 600 12.5px 'IBM Plex Sans', sans-serif; color: var(--navy-2);
+}
+.pantau-project-pill .dot { width: 8px; height: 8px; border-radius: 3px; background: var(--teal); }
+.pantau-instansi { font: 400 11.5px 'IBM Plex Sans', sans-serif; color: var(--text-muted); }
+.pantau-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.pantau-content { padding: 22px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+.pantau-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px;
+}
+
+.pantau-badge {
+  display: inline-block; padding: 3px 9px; border-radius: 20px;
+  font: 600 10.5px 'IBM Plex Sans', sans-serif;
+}
+.pantau-badge-positive { background: #EAF5F0; color: var(--positive); }
+.pantau-badge-negative { background: #FBEDEC; color: var(--negative); }
+.pantau-badge-warning { background: #FDF3E3; color: #9A6B14; }
+.pantau-badge-neutral { background: #EEF2F5; color: var(--text-muted); }
+
+.pantau-neutrality-notice {
+  padding: 7px 24px; background: #FDFAF3; border-bottom: 1px solid #F0E4CC;
+  font: 400 10.5px 'IBM Plex Sans', sans-serif; color: #8A7A52;
+}
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }

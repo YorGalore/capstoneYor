@@ -1,0 +1,17 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'core/css/base.css' %}">
+  {% block extra_css %}{% endblock %}
+  <meta http-equiv="refresh" content="60">
+  <title>War Room — PANTAU</title>
+</head>
+<body class="pantau-warroom-body">
+  {% block content %}{% endblock %}
+</body>
+</html>
