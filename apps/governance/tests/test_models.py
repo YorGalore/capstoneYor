@@ -7,6 +7,7 @@ from apps.governance.models import (
     AuditLogEntry, MonitoredDomain, PlatformIntegration,
     PoliticalMonitoringPermission, PolicyAcknowledgment,
 )
+from apps.governance.services import record_audit_entry
 
 
 class GovernanceModelsTest(TestCase):
@@ -27,6 +28,38 @@ class GovernanceModelsTest(TestCase):
         first = AuditLogEntry.objects.create(actor_label="Sistem", action="A", target="X")
         second = AuditLogEntry.objects.create(actor_label="Sistem", action="B", target="Y")
         self.assertEqual(list(AuditLogEntry.objects.all()), [second, first])
+
+    def test_record_audit_entry_service_write_path(self):
+        """Test that record_audit_entry() service function creates audit entries correctly."""
+        actor_label = "Dewi Anjani"
+        action = "Menandai klaster sebagai organik"
+        target = "Klaster-04"
+
+        # Call the service function
+        entry = record_audit_entry(actor_label, action, target)
+
+        # Assert return value is an AuditLogEntry instance with correct fields
+        self.assertIsInstance(entry, AuditLogEntry)
+        self.assertEqual(entry.actor_label, actor_label)
+        self.assertEqual(entry.action, action)
+        self.assertEqual(entry.target, target)
+
+        # Assert the entry was persisted to the database
+        self.assertTrue(
+            AuditLogEntry.objects.filter(
+                actor_label=actor_label, action=action, target=target
+            ).exists()
+        )
+
+        # Verify the entry can be fetched and has correct values
+        fetched_entry = AuditLogEntry.objects.get(
+            actor_label=actor_label, action=action, target=target
+        )
+        self.assertEqual(fetched_entry.id, entry.id)
+        self.assertEqual(fetched_entry.actor_label, actor_label)
+        self.assertEqual(fetched_entry.action, action)
+        self.assertEqual(fetched_entry.target, target)
+        self.assertIsNotNone(fetched_entry.timestamp)
 
     def test_policy_acknowledgment(self):
         tenant = Tenant.objects.create(name="Kemenko PMK")
