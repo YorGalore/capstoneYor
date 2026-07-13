@@ -35,3 +35,6 @@ class NarasiViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Koalisi Nusantara Raya")
         self.assertContains(response, "Koalisi Perubahan Bersatu")
+        self.assertContains(response, "Tema dominan (klaster topik)")
+        self.assertContains(response, "capaian distribusi tahap 2")
+        self.assertContains(response, "keterlambatan wilayah timur")

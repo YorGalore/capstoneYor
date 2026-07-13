@@ -17,6 +17,13 @@
       </div>
     {% endfor %}
   </div>
+  <div class="narasi-sov-bar">
+    {% for item in summary.coalitions %}
+      <div style="width: {{ item.share_pct }}%; background: {{ item.coalition.color }}"></div>
+      {% if forloop.first %}<div style="width: {{ summary.unattributed_pct }}%; background: #D5DAE3"></div>{% endif %}
+    {% endfor %}
+  </div>
+  <div class="narasi-sov-caption">abu-abu: campuran / tidak jelas</div>
 </div>
 
 <div class="pantau-grid-2">
@@ -30,6 +37,14 @@
         {% for s in item.sentiment_breakdown %}
           <div class="pantau-bg-{{ s.key }}" style="width: {{ s.pct }}%"></div>
         {% endfor %}
+      </div>
+      <div>
+        <div class="narasi-theme-label">Tema dominan (klaster topik)</div>
+        <div class="narasi-theme-tags">
+          {% for theme in item.dominant_themes %}
+            <span class="narasi-theme-tag" style="background: {{ item.coalition.color }}1a; color: {{ item.coalition.color }}">{{ theme.theme }} · {{ theme.pct }}%</span>
+          {% endfor %}
+        </div>
       </div>
       <svg width="100%" height="{{ item.trend_chart.height }}" viewBox="0 0 {{ item.trend_chart.width }} {{ item.trend_chart.height }}" preserveAspectRatio="none">
         <polyline points="{{ item.trend_chart.points }}" fill="none" stroke="{{ item.coalition.color }}" stroke-width="2.5"></polyline>

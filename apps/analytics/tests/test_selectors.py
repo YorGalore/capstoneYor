@@ -77,3 +77,20 @@ class NarasiSummaryTest(TestCase):
         total_share = sum(c["share_pct"] for c in summary["coalitions"])
         self.assertGreater(total_share, 0)
         self.assertIn("series", summary["overlay_chart"])
+
+    def test_narasi_summary_includes_dominant_themes(self):
+        tenant, project = seed_core()
+        seed_analytics(project, mention_count=100)
+        issue = PoliticalIssue.objects.get(title="Distribusi Pangan Wilayah Timur")
+
+        summary = selectors.narasi_summary(issue)
+        for coalition_data in summary["coalitions"]:
+            themes = coalition_data["dominant_themes"]
+            self.assertTrue(themes, "expected non-empty dominant themes for seeded coalition")
+            for entry in themes:
+                self.assertIn("theme", entry)
+                self.assertIn("pct", entry)
+                self.assertTrue(entry["theme"])
+            # not all identical percentages -- weighted pool should show variation
+            pcts = [entry["pct"] for entry in themes]
+            self.assertGreater(len(set(pcts)), 1)

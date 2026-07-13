@@ -64,6 +64,7 @@ class Mention(models.Model):
     )
     author_handle = models.CharField(max_length=150)
     content_snippet = models.TextField()
+    theme = models.CharField(max_length=100, blank=True)
     sentiment = models.CharField(max_length=20, choices=SENTIMENT_CHOICES)
     emotion = models.CharField(max_length=20, choices=EMOTION_CHOICES)
     posted_at = models.DateTimeField()

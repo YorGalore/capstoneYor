@@ -202,6 +202,7 @@ def narasi_summary(issue):
             "count": count,
             "share_pct": share_pct,
             "sentiment_breakdown": sentiment_breakdown,
+            "dominant_themes": _dominant_themes(qs),
             "trend_chart": _coalition_trend(qs),
         })
 
@@ -212,6 +213,19 @@ def narasi_summary(issue):
         "coalitions": coalition_data,
         "overlay_chart": _overlay_trend(coalitions, issue),
     }
+
+
+def _dominant_themes(qs, limit=4):
+    total = qs.exclude(theme="").count()
+    if not total:
+        return []
+    rows = (
+        qs.exclude(theme="")
+        .values("theme")
+        .annotate(n=Count("id"))
+        .order_by("-n")[:limit]
+    )
+    return [{"theme": row["theme"], "pct": round((row["n"] / total) * 100)} for row in rows]
 
 
 def _coalition_trend(qs, days=30, width=560, height=90):

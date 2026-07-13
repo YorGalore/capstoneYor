@@ -36,6 +36,25 @@ SNIPPET_TEMPLATES = [
     "Perlu evaluasi lebih lanjut soal ketepatan sasaran program ini.",
 ]
 
+COALITION_THEME_WEIGHTS = {
+    "nusantara-raya": [
+        ("capaian distribusi tahap 2", 0.31),
+        ("testimoni penerima manfaat", 0.24),
+        ("transparansi anggaran", 0.17),
+        ("koreksi hoaks", 0.11),
+        ("kolaborasi pemerintah daerah", 0.10),
+        ("apresiasi relawan lapangan", 0.07),
+    ],
+    "perubahan-bersatu": [
+        ("keterlambatan wilayah timur", 0.38),
+        ("dugaan salah sasaran", 0.22),
+        ("kritik tata kelola anggaran", 0.19),
+        ("usulan skema alternatif", 0.09),
+        ("desakan audit independen", 0.07),
+        ("laporan warga terdampak", 0.05),
+    ],
+}
+
 
 def _weighted_choice(rng, weighted_options):
     total = sum(weight for _, weight in weighted_options)
@@ -127,6 +146,7 @@ def _seed_political_issue(project, rng, now):
         ]),
     )
     for coalition, sentiment_weights in coalition_sentiment_weights:
+        theme_weights = COALITION_THEME_WEIGHTS[coalition.slug]
         for _ in range(700):
             sentiment = _weighted_choice(rng, sentiment_weights)
             political_mentions.append(Mention(
@@ -135,6 +155,7 @@ def _seed_political_issue(project, rng, now):
                 province=_weighted_choice(rng, province_weights),
                 author_handle=rng.choice(SAMPLE_HANDLES),
                 content_snippet=rng.choice(SNIPPET_TEMPLATES),
+                theme=_weighted_choice(rng, theme_weights),
                 sentiment=sentiment,
                 emotion=rng.choice(EMOTION_CHOICES),
                 posted_at=now - timedelta(days=rng.uniform(0, 16), hours=rng.uniform(0, 24)),
