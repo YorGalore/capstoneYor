@@ -1,0 +1,67 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Deteksi Koordinasi{% endblock %}
+{% block content %}
+<div class="pantau-neutrality-notice">⚖ Temuan bersifat indikatif, bukan bukti. Wajib tinjauan manusia sebelum tindak lanjut; sistem tidak pernah melapor/memblokir akun secara otomatis (FR-26.2, FR-26.4).</div>
+<div class="pantau-grid-koordinasi">
+  <div class="pantau-cluster-list">
+    {% for cluster in clusters %}
+      <a class="pantau-card pantau-cluster-card{% if cluster == selected %} pantau-cluster-selected{% endif %}" href="?cluster={{ cluster.cluster_code }}">
+        <div class="pantau-card-header">
+          <span class="mono-strong">{{ cluster.cluster_code }}</span>
+          <span class="pantau-badge pantau-badge-{% if cluster.status == 'flagged' %}warning{% elif cluster.status == 'reviewed_organic' %}positive{% else %}neutral{% endif %}">{{ cluster.get_status_display }}</span>
+        </div>
+        <div class="pantau-cluster-score">{{ cluster.score }}</div>
+        <div class="mono-muted">{{ cluster.note }}</div>
+      </a>
+    {% endfor %}
+  </div>
+  {% if selected %}
+  <div class="pantau-cluster-detail">
+    <div class="pantau-grid-2">
+      <div class="pantau-card">
+        <div class="pantau-card-title">{{ selected.cluster_code }} — Jaringan Amplifikasi</div>
+        {% for account in selected.accounts.all %}
+          <div class="pantau-source-row">
+            <span>{{ account.handle }}</span>
+            <span class="mono">{{ account.get_role_display }}</span>
+            <span class="mono">{{ account.reach }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="pantau-card">
+        <div class="pantau-card-title">Sinyal Koordinasi</div>
+        {% for signal in selected.signals.all %}
+          <div class="pantau-source-row">
+            <span>{{ signal.get_signal_type_display }}</span>
+            <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ signal.score|floatformat:0 }}0%"></div></div>
+            <span class="mono">{{ signal.score }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="pantau-card">
+      <div class="pantau-card-title">Sampel Teks Terduplikasi</div>
+      <div class="pantau-grid-3">
+        {% for sample in selected.duplicate_samples.all %}
+          <div class="pantau-sample-card">
+            <div class="mono-muted">{{ sample.account_handle }} · {{ sample.posted_at|date:"H:i" }}</div>
+            <div>{{ sample.text }}</div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="pantau-cluster-actions">
+        <form method="post" action="{% url 'coordination:escalate_cluster' selected.cluster_code %}">
+          {% csrf_token %}
+          <button type="submit" class="pantau-btn-dark">Kirim ke tinjauan analis senior</button>
+        </form>
+        <form method="post" action="{% url 'coordination:mark_cluster_organic' selected.cluster_code %}">
+          {% csrf_token %}
+          <button type="submit" class="pantau-btn-outline">Tandai organik (false positive)</button>
+        </form>
+        <span class="mono-muted">Pelaporan eksternal hanya manual oleh pengguna berwenang &amp; tercatat (FR-26.4)</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
