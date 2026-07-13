@@ -105,3 +105,73 @@ def timeline_chart(timeline, width=760, height=230):
 
 def recent_alerts(limit=5):
     return list(Alert.objects.select_related("rule").order_by("-triggered_at")[:limit])
+
+
+def war_room_summary(issue):
+    now = timezone.now()
+    last_hour = Mention.objects.filter(issue=issue, posted_at__gte=now - timezone.timedelta(hours=1))
+    prev_window = Mention.objects.filter(
+        issue=issue,
+        posted_at__gte=now - timezone.timedelta(hours=4),
+        posted_at__lt=now - timezone.timedelta(hours=1),
+    )
+
+    mentions_last_hour = last_hour.count()
+    negative_last_hour = last_hour.filter(sentiment=Mention.SENTIMENT_NEGATIVE).count()
+    negative_ratio = round((negative_last_hour / mentions_last_hour) * 100) if mentions_last_hour else 0
+
+    prev_hourly_avg = (prev_window.count() / 3) or 1
+    hourly_change_pct = round(((mentions_last_hour - prev_hourly_avg) / prev_hourly_avg) * 100)
+
+    cumulative_reach = Mention.objects.filter(issue=issue).aggregate(total=Sum("reach_estimate"))["total"] or 0
+
+    from apps.coordination.models import ClusterAccount, CoordinationCluster
+    coordinated_cluster_count = CoordinationCluster.objects.filter(
+        issue=issue, status=CoordinationCluster.STATUS_FLAGGED
+    ).count()
+    top_spreaders = list(
+        ClusterAccount.objects.filter(cluster__issue=issue)
+        .select_related("cluster")
+        .order_by("-reach")[:5]
+    )
+
+    timeline = _hourly_timeline(issue, now)
+    hotspots = _geo_hotspots(issue)
+
+    return {
+        "issue": issue,
+        "mentions_last_hour": mentions_last_hour,
+        "negative_ratio": negative_ratio,
+        "hourly_change_pct": hourly_change_pct,
+        "cumulative_reach": cumulative_reach,
+        "coordinated_cluster_count": coordinated_cluster_count,
+        "timeline_chart": timeline_chart(timeline, width=800, height=210),
+        "top_spreaders": top_spreaders,
+        "hotspots": hotspots,
+    }
+
+
+def _hourly_timeline(issue, now, hours=12, bucket_minutes=5):
+    since = now - timezone.timedelta(hours=hours)
+    bucket_count = hours * 60 // bucket_minutes
+    buckets = [{"positive": 0, "neutral": 0, "negative": 0} for _ in range(bucket_count)]
+    for mention in Mention.objects.filter(issue=issue, posted_at__gte=since).only("posted_at", "sentiment"):
+        elapsed_minutes = (mention.posted_at - since).total_seconds() / 60
+        index = min(int(elapsed_minutes // bucket_minutes), bucket_count - 1)
+        buckets[index][mention.sentiment] += 1
+    return buckets
+
+
+def _geo_hotspots(issue, limit=6):
+    rows = (
+        Mention.objects.filter(issue=issue, province__isnull=False)
+        .values("province__name")
+        .annotate(n=Count("id"))
+        .order_by("-n")[:limit]
+    )
+    rows = list(rows)
+    max_count = rows[0]["n"] if rows else 1
+    return [
+        {"name": row["province__name"], "count": row["n"], "pct": round((row["n"] / max_count) * 100)}
+        for row in rows
+    ]

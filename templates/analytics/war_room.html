@@ -1,0 +1,75 @@
+{% extends "core/base_warroom.html" %}
+{% block extra_css %}{% load static %}<link rel="stylesheet" href="{% static 'analytics/css/war_room.css' %}">{% endblock %}
+{% block content %}
+<div class="wr-header">
+  <div class="pantau-logo">P</div>
+  <div>
+    <div class="wr-title-row">
+      <span class="wr-title">WAR ROOM NARASI</span>
+      <span class="wr-live-badge"><span class="wr-live-dot"></span>LANGSUNG</span>
+    </div>
+    <div class="wr-subtitle">Isu aktif: <strong>{{ summary.issue.title }}</strong> · dibuka {{ summary.issue.opened_at|date:"d M Y H:i" }} WIB · pemilik: {{ summary.issue.owner_label }}</div>
+  </div>
+  <div class="wr-header-actions">
+    <div class="wr-pill">Segarkan: 60 dtk</div>
+    <div class="wr-pill">Layar penuh (kiosk)</div>
+    <div class="wr-btn-escalate">Eskalasi</div>
+  </div>
+</div>
+<div class="wr-notice">⚖ Tampilan narasi politik — hanya untuk kesadaran sentimen publik &amp; pelaporan netral. Dilarang untuk penargetan, penekanan, atau pemrofilan individu (FR-29.5). Seluruh kueri tercatat dalam log audit.</div>
+<div class="wr-body">
+  <div class="wr-left">
+    <div class="wr-kpi-strip">
+      <div class="wr-kpi-card">
+        <div class="wr-kpi-label">Sebutan / Jam</div>
+        <div class="wr-kpi-value">{{ summary.mentions_last_hour }}</div>
+        <div class="wr-kpi-delta">{{ summary.hourly_change_pct }}% vs 3 jam lalu</div>
+      </div>
+      <div class="wr-kpi-card">
+        <div class="wr-kpi-label">Rasio Negatif (1 jam)</div>
+        <div class="wr-kpi-value wr-negative">{{ summary.negative_ratio }}%</div>
+      </div>
+      <div class="wr-kpi-card">
+        <div class="wr-kpi-label">Jangkauan Kumulatif</div>
+        <div class="wr-kpi-value">{{ summary.cumulative_reach }}</div>
+      </div>
+      <div class="wr-kpi-card">
+        <div class="wr-kpi-label">Klaster Terkoordinasi</div>
+        <div class="wr-kpi-value wr-warning">{{ summary.coordinated_cluster_count }}</div>
+        <div class="wr-kpi-delta">menunggu tinjauan analis</div>
+      </div>
+    </div>
+    <div class="wr-card">
+      <div class="wr-card-title">Volume Waktu-Nyata — interval 5 menit</div>
+      <svg width="100%" height="{{ summary.timeline_chart.height }}" viewBox="0 0 {{ summary.timeline_chart.width }} {{ summary.timeline_chart.height }}" preserveAspectRatio="none">
+        <polyline points="{{ summary.timeline_chart.negative_points }}" fill="none" stroke="#FF6B5E" stroke-width="2.5"></polyline>
+        <polyline points="{{ summary.timeline_chart.positive_points }}" fill="none" stroke="#2FD4C4" stroke-width="2"></polyline>
+        <polyline points="{{ summary.timeline_chart.neutral_points }}" fill="none" stroke="#41597A" stroke-width="2" stroke-dasharray="4 4"></polyline>
+      </svg>
+    </div>
+    <div class="wr-grid-2">
+      <div class="wr-card">
+        <div class="wr-card-title">Akun Penyebar Teratas</div>
+        {% for account in summary.top_spreaders %}
+          <div class="wr-spreader-row">
+            <span class="mono-light">{{ account.handle }}</span>
+            <span class="mono-light">{{ account.reach }}</span>
+            <span class="mono-light">{{ account.post_count }}</span>
+            <span class="wr-cluster-tag">{{ account.cluster.cluster_code }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="wr-card">
+        <div class="wr-card-title">Titik Panas Geografis</div>
+        {% for hotspot in summary.hotspots %}
+          <div class="wr-hotspot-row">
+            <span>{{ hotspot.name }}</span>
+            <div class="wr-progress"><div class="wr-progress-fill" style="width: {{ hotspot.pct }}%"></div></div>
+            <span class="mono-light">{{ hotspot.count }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

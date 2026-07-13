@@ -17,7 +17,12 @@ def ringkasan(request):
 
 
 def war_room(request):
-    return HttpResponse("War Room — coming soon")
+    from apps.analytics.models import PoliticalIssue
+
+    project = get_active_project(request)
+    issue = PoliticalIssue.objects.filter(status=PoliticalIssue.STATUS_ACTIVE).first() if project else None
+    summary = selectors.war_room_summary(issue) if issue else None
+    return render(request, "analytics/war_room.html", {"active_nav": "war_room", "summary": summary})
 
 
 def narasi(request):

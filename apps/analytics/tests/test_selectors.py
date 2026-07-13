@@ -43,3 +43,23 @@ class RingkasanSummaryTest(TestCase):
         )
         summary = selectors.ringkasan_summary(self.project)
         self.assertEqual(summary["total_mentions"], 0)
+
+
+from apps.analytics.models import PoliticalIssue
+from apps.coordination.seed import seed_coordination
+from apps.core.seed import seed_core
+from apps.analytics.seed import seed_analytics
+
+
+class WarRoomSummaryTest(TestCase):
+    def test_war_room_summary_shape(self):
+        tenant, project = seed_core()
+        seed_analytics(project, mention_count=100)
+        seed_coordination()
+        issue = PoliticalIssue.objects.get(title="Distribusi Pangan Wilayah Timur")
+
+        summary = selectors.war_room_summary(issue)
+        self.assertEqual(summary["issue"], issue)
+        self.assertGreaterEqual(summary["coordinated_cluster_count"], 0)
+        self.assertIn("negative_points", summary["timeline_chart"])
+        self.assertIsInstance(summary["hotspots"], list)
