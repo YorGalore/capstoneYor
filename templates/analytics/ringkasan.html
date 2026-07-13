@@ -1,0 +1,95 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Ringkasan{% endblock %}
+{% block topbar_actions %}
+  <div class="pantau-topbar-filter">Semua Platform ▾</div>
+  <div class="pantau-topbar-filter mono">30 hari terakhir</div>
+  <div class="pantau-btn-primary">Ekspor</div>
+{% endblock %}
+{% block content %}
+<div class="pantau-kpi-row">
+  <div class="pantau-card">
+    <div class="pantau-kpi-label">Total Sebutan</div>
+    <div class="pantau-kpi-value">{{ summary.total_mentions }}</div>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-kpi-label">Total Interaksi</div>
+    <div class="pantau-kpi-value">{{ summary.total_interactions }}</div>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-kpi-label">Penulis Unik</div>
+    <div class="pantau-kpi-value">{{ summary.unique_authors }}</div>
+  </div>
+  <div class="pantau-card pantau-card-dark">
+    <div class="pantau-health-gauge" style="--pct: {{ summary.health_index }}"><span>{{ summary.health_index }}</span></div>
+    <div>
+      <div class="pantau-kpi-label light">Indeks Kesehatan Digital</div>
+      <div class="pantau-health-status">Sentimen {{ summary.positive_pct }}% positif</div>
+    </div>
+  </div>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Komposisi Sentimen</div>
+    <div>
+      {% for item in summary.sentiment_breakdown %}
+        <span class="pantau-legend-item pantau-dot-{{ item.key }}">{{ item.label }} {{ item.count }} ({{ item.pct }}%)</span>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="pantau-sentiment-bar">
+    {% for item in summary.sentiment_breakdown %}
+      <div class="pantau-bg-{{ item.key }}" style="width: {{ item.pct }}%"></div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="pantau-grid-2-1">
+  <div class="pantau-card">
+    <div class="pantau-card-title">Linimasa Sebutan</div>
+    <svg width="100%" height="{{ summary.timeline_chart.height }}" viewBox="0 0 {{ summary.timeline_chart.width }} {{ summary.timeline_chart.height }}" preserveAspectRatio="none">
+      <polyline points="{{ summary.timeline_chart.positive_points }}" fill="none" stroke="#178A5C" stroke-width="2.5"></polyline>
+      <polyline points="{{ summary.timeline_chart.neutral_points }}" fill="none" stroke="#AEBBC7" stroke-width="2" stroke-dasharray="5 4"></polyline>
+      <polyline points="{{ summary.timeline_chart.negative_points }}" fill="none" stroke="#C6483F" stroke-width="2.5"></polyline>
+    </svg>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Sumber Sebutan</div>
+    {% for source in summary.source_breakdown %}
+      <div class="pantau-source-row">
+        <span>{{ source.name }}</span>
+        <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ source.pct }}%"></div></div>
+        <span class="mono">{{ source.count }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="pantau-grid-2">
+  <div class="pantau-card">
+    <div class="pantau-card-title">Emosi Dominan — Roda Plutchik</div>
+    {% for item in summary.emotion_breakdown %}
+      <div class="pantau-source-row">
+        <span>{{ item.label }}</span>
+        <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ item.pct }}%"></div></div>
+        <span class="mono">{{ item.pct }}%</span>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-header">
+      <div class="pantau-card-title">Peringatan Terbaru</div>
+      <span class="pantau-badge pantau-badge-negative">{{ alerts|length }} terbaru</span>
+    </div>
+    {% for alert in alerts %}
+      <div class="pantau-alert-row pantau-alert-{{ alert.severity }}">
+        <div>
+          <div class="pantau-alert-title">{{ alert.title }}</div>
+          <div class="pantau-alert-detail">{{ alert.detail }}</div>
+        </div>
+        <span class="mono">{{ alert.triggered_at|date:"H:i" }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
