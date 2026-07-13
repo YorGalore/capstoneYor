@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.utils import timezone
 
 from .models import (
     ApifyCredential, AuditLogEntry, MonitoredDomain, PlatformIntegration,
@@ -23,7 +24,9 @@ def pengawasan(request):
 
     permissions = PoliticalMonitoringPermission.objects.filter(active=True).select_related("user")
     total_users = AnalystProfile.objects.count()
-    political_query_count = AuditLogEntry.objects.filter(action__icontains="kueri").count()
+    political_query_count = AuditLogEntry.objects.filter(
+        action__icontains="kueri", timestamp__gte=timezone.now() - timezone.timedelta(days=30)
+    ).count()
     excluded_profile_count = AuditLogEntry.objects.filter(action__icontains="dikecualikan").count()
     audit_entries = AuditLogEntry.objects.all()[:20]
     policy_ack = PolicyAcknowledgment.objects.order_by("-approved_at").first()
