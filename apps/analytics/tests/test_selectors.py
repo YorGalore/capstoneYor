@@ -63,3 +63,17 @@ class WarRoomSummaryTest(TestCase):
         self.assertGreaterEqual(summary["coordinated_cluster_count"], 0)
         self.assertIn("negative_points", summary["timeline_chart"])
         self.assertIsInstance(summary["hotspots"], list)
+
+
+class NarasiSummaryTest(TestCase):
+    def test_narasi_summary_splits_by_coalition(self):
+        tenant, project = seed_core()
+        seed_analytics(project, mention_count=100)
+        issue = PoliticalIssue.objects.get(title="Distribusi Pangan Wilayah Timur")
+
+        summary = selectors.narasi_summary(issue)
+        self.assertEqual(summary["issue"], issue)
+        self.assertEqual(len(summary["coalitions"]), 2)
+        total_share = sum(c["share_pct"] for c in summary["coalitions"])
+        self.assertGreater(total_share, 0)
+        self.assertIn("series", summary["overlay_chart"])

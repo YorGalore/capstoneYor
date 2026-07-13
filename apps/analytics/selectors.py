@@ -3,7 +3,7 @@ from collections import OrderedDict
 from django.db.models import Count, Sum
 from django.utils import timezone
 
-from .models import Alert, Mention
+from .models import Alert, Coalition, Mention
 
 SENTIMENT_LABELS = OrderedDict([
     (Mention.SENTIMENT_POSITIVE, "Positif"),
@@ -175,3 +175,67 @@ def _geo_hotspots(issue, limit=6):
         {"name": row["province__name"], "count": row["n"], "pct": round((row["n"] / max_count) * 100)}
         for row in rows
     ]
+
+
+def narasi_summary(issue):
+    coalitions = Coalition.objects.all()
+    total_political = Mention.objects.filter(issue=issue, is_political=True).count()
+    total_attributed = Mention.objects.filter(issue=issue, coalition__isnull=False).count()
+    unattributed_pct = (
+        round(((total_political - total_attributed) / total_political) * 100)
+        if total_political else 0
+    )
+
+    coalition_data = []
+    for coalition in coalitions:
+        qs = Mention.objects.filter(issue=issue, coalition=coalition)
+        count = qs.count()
+        share_pct = round((count / total_attributed) * 100) if total_attributed else 0
+        sentiment_counts = {row["sentiment"]: row["n"] for row in qs.values("sentiment").annotate(n=Count("id"))}
+        sentiment_breakdown = []
+        for key, label in SENTIMENT_LABELS.items():
+            c = sentiment_counts.get(key, 0)
+            pct = round((c / count) * 100) if count else 0
+            sentiment_breakdown.append({"key": key, "label": label, "pct": pct})
+        coalition_data.append({
+            "coalition": coalition,
+            "count": count,
+            "share_pct": share_pct,
+            "sentiment_breakdown": sentiment_breakdown,
+            "trend_chart": _coalition_trend(qs),
+        })
+
+    return {
+        "issue": issue,
+        "total_attributed": total_attributed,
+        "unattributed_pct": unattributed_pct,
+        "coalitions": coalition_data,
+        "overlay_chart": _overlay_trend(coalitions, issue),
+    }
+
+
+def _coalition_trend(qs, days=30, width=560, height=90):
+    since = timezone.now() - timezone.timedelta(days=days)
+    daily = [0] * days
+    for mention in qs.filter(posted_at__gte=since).only("posted_at"):
+        offset = (mention.posted_at - since).days
+        if 0 <= offset < days:
+            daily[offset] += 1
+    max_value = max(daily) or 1
+    return {"points": _scale_points(daily, width, height, max_value), "width": width, "height": height}
+
+
+def _overlay_trend(coalitions, issue, days=30, width=1160, height=150):
+    since = timezone.now() - timezone.timedelta(days=days)
+    series = {}
+    for coalition in coalitions:
+        daily = [0] * days
+        for mention in Mention.objects.filter(
+            issue=issue, coalition=coalition, posted_at__gte=since
+        ).only("posted_at"):
+            offset = (mention.posted_at - since).days
+            if 0 <= offset < days:
+                daily[offset] += 1
+        max_value = max(daily) or 1
+        series[coalition.slug] = _scale_points(daily, width, height, max_value)
+    return {"series": series, "width": width, "height": height}

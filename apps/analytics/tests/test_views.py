@@ -25,3 +25,13 @@ class WarRoomViewTest(TestCase):
         response = self.client.get("/war-room/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "WAR ROOM NARASI")
+
+
+class NarasiViewTest(TestCase):
+    def test_narasi_renders_both_coalitions(self):
+        tenant, project = seed_core()
+        seed_analytics(project, mention_count=100)
+        response = self.client.get("/narasi/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Koalisi Nusantara Raya")
+        self.assertContains(response, "Koalisi Perubahan Bersatu")

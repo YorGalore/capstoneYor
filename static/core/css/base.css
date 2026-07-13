@@ -164,3 +164,9 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-topbar-filter { padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font: 500 11.5px 'IBM Plex Sans', sans-serif; color: #334155; }
 .pantau-topbar-filter.mono { font-family: 'IBM Plex Mono', monospace; }
 .pantau-btn-primary { padding: 7px 14px; border-radius: 8px; background: var(--teal); font: 600 11.5px 'IBM Plex Sans', sans-serif; color: #fff; cursor: pointer; }
+
+.mono-muted { font: 400 11px 'IBM Plex Sans', sans-serif; color: var(--text-faint); }
+.narasi-sov-row { display: flex; justify-content: space-around; align-items: baseline; padding: 8px 0; }
+.narasi-sov-name { font: 600 13px 'IBM Plex Sans', sans-serif; }
+.narasi-sov-pct { font: 600 34px Archivo, sans-serif; margin-top: 4px; }
+.narasi-coalition-card { display: flex; flex-direction: column; gap: 12px; }

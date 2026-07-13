@@ -1,0 +1,49 @@
+{% extends "core/base_dashboard.html" %}
+{% load analytics_extras %}
+{% block title %}Perbandingan Narasi{% endblock %}
+{% block content %}
+<div class="pantau-neutrality-notice">⚖ Modul pemantauan politik — akses memerlukan izin khusus dengan persetujuan Petugas Pengawas (FR-29.1). Tampilan simetris; tidak ada penilaian atas kebenaran narasi. Kueri ini tercatat di log audit.</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Pangsa Suara (SoV) pada isu ini</div>
+    <div class="mono-muted">total {{ summary.total_attributed }} sebutan teratribusi · {{ summary.unattributed_pct }}% tidak teratribusi ke kubu manapun</div>
+  </div>
+  <div class="narasi-sov-row">
+    {% for item in summary.coalitions %}
+      <div class="narasi-sov-side" style="color: {{ item.coalition.color }}">
+        <div class="narasi-sov-name">{{ item.coalition.name }}</div>
+        <div class="narasi-sov-pct">{{ item.share_pct }}%</div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="pantau-grid-2">
+  {% for item in summary.coalitions %}
+    <div class="pantau-card narasi-coalition-card" style="border-top: 3px solid {{ item.coalition.color }}">
+      <div class="pantau-card-header">
+        <div class="pantau-card-title">{{ item.coalition.name }}</div>
+        <span class="mono-muted">{{ item.count }} sebutan</span>
+      </div>
+      <div class="pantau-sentiment-bar">
+        {% for s in item.sentiment_breakdown %}
+          <div class="pantau-bg-{{ s.key }}" style="width: {{ s.pct }}%"></div>
+        {% endfor %}
+      </div>
+      <svg width="100%" height="{{ item.trend_chart.height }}" viewBox="0 0 {{ item.trend_chart.width }} {{ item.trend_chart.height }}" preserveAspectRatio="none">
+        <polyline points="{{ item.trend_chart.points }}" fill="none" stroke="{{ item.coalition.color }}" stroke-width="2.5"></polyline>
+      </svg>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-title">SoV Harian — kedua kubu pada skala yang sama</div>
+  <svg width="100%" height="{{ summary.overlay_chart.height }}" viewBox="0 0 {{ summary.overlay_chart.width }} {{ summary.overlay_chart.height }}" preserveAspectRatio="none">
+    {% for item in summary.coalitions %}
+      <polyline points="{{ summary.overlay_chart.series|get_item:item.coalition.slug }}" fill="none" stroke="{{ item.coalition.color }}" stroke-width="2.5"></polyline>
+    {% endfor %}
+  </svg>
+</div>
+{% endblock %}

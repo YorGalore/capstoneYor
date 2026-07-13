@@ -26,7 +26,12 @@ def war_room(request):
 
 
 def narasi(request):
-    return HttpResponse("Perbandingan Narasi — coming soon")
+    from apps.analytics.models import PoliticalIssue
+
+    project = get_active_project(request)
+    issue = PoliticalIssue.objects.filter(status=PoliticalIssue.STATUS_ACTIVE).first() if project else None
+    summary = selectors.narasi_summary(issue) if issue else None
+    return render(request, "analytics/narasi.html", {"active_nav": "narasi", "summary": summary})
 
 
 def regional(request):
