@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 from django.shortcuts import render
 
 from apps.core.selectors import get_active_project
@@ -16,15 +17,12 @@ def ringkasan(request):
 
 
 def war_room(request):
-    from django.http import HttpResponse
     return HttpResponse("War Room — coming soon")
 
 
 def narasi(request):
-    from django.http import HttpResponse
     return HttpResponse("Perbandingan Narasi — coming soon")
 
 
 def regional(request):
-    from django.http import HttpResponse
     return HttpResponse("Regional — coming soon")
