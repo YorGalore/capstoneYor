@@ -55,13 +55,14 @@ def seed_analytics(project, mention_count=4000):
     rng = random.Random(RNG_SEED)
     platforms = {p.slug: p for p in Platform.objects.all()}
     provinces = list(Province.objects.all())
+    province_weights = [(p, p.population_online) for p in provinces]
     now = timezone.now()
 
     mentions = []
     for _ in range(mention_count):
         platform_slug = _weighted_choice(rng, list(PLATFORM_WEIGHTS.items()))
         sentiment = _weighted_choice(rng, SENTIMENT_WEIGHTS)
-        province = rng.choice(provinces)
+        province = _weighted_choice(rng, province_weights)
         regency = rng.choice(list(province.regencies.all())) if province.regencies.exists() else None
         posted_at = now - timedelta(days=rng.uniform(0, 30), hours=rng.uniform(0, 24))
         mentions.append(Mention(
@@ -111,6 +112,7 @@ def _seed_political_issue(project, rng, now):
 
     platforms = {p.slug: p for p in Platform.objects.all()}
     provinces = list(Province.objects.all())
+    province_weights = [(p, p.population_online) for p in provinces]
     political_mentions = []
     coalition_sentiment_weights = (
         (coalition_a, [
@@ -130,7 +132,7 @@ def _seed_political_issue(project, rng, now):
             political_mentions.append(Mention(
                 project=project,
                 platform=platforms[_weighted_choice(rng, list(PLATFORM_WEIGHTS.items()))],
-                province=rng.choice(provinces),
+                province=_weighted_choice(rng, province_weights),
                 author_handle=rng.choice(SAMPLE_HANDLES),
                 content_snippet=rng.choice(SNIPPET_TEMPLATES),
                 sentiment=sentiment,
