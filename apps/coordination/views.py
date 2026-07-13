@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.governance.services import record_audit_entry
 
@@ -21,6 +22,7 @@ def koordinasi(request):
     })
 
 
+@require_POST
 @transaction.atomic
 def escalate_cluster(request, cluster_code):
     cluster = get_object_or_404(CoordinationCluster, cluster_code=cluster_code)
@@ -34,6 +36,7 @@ def escalate_cluster(request, cluster_code):
     return redirect(f"/koordinasi/?cluster={cluster_code}")
 
 
+@require_POST
 @transaction.atomic
 def mark_cluster_organic(request, cluster_code):
     cluster = get_object_or_404(CoordinationCluster, cluster_code=cluster_code)

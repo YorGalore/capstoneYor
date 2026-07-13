@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 
 from apps.core.seed import seed_core
@@ -32,3 +34,33 @@ class CoordinationViewsTest(TestCase):
         self.assertTrue(
             AuditLogEntry.objects.filter(action__icontains="tinjauan analis senior").exists()
         )
+
+    def test_escalate_cluster_rejects_get(self):
+        audit_count_before = AuditLogEntry.objects.count()
+        response = self.client.get("/koordinasi/Klaster-07/eskalasi/")
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(AuditLogEntry.objects.count(), audit_count_before)
+
+    def test_mark_cluster_organic_rejects_get(self):
+        audit_count_before = AuditLogEntry.objects.count()
+        response = self.client.get("/koordinasi/Klaster-07/tandai-organik/")
+        self.assertEqual(response.status_code, 405)
+        cluster = CoordinationCluster.objects.get(cluster_code="Klaster-07")
+        self.assertEqual(cluster.status, CoordinationCluster.STATUS_FLAGGED)
+        self.assertEqual(AuditLogEntry.objects.count(), audit_count_before)
+
+    def test_mark_cluster_organic_rolls_back_on_audit_failure(self):
+        cluster_before = CoordinationCluster.objects.get(cluster_code="Klaster-07")
+        self.assertEqual(cluster_before.status, CoordinationCluster.STATUS_FLAGGED)
+        audit_count_before = AuditLogEntry.objects.count()
+
+        with patch(
+            "apps.coordination.views.record_audit_entry",
+            side_effect=Exception("boom"),
+        ):
+            with self.assertRaises(Exception):
+                self.client.post("/koordinasi/Klaster-07/tandai-organik/")
+
+        cluster_after = CoordinationCluster.objects.get(cluster_code="Klaster-07")
+        self.assertEqual(cluster_after.status, CoordinationCluster.STATUS_FLAGGED)
+        self.assertEqual(AuditLogEntry.objects.count(), audit_count_before)
