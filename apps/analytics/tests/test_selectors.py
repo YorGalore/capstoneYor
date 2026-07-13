@@ -94,3 +94,21 @@ class NarasiSummaryTest(TestCase):
             # not all identical percentages -- weighted pool should show variation
             pcts = [entry["pct"] for entry in themes]
             self.assertGreater(len(set(pcts)), 1)
+
+
+class RegionalSummaryTest(TestCase):
+    def test_regional_summary_ranks_and_drills_down(self):
+        tenant, project = seed_core()
+        seed_analytics(project, mention_count=300)
+
+        summary = selectors.regional_summary(project)
+        self.assertLessEqual(len(summary["province_rows"]), 10)
+        self.assertIsNotNone(summary["selected"])
+        self.assertIn("regencies", summary["selected"])
+
+    def test_regional_summary_respects_selected_province(self):
+        tenant, project = seed_core()
+        seed_analytics(project, mention_count=300)
+
+        summary = selectors.regional_summary(project, selected_province="Maluku")
+        self.assertEqual(summary["selected"]["name"], "Maluku")

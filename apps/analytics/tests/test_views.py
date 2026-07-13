@@ -38,3 +38,16 @@ class NarasiViewTest(TestCase):
         self.assertContains(response, "Tema dominan (klaster topik)")
         self.assertContains(response, "capaian distribusi tahap 2")
         self.assertContains(response, "keterlambatan wilayah timur")
+
+
+class RegionalViewTest(TestCase):
+    def test_regional_view_renders_and_drill_down(self):
+        tenant, project = seed_core()
+        seed_analytics(project, mention_count=300)
+        response = self.client.get("/regional/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Distribusi Narasi Regional")
+
+        province_name = response.context["summary"]["province_rows"][0]["name"]
+        drill_response = self.client.get(f"/regional/?provinsi={province_name}")
+        self.assertEqual(drill_response.context["summary"]["selected"]["name"], province_name)

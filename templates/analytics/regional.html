@@ -1,0 +1,41 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Regional{% endblock %}
+{% block content %}
+<div class="pantau-page-title">Distribusi Narasi Regional</div>
+<div class="pantau-grid-regional">
+  <div class="pantau-card">
+    <div class="pantau-card-title">10 Provinsi Teratas — volume &amp; komposisi sentimen</div>
+    {% for row in summary.province_rows %}
+      <a class="pantau-region-row{% if row.flagged %} pantau-region-flagged{% endif %}" href="?provinsi={{ row.name|urlencode }}">
+        <span>{{ row.name }}{% if row.flagged %} ⚠{% endif %}</span>
+        <div class="pantau-sentiment-bar">
+          <div class="pantau-bg-positive" style="width: {{ row.positive_pct }}%"></div>
+          <div class="pantau-bg-neutral" style="width: {{ row.neutral_pct }}%"></div>
+          <div class="pantau-bg-negative" style="width: {{ row.negative_pct }}%"></div>
+        </div>
+        <span class="mono">{{ row.count }}</span>
+      </a>
+    {% endfor %}
+  </div>
+  <div class="pantau-card pantau-card-dark pantau-region-selected">
+    <div>
+      <div class="pantau-kpi-label light">Provinsi terpilih</div>
+      <div class="pantau-region-name">{{ summary.selected.name }}</div>
+    </div>
+    <span class="pantau-badge pantau-badge-negative">{{ summary.selected.negative_pct }}% negatif</span>
+    <div class="pantau-region-kpis">
+      <div><div class="pantau-kpi-value light">{{ summary.selected.count }}</div><div class="pantau-kpi-label light">sebutan</div></div>
+    </div>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Kabupaten/Kota — {{ summary.selected.name }}</div>
+    {% for regency in summary.selected.regencies %}
+      <div class="pantau-source-row">
+        <span>{{ regency.name }}</span>
+        <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ regency.pct }}%"></div></div>
+        <span class="mono">{{ regency.count }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

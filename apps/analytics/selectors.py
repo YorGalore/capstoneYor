@@ -1,7 +1,9 @@
 from collections import OrderedDict
 
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
+
+from apps.core.models import Province
 
 from .models import Alert, Coalition, Mention
 
@@ -253,3 +255,52 @@ def _overlay_trend(coalitions, issue, days=30, width=1160, height=150):
         max_value = max(daily) or 1
         series[coalition.slug] = _scale_points(daily, width, height, max_value)
     return {"series": series, "width": width, "height": height}
+
+
+def regional_summary(project, selected_province=None):
+    rows = (
+        Mention.objects.filter(project=project, is_political=False, province__isnull=False)
+        .values("province__name")
+        .annotate(
+            n=Count("id"),
+            positive=Count("id", filter=Q(sentiment=Mention.SENTIMENT_POSITIVE)),
+            neutral=Count("id", filter=Q(sentiment=Mention.SENTIMENT_NEUTRAL)),
+            negative=Count("id", filter=Q(sentiment=Mention.SENTIMENT_NEGATIVE)),
+        )
+        .order_by("-n")
+    )
+    province_rows = []
+    for row in rows:
+        total = row["n"] or 1
+        negative_pct = round((row["negative"] / total) * 100)
+        province_rows.append({
+            "name": row["province__name"],
+            "count": row["n"],
+            "positive_pct": round((row["positive"] / total) * 100),
+            "neutral_pct": round((row["neutral"] / total) * 100),
+            "negative_pct": negative_pct,
+            "flagged": negative_pct > 50,
+        })
+
+    selected = None
+    if province_rows:
+        target_name = selected_province or max(province_rows, key=lambda r: r["negative_pct"])["name"]
+        selected_row = next((r for r in province_rows if r["name"] == target_name), province_rows[0])
+        province = Province.objects.filter(name=selected_row["name"]).first()
+        regency_rows = (
+            Mention.objects.filter(project=project, province=province, regency__isnull=False)
+            .values("regency__name")
+            .annotate(n=Count("id"))
+            .order_by("-n")[:6]
+        )
+        regency_rows = list(regency_rows)
+        max_regency = regency_rows[0]["n"] if regency_rows else 1
+        selected = {
+            **selected_row,
+            "regencies": [
+                {"name": r["regency__name"], "count": r["n"], "pct": round((r["n"] / max_regency) * 100)}
+                for r in regency_rows
+            ],
+        }
+
+    return {"province_rows": province_rows[:10], "selected": selected}

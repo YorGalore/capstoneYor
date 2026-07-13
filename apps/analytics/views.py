@@ -1,4 +1,3 @@
-from django.http import HttpResponse
 from django.shortcuts import render
 
 from apps.core.selectors import get_active_project
@@ -35,4 +34,7 @@ def narasi(request):
 
 
 def regional(request):
-    return HttpResponse("Regional — coming soon")
+    project = get_active_project(request)
+    selected_province = request.GET.get("provinsi") or None
+    summary = selectors.regional_summary(project, selected_province) if project else None
+    return render(request, "analytics/regional.html", {"active_nav": "regional", "summary": summary})
