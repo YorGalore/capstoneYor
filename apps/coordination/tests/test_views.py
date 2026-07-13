@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import Client, TestCase
 
 from apps.core.seed import seed_core
 from apps.analytics.seed import seed_analytics
@@ -63,4 +63,15 @@ class CoordinationViewsTest(TestCase):
 
         cluster_after = CoordinationCluster.objects.get(cluster_code="Klaster-07")
         self.assertEqual(cluster_after.status, CoordinationCluster.STATUS_FLAGGED)
+        self.assertEqual(AuditLogEntry.objects.count(), audit_count_before)
+
+    def test_escalate_cluster_rejects_post_without_csrf_token(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        audit_count_before = AuditLogEntry.objects.count()
+
+        response = csrf_client.post("/koordinasi/Klaster-07/eskalasi/")
+
+        self.assertEqual(response.status_code, 403)
+        cluster = CoordinationCluster.objects.get(cluster_code="Klaster-07")
+        self.assertEqual(cluster.status, CoordinationCluster.STATUS_FLAGGED)
         self.assertEqual(AuditLogEntry.objects.count(), audit_count_before)
