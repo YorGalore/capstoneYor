@@ -1,0 +1,53 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Konsol Konfigurasi{% endblock %}
+{% block content %}
+<div class="pantau-card">
+  <div class="pantau-card-title">Platform Terpantau</div>
+  {% for integration in integrations %}
+    <div class="pantau-source-row">
+      <span>{{ integration.platform.display_name }}</span>
+      <span class="mono-muted">{{ integration.actor_id }}{% if integration.status_note %} ⚠ {{ integration.status_note }}{% endif %}</span>
+      <span class="{% if integration.is_active %}pantau-status-active{% else %}pantau-status-inactive{% endif %}">
+        {% if integration.is_active %}● Aktif{% else %}● Nonaktif{% endif %}
+      </span>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="pantau-grid-2">
+  <div class="pantau-card">
+    <div class="pantau-card-title">Kredensial Apify</div>
+    <div class="mono-muted">TOKEN API (TINGKAT TENANT)</div>
+    <div class="pantau-credential-box">{{ credential.masked_token }}</div>
+    <div class="pantau-credential-status">✓ Terverifikasi {{ credential.last_verified_at|timesince }} lalu</div>
+    <div class="pantau-hint">Nilai penuh disimpan terenkripsi di secrets manager; tidak pernah dikirim utuh ke browser (FR-2A.3).</div>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Pemilihan Aktor per Platform</div>
+    {% for integration in integrations %}
+      {% if integration.method == 'apify' %}
+        <div class="pantau-source-row">
+          <span>{{ integration.platform.display_name }}</span>
+          <span class="mono">{{ integration.actor_id }} ▾</span>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Situs &amp; Domain Pantauan</div>
+    <div class="pantau-btn-dark">+ Tambah domain</div>
+  </div>
+  {% for domain in domains %}
+    <div class="pantau-domain-row">
+      <span class="mono-strong">{{ domain.domain }}</span>
+      <span class="mono-muted">{{ domain.adapter }}</span>
+      <span>{{ domain.get_status_display }}</span>
+      <span class="mono-muted">{% if domain.last_tested_at %}{{ domain.last_tested_at|timesince }} lalu{% else %}—{% endif %}</span>
+    </div>
+  {% endfor %}
+</div>
+<div class="pantau-hint pantau-hint-highlight">Setiap perubahan pada konsol ini tercatat ke log audit — siapa, kapan, nilai sebelum/sesudah (FR-2A.7).</div>
+{% endblock %}

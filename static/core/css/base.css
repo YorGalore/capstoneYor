@@ -230,3 +230,11 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-cluster-actions { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #EEF2F5; }
 .pantau-btn-dark { padding: 8px 16px; border-radius: 8px; background: var(--navy); border: none; font: 600 12px 'IBM Plex Sans', sans-serif; color: #fff; cursor: pointer; }
 .pantau-btn-outline { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: #fff; font: 600 12px 'IBM Plex Sans', sans-serif; color: #334155; cursor: pointer; }
+
+.pantau-status-active { color: var(--positive); font: 500 11px 'IBM Plex Sans', sans-serif; }
+.pantau-status-inactive { color: var(--text-faint); font: 500 11px 'IBM Plex Sans', sans-serif; }
+.pantau-credential-box { padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: #F8FAFB; font: 500 12.5px 'IBM Plex Mono', monospace; color: #334155; margin: 6px 0; }
+.pantau-credential-status { font: 600 11.5px 'IBM Plex Sans', sans-serif; color: var(--positive); margin-bottom: 10px; }
+.pantau-hint { padding: 10px 12px; border-radius: 8px; background: #F8FAFB; border: 1px solid #EEF2F5; font: 400 10.5px 'IBM Plex Sans', sans-serif; color: var(--text-faint); }
+.pantau-hint-highlight { background: #EAF4F5; border-color: #D3E8EA; color: var(--teal); }
+.pantau-domain-row { display: grid; grid-template-columns: 1.6fr 1fr 110px 110px; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #F5F7F8; font: 500 12px 'IBM Plex Sans', sans-serif; }
