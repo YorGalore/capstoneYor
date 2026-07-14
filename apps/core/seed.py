@@ -70,8 +70,9 @@ def seed_core():
             # Structured role governs page access (FR-1A). The single demo user is
             # a Platform Super Admin so every screen — including the reserved
             # Dev/Ops runtime settings — is reachable in the demo.
+            # Political-monitoring access is NOT granted here: it is a separate,
+            # compliance-approved grant recorded in governance (FR-29.1).
             "role": AnalystProfile.ROLE_SUPER_ADMIN,
-            "has_political_monitoring_permission": True,
         },
     )
     seed_permission_matrix()

@@ -28,11 +28,26 @@ class NavigationSmokeTest(TestCase):
         self.assertRedirects(response, "/ringkasan/", fetch_redirect_response=False)
 
     def test_all_screen_routes_resolve(self):
+        from django.utils import timezone
+
+        from apps.governance.models import PoliticalMonitoringPermission
+
         seed_core()
-        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
+        demo_user = get_user_model().objects.get(username=DEMO_USERNAME)
+        # /narasi/ is a political-monitoring view: it requires the separate,
+        # compliance-approved grant (FR-29.1), not merely an admin role.
+        PoliticalMonitoringPermission.objects.create(
+            user=demo_user, approved_by="Kepatuhan", approved_at=timezone.now(), active=True
+        )
+        self.client.force_login(demo_user)
         for path in [
             "/ringkasan/", "/war-room/", "/narasi/", "/regional/",
             "/koordinasi/", "/konfigurasi/", "/pengawasan/",
         ]:
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200, path)
+
+    def test_narasi_denied_without_political_monitoring_permission(self):
+        seed_core()
+        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
+        self.assertEqual(self.client.get("/narasi/").status_code, 403)

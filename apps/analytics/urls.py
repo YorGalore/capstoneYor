@@ -9,6 +9,7 @@ urlpatterns = [
     path("umpan/", views.feed, name="feed"),
     path("umpan/<int:mention_id>/koreksi-sentimen/", views.correct_sentiment, name="correct_sentiment"),
     path("war-room/", views.war_room, name="war_room"),
+    path("war-room/<int:issue_id>/aksi/", views.log_response, name="log_response"),
     path("narasi/", views.narasi, name="narasi"),
     path("regional/", views.regional, name="regional"),
     path("ekspor/mention/", views.export_mentions, name="export_mentions"),

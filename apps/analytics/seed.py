@@ -6,7 +6,8 @@ from django.utils import timezone
 from apps.core.models import Platform, Province
 
 from .models import (
-    Alert, AlertRule, Category, Coalition, Issue, Mention, PoliticalIssue, SubCategory,
+    Alert, AlertRule, Camp, Category, Coalition, GovernmentProgram, Issue, Mention,
+    PoliticalActor, PoliticalIssue, SubCategory,
 )
 
 RNG_SEED = 20260710
@@ -103,8 +104,56 @@ def seed_taxonomy():
                 )
 
 
+CAMPS = [
+    ("Koalisi Nusantara Raya", "#1F6FB2"),
+    ("Koalisi Perubahan Bersatu", "#B2601F"),
+]
+
+# Camps and actors are configuration, never hard-coded political judgments
+# (FR-24.3). The seed provides a neutral, symmetric starting set for the demo.
+ACTORS = [
+    ("Partai Nusantara", PoliticalActor.TYPE_PARTY, "Koalisi Nusantara Raya",
+     ["partai nusantara", "nusantara raya"], ["@partainusantara"]),
+    ("Partai Perubahan", PoliticalActor.TYPE_PARTY, "Koalisi Perubahan Bersatu",
+     ["partai perubahan", "perubahan bersatu"], ["@partaiperubahan"]),
+]
+
+PROGRAMS = [
+    ("Program Pangan Rakyat", "Kemenko PMK", ["pangan rakyat", "distribusi pangan", "bansos pangan"]),
+    ("Subsidi Energi Tepat Sasaran", "Kementerian ESDM", ["subsidi energi", "subsidi bbm"]),
+]
+
+
+def seed_political_entities(project):
+    """Seed user-defined camps, public political actors, and tracked programs
+    (FR-24, FR-27). Only public/organizational actors — never private individuals
+    (FR-29.3)."""
+    camps = {}
+    for name, color in CAMPS:
+        camp, _ = Camp.objects.get_or_create(
+            project=project, name=name, defaults={"color": color}
+        )
+        camps[name] = camp
+
+    for name, actor_type, camp_name, keywords, handles in ACTORS:
+        PoliticalActor.objects.get_or_create(
+            project=project, name=name,
+            defaults={
+                "actor_type": actor_type, "camp": camps.get(camp_name),
+                "keywords": keywords, "handles": handles,
+            },
+        )
+
+    for name, agency, keywords in PROGRAMS:
+        GovernmentProgram.objects.get_or_create(
+            project=project, name=name,
+            defaults={"agency": agency, "keywords": keywords},
+        )
+
+
 def seed_analytics(project, mention_count=4000):
     seed_taxonomy()
+    seed_political_entities(project)
     if Mention.objects.filter(project=project).exists():
         return
 

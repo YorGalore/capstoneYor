@@ -15,7 +15,9 @@ class SeedCoreTest(TestCase):
         self.assertTrue(Regency.objects.filter(province__name="Maluku").exists())
         demo_user = get_user_model().objects.get(username="dewi.anjani")
         profile = AnalystProfile.objects.get(user=demo_user)
-        self.assertTrue(profile.has_political_monitoring_permission)
+        # Political monitoring is a separate, compliance-approved grant recorded in
+        # governance (FR-29.1) — seeding core alone must not confer it.
+        self.assertFalse(profile.has_political_monitoring_permission)
 
     def test_seed_core_is_idempotent(self):
         seed_core()

@@ -71,5 +71,32 @@
       </div>
     </div>
   </div>
+
+  {% if issue %}
+  <div class="wr-panel wr-response-log">
+    <div class="wr-panel-title">Log Aksi Respons</div>
+    <div class="wr-hint">Catatan auditabel atas respons institusi terhadap peristiwa narasi ini (FR-28.2).</div>
+    <form method="post" action="{% url 'analytics:log_response' issue.pk %}" class="wr-response-form">
+      {% csrf_token %}
+      <select name="action_type">
+        {% for key, label in action_choices %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+      </select>
+      <input type="text" name="description" placeholder="mis. Klarifikasi resmi diterbitkan pukul 14:32" required>
+      <button type="submit">Catat aksi</button>
+    </form>
+    <div class="wr-response-list">
+      {% for action in response_actions %}
+      <div class="wr-response-row">
+        <span class="mono-light">{{ action.occurred_at|date:"d M H:i" }}</span>
+        <strong>{{ action.get_action_type_display }}</strong>
+        <span>{{ action.description }}</span>
+        <span class="mono-light">— {{ action.logged_by }}</span>
+      </div>
+      {% empty %}
+      <div class="wr-response-row">Belum ada aksi respons yang dicatat.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

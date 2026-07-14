@@ -86,7 +86,20 @@ class AnalystProfile(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="analysts")
     role_label = models.CharField(max_length=100, default="Analis Humas")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_ANALYST)
-    has_political_monitoring_permission = models.BooleanField(default=False)
+
+    @property
+    def has_political_monitoring_permission(self):
+        """Derived from the governance permission record — never stored separately.
+
+        A stored duplicate could drift out of sync with the grant that is actually
+        enforced (FR-29.1) and revoked (FR-29.4), which would let this profile
+        display "allowed" while access is in fact denied.
+        """
+        from apps.governance.models import PoliticalMonitoringPermission
+
+        return PoliticalMonitoringPermission.objects.filter(
+            user=self.user, active=True
+        ).exists()
 
     @property
     def is_super_admin(self):

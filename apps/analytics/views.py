@@ -8,8 +8,12 @@ from django.views.decorators.http import require_POST
 from apps.core.models import Platform
 from apps.core.permissions import require_page, user_can_access
 from apps.core.selectors import get_active_project, scope_to_tenant
+from apps.governance.neutrality import NEUTRALITY_NOTICE, require_political_monitoring
+from apps.governance.services import record_audit_entry
 from . import exports, selectors, taxonomy
-from .models import Issue, IssueMergeHistory, LabelCorrection, Mention
+from .models import (
+    Issue, IssueMergeHistory, LabelCorrection, Mention, PoliticalIssue, ResponseAction,
+)
 
 
 def _export_max_rows():
@@ -115,21 +119,30 @@ def ringkasan(request):
 
 
 def war_room(request):
-    from apps.analytics.models import PoliticalIssue
-
     project = get_active_project(request)
     issue = PoliticalIssue.objects.filter(status=PoliticalIssue.STATUS_ACTIVE).first() if project else None
     summary = selectors.war_room_summary(issue) if issue else None
-    return render(request, "analytics/war_room.html", {"active_nav": "war_room", "summary": summary})
+    return render(request, "analytics/war_room.html", {
+        "active_nav": "war_room",
+        "summary": summary,
+        "issue": issue,
+        "response_actions": (
+            ResponseAction.objects.filter(issue=issue)[:10] if issue else []
+        ),
+        "action_choices": ResponseAction.ACTION_CHOICES,
+    })
 
 
+@require_political_monitoring("Narasi & perbandingan kubu")
 def narasi(request):
-    from apps.analytics.models import PoliticalIssue
-
     project = get_active_project(request)
     issue = PoliticalIssue.objects.filter(status=PoliticalIssue.STATUS_ACTIVE).first() if project else None
     summary = selectors.narasi_summary(issue) if issue else None
-    return render(request, "analytics/narasi.html", {"active_nav": "narasi", "summary": summary})
+    return render(request, "analytics/narasi.html", {
+        "active_nav": "narasi",
+        "summary": summary,
+        "neutrality_notice": NEUTRALITY_NOTICE,
+    })
 
 
 def regional(request):
@@ -193,3 +206,32 @@ def unmerge_issues(request, history_id):
     taxonomy.unmerge(history)
     messages.success(request, "Penggabungan isu dibatalkan.")
     return redirect("analytics:taxonomy")
+
+
+@require_POST
+def log_response(request, issue_id):
+    """Log a response action against the War Room timeline (FR-28.2), creating a
+    single auditable record of the narrative event and the institution's response."""
+    issue = get_object_or_404(PoliticalIssue, pk=issue_id)
+    description = (request.POST.get("description") or "").strip()
+    action_type = request.POST.get("action_type", "")
+    valid = {key for key, _label in ResponseAction.ACTION_CHOICES}
+
+    if not description or action_type not in valid:
+        messages.error(request, "Jenis aksi dan deskripsi wajib diisi.")
+        return redirect("analytics:war_room")
+
+    ResponseAction.objects.create(
+        issue=issue,
+        action_type=action_type,
+        description=description,
+        logged_by=request.user.get_full_name() or request.user.username,
+        occurred_at=timezone.now(),
+    )
+    record_audit_entry(
+        actor_label=request.user.get_full_name() or request.user.username,
+        action="Mencatat aksi respons War Room",
+        target=issue.title,
+    )
+    messages.success(request, "Aksi respons dicatat pada linimasa War Room.")
+    return redirect("analytics:war_room")

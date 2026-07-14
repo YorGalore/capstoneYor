@@ -325,3 +325,23 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-check { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); }
 
 .pantau-pager { display: flex; gap: 12px; align-items: center; margin-top: 14px; }
+
+/* War Room response action log (FR-28.2) */
+.wr-response-log { margin-top: 14px; }
+.wr-hint { font: 400 11.5px 'IBM Plex Sans', sans-serif; color: #8FA3B8; margin-bottom: 10px; }
+.wr-response-form { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.wr-response-form select, .wr-response-form input {
+  padding: 7px 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06); color: #E8EFF6;
+  font: 400 12.5px 'IBM Plex Sans', sans-serif;
+}
+.wr-response-form input { flex: 1 1 280px; }
+.wr-response-form button {
+  padding: 7px 14px; border: 0; border-radius: 7px; cursor: pointer;
+  background: var(--teal); color: #fff; font: 600 12.5px 'IBM Plex Sans', sans-serif;
+}
+.wr-response-row {
+  display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+  padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.07);
+  font: 400 12.5px 'IBM Plex Sans', sans-serif; color: #D5E2EE;
+}

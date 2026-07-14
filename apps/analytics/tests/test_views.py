@@ -32,9 +32,18 @@ class WarRoomViewTest(TestCase):
 
 class NarasiViewTest(TestCase):
     def test_narasi_renders_both_coalitions(self):
+        from django.utils import timezone
+
+        from apps.governance.models import PoliticalMonitoringPermission
+
         tenant, project = seed_core()
         seed_analytics(project, mention_count=100)
-        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
+        demo_user = get_user_model().objects.get(username=DEMO_USERNAME)
+        # Political-narrative views require the compliance-approved grant (FR-29.1).
+        PoliticalMonitoringPermission.objects.create(
+            user=demo_user, approved_by="Kepatuhan", approved_at=timezone.now(), active=True
+        )
+        self.client.force_login(demo_user)
         response = self.client.get("/narasi/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Koalisi Nusantara Raya")

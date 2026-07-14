@@ -160,12 +160,16 @@ Implemented TDD; +27 tests (170 → 197 passing). Backfilled 5,405 seeded mentio
 14. ✅ **Issue Taxonomy + auto/manual labeling + merge** (FR-3A): `Category → SubCategory → Issue` + `IssueLabel` (auto|manual); auto-labeling on ingest **and** on backfill; manual review queue for unmatched content; **manual labels never overwritten by an auto pass** (FR-3A.3); merge/unmerge with reversible `IssueMergeHistory` (FR-3A.5); top-content preview (FR-3A.6). New `taxonomy` tool page, denied by default to analyst/viewer.
 15. ⏳ **Remaining:** OCEAN (FR-7), demographics/gender (FR-8), real LLM provider wired as primary tier (the `analyze` API contract in `docs/api-example-analyze-*.json` is the intended enrichment interface), unresolved-raw-label queue (FR-3A.4).
 
-### Workstream D — Complete the political/governance modules
-14. **PoliticalActor + camps + detection rules** (FR-24), **program/policy entity** (FR-27).
-15. **CIB detection engine** behind the existing `koordinasi` UI (FR-26.1).
-16. **War Room response logging** (`WarRoomEvent`, FR-28.2) + alert rule engine & delivery (FR-12).
-17. **Governance enforcement**: co-approval (29.1), private-individual prohibition at data-model level (29.3), persistent notice (29.5), election-period mode (§8.5).
-18. **Daily Brief Engine + Regulatory RAG** (FR-30/31) — largest Phase-3 items.
+### Workstream D — Political/governance modules — 🟢 MOSTLY DONE (2026-07-14)
+Implemented TDD; +47 tests (197 → 244 passing).
+14. ✅ **PoliticalActor + camps + program/policy** (FR-24, FR-27): `PoliticalActor` (party/coalition/official/organization) with keywords+handles, **user-defined `Camp`** (no camp is hard-coded or defaulted, FR-24.3), multi-actor tagging per mention, symmetric Share-of-Voice, and `GovernmentProgram` as a first-class tracked entity with its own sentiment breakdown. *(Service + admin layer; no dedicated actor-management UI yet — `narasi` still renders off the legacy `Coalition` model.)*
+15. ✅ **CIB detection engine** (FR-26.1/26.2): real coordination scoring in `apps/coordination/detection.py` — near-duplicate text (Jaccard), synchronized posting times, shared-media proxy → weighted composite score; clusters above a configurable threshold are **flagged for human review only, never auto-actioned**. `manage.py detect_coordination`.
+16. ✅ **War Room response log + alert engine** (FR-28.2, FR-12): `ResponseAction` logged against the live issue timeline (auditable record of the institution's response); `apps/analytics/alerting.py` evaluates machine-readable rules (negative-ratio, volume-spike) over a rolling window, raises deduplicated Alerts with the numbers that caused them. `manage.py evaluate_alerts`.
+17. ✅ **Governance enforcement** (FR-29, §8.5) — `apps/governance/neutrality.py`: political views gated on the **Political Monitoring permission** (FR-29.1) with every political query written to the audit trail (FR-29.2); **data-model prohibition on profiling private individuals** (FR-29.3 — only parties/coalitions/public officials/organizations may be registered); persistent neutrality notice (FR-29.5); **election-period mode** freezing political-actor configuration (§8.5).
+    - Also removed a duplicate source of truth: `AnalystProfile.has_political_monitoring_permission` was a stored bool that the profile page displayed but nothing enforced — it could read "Diizinkan" while access was denied. It is now a **derived property** of the governance grant, so it cannot drift.
+18. ⏳ **Remaining:** Daily Brief Engine (FR-30) + Regulatory RAG (FR-31) — the largest Phase-3 items; actor-management UI; wiring `narasi` onto `PoliticalActor`/`Camp` in place of legacy `Coalition`.
+
+**Demo-data caveat:** the seeded corpus never names a party, so actor tagging matches nothing and Share-of-Voice renders 0%/0% until real collected data (or an enriched seed) is present. Program tagging does work on the seed (134 mentions → "Program Pangan Rakyat").
 
 ### Workstream E — Platform/non-functional (defer / parallel)
 19. REST/GraphQL API + WebSocket (§7), i18n framework (§8.8), observability (§3.6), search index, then the microservices decomposition (§3.3) once load/team justify it.

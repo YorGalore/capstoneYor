@@ -110,6 +110,13 @@ class Mention(models.Model):
     source_url = models.URLField(max_length=500, null=True, blank=True, unique=True)
     matched_keyword = models.CharField(max_length=150, blank=True)
     is_scraped = models.BooleanField(default=False)
+    political_actors = models.ManyToManyField(
+        "PoliticalActor", blank=True, related_name="mentions"
+    )
+    program = models.ForeignKey(
+        "GovernmentProgram", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="mentions",
+    )
 
     class Meta:
         indexes = [
@@ -148,9 +155,23 @@ class AlertRule(models.Model):
         (CHANNEL_EMAIL, "Email"), (CHANNEL_PUSH, "Push"), (CHANNEL_WEBHOOK, "Webhook"),
     ]
 
+    # Machine-evaluable conditions (FR-12.1).
+    CONDITION_NEGATIVE_RATIO = "negative_ratio"
+    CONDITION_VOLUME_SPIKE = "volume_spike"
+    CONDITION_CHOICES = [
+        (CONDITION_NEGATIVE_RATIO, "Rasio sentimen negatif melewati ambang"),
+        (CONDITION_VOLUME_SPIKE, "Lonjakan volume sebutan"),
+    ]
+
     name = models.CharField(max_length=150)
     condition_summary = models.CharField(max_length=255)
     channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES)
+    condition_type = models.CharField(
+        max_length=30, choices=CONDITION_CHOICES, default=CONDITION_NEGATIVE_RATIO
+    )
+    threshold = models.FloatField(default=0.5)
+    window_minutes = models.PositiveIntegerField(default=60)
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -263,3 +284,105 @@ class IssueMergeHistory(models.Model):
 
     def __str__(self):
         return f"merge → {self.target_issue.name}"
+
+
+class Camp(models.Model):
+    """A user-defined grouping of political actors (FR-24.3). The Platform never
+    hard-codes or defaults a camp — every camp is created by the tenant."""
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="camps")
+    name = models.CharField(max_length=150)
+    color = models.CharField(max_length=7, default="#7C8A99")
+    is_user_defined = models.BooleanField(default=True, editable=False)
+
+    class Meta:
+        unique_together = ("project", "name")
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class PoliticalActor(models.Model):
+    """A trackable political entity (FR-24.1). Restricted by FR-29.3 to public
+    officials, candidates, parties, coalitions, and organizational accounts —
+    never private individuals."""
+
+    TYPE_PARTY = "party"
+    TYPE_COALITION = "coalition"
+    TYPE_OFFICIAL = "official"
+    TYPE_ORGANIZATION = "organization"
+    TYPE_CHOICES = [
+        (TYPE_PARTY, "Partai"),
+        (TYPE_COALITION, "Koalisi"),
+        (TYPE_OFFICIAL, "Pejabat/Kandidat"),
+        (TYPE_ORGANIZATION, "Organisasi"),
+    ]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="political_actors")
+    name = models.CharField(max_length=200)
+    actor_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    camp = models.ForeignKey(
+        Camp, on_delete=models.SET_NULL, null=True, blank=True, related_name="actors"
+    )
+    keywords = models.JSONField(default=list, blank=True)
+    handles = models.JSONField(default=list, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class GovernmentProgram(models.Model):
+    """A named government program/policy tracked as a first-class entity, distinct
+    from general keywords (FR-27.1)."""
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="programs")
+    name = models.CharField(max_length=200)
+    agency = models.CharField(max_length=200, blank=True)
+    keywords = models.JSONField(default=list, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class ResponseAction(models.Model):
+    """A response action logged by communications staff against a live narrative
+    event (FR-28.2) — e.g. "clarification statement issued at 14:32". Together with
+    the mention timeline this forms a single auditable record of the event and the
+    institution's response to it."""
+
+    ACTION_STATEMENT = "statement"
+    ACTION_CLARIFICATION = "clarification"
+    ACTION_BRIEFING = "briefing"
+    ACTION_ESCALATION = "escalation"
+    ACTION_OTHER = "other"
+    ACTION_CHOICES = [
+        (ACTION_STATEMENT, "Pernyataan resmi"),
+        (ACTION_CLARIFICATION, "Klarifikasi"),
+        (ACTION_BRIEFING, "Briefing pimpinan"),
+        (ACTION_ESCALATION, "Eskalasi"),
+        (ACTION_OTHER, "Lainnya"),
+    ]
+
+    issue = models.ForeignKey(
+        PoliticalIssue, on_delete=models.CASCADE, related_name="response_actions"
+    )
+    action_type = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    description = models.CharField(max_length=500)
+    logged_by = models.CharField(max_length=150)
+    occurred_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-occurred_at"]
+
+    def __str__(self):
+        return f"{self.get_action_type_display()} — {self.occurred_at:%d %b %H:%M}"
