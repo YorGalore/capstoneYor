@@ -1,11 +1,17 @@
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
+
+from apps.core.seed import DEMO_USERNAME
 
 
 class FullFlowSmokeTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         call_command("seed_demo_data")
+
+    def setUp(self):
+        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
 
     def test_all_seven_screens_render_with_seeded_data(self):
         checks = [

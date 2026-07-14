@@ -25,9 +25,9 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "apps.core.middleware.DemoUserMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.contrib.auth.middleware.LoginRequiredMiddleware",
 ]
 
 ROOT_URLCONF = "pantau.urls"
@@ -59,6 +59,10 @@ DATABASES = {
 }
 
 AUTH_PASSWORD_VALIDATORS = []
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "analytics:ringkasan"
+LOGOUT_REDIRECT_URL = "login"
 
 LANGUAGE_CODE = "id"
 TIME_ZONE = "Asia/Jakarta"

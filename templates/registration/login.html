@@ -1,0 +1,46 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'core/css/base.css' %}">
+  <link rel="stylesheet" href="{% static 'core/css/auth.css' %}">
+  <title>Masuk — PANTAU</title>
+</head>
+<body>
+  <div class="pantau-auth-shell">
+    <div class="pantau-auth-card">
+      <div class="pantau-auth-brand">
+        <div class="pantau-logo">P</div>
+        <div>
+          <div class="pantau-brand-name">PANTAU</div>
+          <div class="pantau-brand-sub">NARASI &amp; OPINI</div>
+        </div>
+      </div>
+      <h1 class="pantau-auth-title">Masuk</h1>
+      <p class="pantau-auth-subtitle">Masuk untuk mengakses dasbor pemantauan.</p>
+
+      {% if form.errors %}
+      <div class="pantau-auth-errors">Nama pengguna atau kata sandi salah.</div>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="pantau-auth-field">
+          <label for="{{ form.username.id_for_label }}">Nama Pengguna</label>
+          {{ form.username }}
+        </div>
+        <div class="pantau-auth-field">
+          <label for="{{ form.password.id_for_label }}">Kata Sandi</label>
+          {{ form.password }}
+        </div>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button type="submit" class="pantau-auth-submit">Masuk</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

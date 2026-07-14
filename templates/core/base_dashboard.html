@@ -14,6 +14,13 @@
     {% include "core/_sidebar.html" %}
     <div class="pantau-main">
       {% include "core/_topbar.html" %}
+      {% if messages %}
+        <div class="pantau-messages">
+          {% for message in messages %}
+            <div class="pantau-message pantau-message-{{ message.tags }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
       <div class="pantau-content">
         {% block content %}{% endblock %}
       </div>

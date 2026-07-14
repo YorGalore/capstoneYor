@@ -1,7 +1,8 @@
+from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 
-from apps.core.seed import seed_core
+from apps.core.seed import DEMO_USERNAME, seed_core
 
 
 class NavigationSmokeTest(TestCase):
@@ -22,11 +23,13 @@ class NavigationSmokeTest(TestCase):
 
     def test_root_redirects_to_ringkasan(self):
         seed_core()
+        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
         response = self.client.get("/")
         self.assertRedirects(response, "/ringkasan/", fetch_redirect_response=False)
 
     def test_all_screen_routes_resolve(self):
         seed_core()
+        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
         for path in [
             "/ringkasan/", "/war-room/", "/narasi/", "/regional/",
             "/koordinasi/", "/konfigurasi/", "/pengawasan/",

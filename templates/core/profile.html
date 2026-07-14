@@ -1,0 +1,34 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Profil{% endblock %}
+{% block topbar_actions %}
+  <form method="post" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="pantau-btn-primary">Keluar</button>
+  </form>
+{% endblock %}
+{% block content %}
+<div class="pantau-card" style="max-width: 480px;">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Profil Analis</div>
+  </div>
+  <div class="pantau-kpi-label" style="margin-top: 12px;">Nama</div>
+  <div>{{ request.user.get_full_name|default:request.user.username }}</div>
+
+  <div class="pantau-kpi-label" style="margin-top: 12px;">Nama Pengguna</div>
+  <div>{{ request.user.username }}</div>
+
+  <div class="pantau-kpi-label" style="margin-top: 12px;">Email</div>
+  <div>{{ request.user.email|default:"—" }}</div>
+
+  {% if profile %}
+  <div class="pantau-kpi-label" style="margin-top: 12px;">Peran</div>
+  <div>{{ profile.role_label }}</div>
+
+  <div class="pantau-kpi-label" style="margin-top: 12px;">Instansi</div>
+  <div>{{ profile.tenant.name }}</div>
+
+  <div class="pantau-kpi-label" style="margin-top: 12px;">Akses Pemantauan Politik</div>
+  <div>{{ profile.has_political_monitoring_permission|yesno:"Diizinkan,Tidak diizinkan" }}</div>
+  {% endif %}
+</div>
+{% endblock %}
