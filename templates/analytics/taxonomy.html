@@ -1,0 +1,86 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Taksonomi Isu{% endblock %}
+{% block content %}
+<div class="pantau-page-head">
+  <h1 class="pantau-page-title">Taksonomi Isu</h1>
+  <p class="pantau-page-sub">Kategori › Sub-Kategori › Isu. Konten yang tidak terlabeli otomatis masuk antrean tinjauan manual; keputusan manual tidak pernah ditimpa pelabelan otomatis (FR-3A).</p>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Antrean Tinjauan Manual</div>
+  </div>
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead><tr><th>Waktu</th><th>Platform</th><th>Konten</th><th>Labeli ke isu</th></tr></thead>
+      <tbody>
+        {% for m in queue %}
+        <tr>
+          <td class="mono">{{ m.posted_at|date:"d M H:i" }}</td>
+          <td>{{ m.platform.display_name }}</td>
+          <td>{{ m.content_snippet|truncatechars:80 }}</td>
+          <td>
+            <form method="post" action="{% url 'analytics:assign_issue' m.pk %}" class="pantau-inline-form" style="margin:0">
+              {% csrf_token %}
+              <select class="pantau-input" name="issue">
+                {% for issue in issues %}
+                <option value="{{ issue.pk }}">{{ issue.subcategory.category.name }} › {{ issue.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="pantau-chip pantau-chip-allow">Labeli</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">Antrean kosong — semua konten sudah terlabeli.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Gabungkan Isu</div>
+  </div>
+  <div class="pantau-hint">Pindahkan seluruh konten dari isu sumber ke isu tujuan dan nonaktifkan isu yang redundan. Dapat dibatalkan (FR-3A.5).</div>
+  <form method="post" action="{% url 'analytics:merge_issues' %}" class="pantau-inline-form">
+    {% csrf_token %}
+    <select class="pantau-input" name="source" multiple size="4">
+      {% for issue in issues %}<option value="{{ issue.pk }}">{{ issue.name }}</option>{% endfor %}
+    </select>
+    <select class="pantau-input" name="target">
+      {% for issue in issues %}<option value="{{ issue.pk }}">→ {{ issue.name }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="pantau-btn">Gabungkan</button>
+  </form>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Riwayat Penggabungan</div>
+  </div>
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead><tr><th>Tujuan</th><th>Oleh</th><th>Waktu</th><th>Aksi</th></tr></thead>
+      <tbody>
+        {% for h in merges %}
+        <tr>
+          <td>{{ h.target_issue.name }}</td>
+          <td>{{ h.performed_by }}</td>
+          <td class="mono">{{ h.performed_at|date:"d M H:i" }}</td>
+          <td>
+            <form method="post" action="{% url 'analytics:unmerge_issues' h.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="pantau-chip pantau-chip-deny">Batalkan</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">Belum ada penggabungan.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

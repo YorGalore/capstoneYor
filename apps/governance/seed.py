@@ -4,16 +4,21 @@ from django.utils import timezone
 from apps.core.models import Platform
 
 from .models import (
-    ApifyCredential, AuditLogEntry, MonitoredDomain, PlatformIntegration,
+    ApifyCredential, AuditLogEntry, MonitoredDomain, MonitoringKeyword, PlatformIntegration,
     PoliticalMonitoringPermission, PolicyAcknowledgment,
 )
 
+# feed_url is left blank for sources with no known public RSS feed — the
+# console still lists them, but "Jalankan Sekarang" skips them until an
+# analyst supplies one.
 DOMAINS = [
-    ("kompas.com", "generik-berita", MonitoredDomain.STATUS_ACTIVE),
-    ("detik.com", "generik-berita", MonitoredDomain.STATUS_ACTIVE),
-    ("forum.kaskus.co.id", "adapter khusus", MonitoredDomain.STATUS_NEEDS_REVIEW),
-    ("tribunnews.com", "generik-berita", MonitoredDomain.STATUS_INACTIVE),
+    ("antaranews.com", "RSS", MonitoredDomain.STATUS_ACTIVE, "https://www.antaranews.com/rss/terkini.xml"),
+    ("cnnindonesia.com", "RSS", MonitoredDomain.STATUS_ACTIVE, "https://www.cnnindonesia.com/nasional/rss"),
+    ("forum.kaskus.co.id", "adapter khusus", MonitoredDomain.STATUS_NEEDS_REVIEW, ""),
+    ("tribunnews.com", "generik-berita", MonitoredDomain.STATUS_INACTIVE, ""),
 ]
+
+MONITORING_KEYWORDS = ["pangan", "bansos"]
 
 PERMISSION_USERS = [
     ("bagus.prakoso", "Bagus Prakoso"),
@@ -64,14 +69,17 @@ def seed_governance(tenant):
         defaults={"last_verified_at": now - timezone.timedelta(hours=2)},
     )
 
-    for domain, adapter, status in DOMAINS:
+    for domain, adapter, status, feed_url in DOMAINS:
         MonitoredDomain.objects.get_or_create(
             domain=domain,
             defaults={
-                "adapter": adapter, "status": status,
+                "adapter": adapter, "status": status, "feed_url": feed_url,
                 "last_tested_at": now - timezone.timedelta(hours=2),
             },
         )
+
+    for keyword in MONITORING_KEYWORDS:
+        MonitoringKeyword.objects.get_or_create(keyword=keyword, defaults={"created_by": "Sistem (seed)"})
 
     User = get_user_model()
     demo_user = User.objects.filter(username="dewi.anjani").first()

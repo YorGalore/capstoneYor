@@ -1,6 +1,7 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from apps.core.seed import seed_core
+from apps.core.seed import DEMO_USERNAME, seed_core
 from apps.analytics.seed import seed_analytics
 
 
@@ -8,6 +9,7 @@ class RingkasanViewTest(TestCase):
     def test_ringkasan_renders_kpis(self):
         tenant, project = seed_core()
         seed_analytics(project, mention_count=200)
+        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
         response = self.client.get("/ringkasan/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Total Sebutan")
@@ -22,6 +24,7 @@ class WarRoomViewTest(TestCase):
         tenant, project = seed_core()
         seed_analytics(project, mention_count=100)
         seed_coordination()
+        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
         response = self.client.get("/war-room/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "WAR ROOM NARASI")
@@ -31,6 +34,7 @@ class NarasiViewTest(TestCase):
     def test_narasi_renders_both_coalitions(self):
         tenant, project = seed_core()
         seed_analytics(project, mention_count=100)
+        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
         response = self.client.get("/narasi/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Koalisi Nusantara Raya")
@@ -44,6 +48,7 @@ class RegionalViewTest(TestCase):
     def test_regional_view_renders_and_drill_down(self):
         tenant, project = seed_core()
         seed_analytics(project, mention_count=300)
+        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
         response = self.client.get("/regional/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Distribusi Narasi Regional")

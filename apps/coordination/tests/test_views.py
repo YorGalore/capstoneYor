@@ -1,8 +1,9 @@
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
-from apps.core.seed import seed_core
+from apps.core.seed import DEMO_USERNAME, seed_core
 from apps.analytics.seed import seed_analytics
 from apps.coordination.models import CoordinationCluster
 from apps.coordination.seed import seed_coordination
@@ -14,6 +15,8 @@ class CoordinationViewsTest(TestCase):
         tenant, project = seed_core()
         seed_analytics(project, mention_count=100)
         seed_coordination()
+        self.demo_user = get_user_model().objects.get(username=DEMO_USERNAME)
+        self.client.force_login(self.demo_user)
 
     def test_koordinasi_view_renders(self):
         response = self.client.get("/koordinasi/")

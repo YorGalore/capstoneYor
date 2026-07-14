@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from apps.core.models import Platform, Tenant
 from apps.governance.models import (
-    AuditLogEntry, MonitoredDomain, PlatformIntegration,
+    AuditLogEntry, MonitoredDomain, MonitoringKeyword, PlatformIntegration,
     PoliticalMonitoringPermission, PolicyAcknowledgment,
 )
 from apps.governance.services import record_audit_entry
@@ -75,3 +75,13 @@ class GovernanceModelsTest(TestCase):
             user=user, approved_by="R. Hartono (Kepatuhan)", approved_at=timezone.now(),
         )
         self.assertTrue(permission.active)
+
+    def test_monitoring_keyword_defaults(self):
+        keyword = MonitoringKeyword.objects.create(keyword="pangan")
+        self.assertTrue(keyword.is_active)
+        self.assertEqual(keyword.match_count, 0)
+        self.assertEqual(str(keyword), "pangan")
+
+    def test_monitored_domain_feed_url_optional(self):
+        domain = MonitoredDomain.objects.create(domain="kompas.com", adapter="generik-berita")
+        self.assertEqual(domain.feed_url, "")

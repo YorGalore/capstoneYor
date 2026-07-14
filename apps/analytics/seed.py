@@ -5,7 +5,9 @@ from django.utils import timezone
 
 from apps.core.models import Platform, Province
 
-from .models import Alert, AlertRule, Coalition, Mention, PoliticalIssue
+from .models import (
+    Alert, AlertRule, Category, Coalition, Issue, Mention, PoliticalIssue, SubCategory,
+)
 
 RNG_SEED = 20260710
 
@@ -67,7 +69,42 @@ def _weighted_choice(rng, weighted_options):
     return weighted_options[-1][0]
 
 
+TAXONOMY = [
+    ("Ekonomi", [
+        ("Energi", [
+            ("Harga BBM", ["bbm", "pertamax", "solar", "subsidi energi"]),
+            ("Tarif Listrik", ["listrik", "pln", "tarif dasar"]),
+        ]),
+        ("Pangan", [
+            ("Harga Pangan", ["pangan", "beras", "sembako", "harga bahan"]),
+            ("Distribusi Bansos", ["bansos", "bantuan sosial", "sembako gratis"]),
+        ]),
+    ]),
+    ("Kesejahteraan", [
+        ("Kesehatan", [
+            ("Layanan BPJS", ["bpjs", "jkn", "iuran kesehatan"]),
+        ]),
+        ("Pendidikan", [
+            ("Biaya Sekolah", ["ukt", "spp", "biaya sekolah"]),
+        ]),
+    ]),
+]
+
+
+def seed_taxonomy():
+    """Idempotently seed the three-level Issue Taxonomy (FR-3A.1)."""
+    for category_name, subcategories in TAXONOMY:
+        category, _ = Category.objects.get_or_create(name=category_name)
+        for sub_name, issues in subcategories:
+            sub, _ = SubCategory.objects.get_or_create(category=category, name=sub_name)
+            for issue_name, keywords in issues:
+                Issue.objects.get_or_create(
+                    subcategory=sub, name=issue_name, defaults={"keywords": keywords}
+                )
+
+
 def seed_analytics(project, mention_count=4000):
+    seed_taxonomy()
     if Mention.objects.filter(project=project).exists():
         return
 
