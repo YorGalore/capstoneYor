@@ -2,7 +2,8 @@ from django.contrib import admin
 
 from .models import (
     ApifyCredential, AuditLogEntry, CollectionRun, MonitoredDomain, MonitoringKeyword,
-    PlatformIntegration, PoliticalMonitoringPermission, PolicyAcknowledgment,
+    PlatformIntegration, PoliticalMonitoringPermission, PolicyAcknowledgment, RegulatoryDocument,
+    RuntimeSetting,
 )
 
 admin.site.register(PlatformIntegration)
@@ -28,3 +29,13 @@ class AuditLogEntryAdmin(admin.ModelAdmin):
 
 
 admin.site.register(PolicyAcknowledgment)
+
+admin.site.register(RuntimeSetting)
+
+
+@admin.register(RegulatoryDocument)
+class RegulatoryDocumentAdmin(admin.ModelAdmin):
+    """Corpus management for the Compliance Officer / Super Admin (FR-31.5)."""
+
+    list_display = ("title", "source_ref", "indexed_at", "retired_at")
+    search_fields = ("title", "source_ref", "body")

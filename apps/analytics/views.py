@@ -2,17 +2,21 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
 from apps.core.models import Platform
 from apps.core.permissions import require_page, user_can_access
 from apps.core.selectors import get_active_project, scope_to_tenant
+from apps.governance import regulatory
 from apps.governance.neutrality import NEUTRALITY_NOTICE, require_political_monitoring
 from apps.governance.services import record_audit_entry
-from . import exports, selectors, taxonomy
+from . import briefs, exports, selectors, taxonomy
 from .models import (
-    Issue, IssueMergeHistory, LabelCorrection, Mention, PoliticalIssue, ResponseAction,
+    DailyBrief, DailyBriefIssue, Issue, IssueMergeHistory, LabelCorrection, Mention,
+    PoliticalIssue, ResponseAction,
 )
 
 
@@ -235,3 +239,93 @@ def log_response(request, issue_id):
     )
     messages.success(request, "Aksi respons dicatat pada linimasa War Room.")
     return redirect("analytics:war_room")
+
+
+@require_page("brief")
+def brief_view(request):
+    """Daily Executive Brief (FR-30): draft review workspace for the Analyst /
+    Spokesperson — edit, approve, reorder, then finalize (which locks it)."""
+    project = get_active_project(request)
+    brief_date = request.GET.get("tanggal")
+    if brief_date:
+        parsed = parse_date(brief_date)
+    else:
+        parsed = (timezone.now() - timezone.timedelta(days=1)).date()
+
+    brief = (
+        DailyBrief.objects.filter(project=project, brief_date=parsed).first()
+        if project else None
+    )
+    return render(request, "analytics/brief.html", {
+        "active_nav": "brief",
+        "brief": brief,
+        "brief_date": parsed,
+        "risk_labels": regulatory.RISK_LABELS,
+        "recent": DailyBrief.objects.filter(project=project)[:7] if project else [],
+    })
+
+
+@require_page("brief")
+@require_POST
+def generate_brief(request):
+    project = get_active_project(request)
+    parsed = parse_date(request.POST.get("tanggal") or "") or (
+        timezone.now() - timezone.timedelta(days=1)
+    ).date()
+    actor = request.user.get_full_name() or request.user.username
+    try:
+        brief = briefs.generate(project, parsed, triggered_by=actor)
+    except briefs.BriefAlreadyGenerating:
+        messages.warning(request, "Pembuatan brief untuk tanggal ini sedang berjalan.")
+        return redirect(f"{reverse('analytics:brief')}?tanggal={parsed}")
+    except briefs.BriefLocked:
+        messages.error(request, "Brief sudah final dan tidak dapat dibuat ulang.")
+        return redirect(f"{reverse('analytics:brief')}?tanggal={parsed}")
+
+    record_audit_entry(
+        actor_label=actor, action="Membuat draf brief harian", target=str(parsed),
+    )
+    messages.success(
+        request,
+        f"Draf brief dibuat: {brief.issues.count()} isu. Semua konten AI wajib ditinjau manusia.",
+    )
+    return redirect(f"{reverse('analytics:brief')}?tanggal={parsed}")
+
+
+@require_page("brief")
+@require_POST
+def review_brief_issue(request, issue_id):
+    item = get_object_or_404(DailyBriefIssue, pk=issue_id)
+    actor = request.user.get_full_name() or request.user.username
+    action = request.POST.get("action")
+    try:
+        if action == "save":
+            briefs.edit_issue(item, content=request.POST.get("content", ""), edited_by=actor)
+            messages.success(request, "Suntingan disimpan.")
+        elif action == "approve":
+            briefs.approve_issue(item, approved_by=actor)
+            messages.success(request, f'Isu "{item.title}" disetujui.')
+    except briefs.BriefLocked as exc:
+        messages.error(request, str(exc))
+    return redirect(f"{reverse('analytics:brief')}?tanggal={item.brief.brief_date}")
+
+
+@require_page("brief")
+@require_POST
+def finalize_brief(request, brief_id):
+    brief = get_object_or_404(DailyBrief, pk=brief_id)
+    actor = request.user.get_full_name() or request.user.username
+    try:
+        briefs.finalize(brief, finalized_by=actor)
+    except briefs.BriefNotReviewed as exc:
+        messages.error(request, str(exc))
+        return redirect(f"{reverse('analytics:brief')}?tanggal={brief.brief_date}")
+    except briefs.BriefLocked as exc:
+        messages.error(request, str(exc))
+        return redirect(f"{reverse('analytics:brief')}?tanggal={brief.brief_date}")
+
+    record_audit_entry(
+        actor_label=actor, action="Memfinalisasi brief harian", target=str(brief.brief_date),
+    )
+    messages.success(request, "Brief difinalisasi dan dikunci.")
+    return redirect(f"{reverse('analytics:brief')}?tanggal={brief.brief_date}")

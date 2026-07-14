@@ -1,8 +1,9 @@
 from django.contrib import admin
 
 from .models import (
-    Alert, AlertRule, Author, Category, Coalition, Issue, IssueLabel, IssueMergeHistory,
-    LabelCorrection, Mention, PoliticalIssue, SubCategory,
+    Alert, AlertRule, Author, Camp, Category, Coalition, DailyBrief, DailyBriefIssue,
+    DailyBriefRun, GovernmentProgram, Issue, IssueLabel, IssueMergeHistory, LabelCorrection,
+    Mention, PoliticalActor, PoliticalIssue, ResponseAction, SubCategory,
 )
 
 admin.site.register(Coalition)
@@ -32,3 +33,23 @@ class LabelCorrectionAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+admin.site.register(Camp)
+admin.site.register(PoliticalActor)
+admin.site.register(GovernmentProgram)
+admin.site.register(ResponseAction)
+admin.site.register(DailyBriefRun)
+
+
+@admin.register(DailyBrief)
+class DailyBriefAdmin(admin.ModelAdmin):
+    list_display = ("brief_date", "project", "status", "finalized_by", "finalized_at")
+
+    def has_change_permission(self, request, obj=None):
+        # A finalized brief is a locked snapshot of what leadership read (FR-30.4).
+        if obj is not None and obj.is_locked:
+            return False
+        return super().has_change_permission(request, obj)
+
+
+admin.site.register(DailyBriefIssue)

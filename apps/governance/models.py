@@ -119,6 +119,28 @@ class AuditLogEntry(models.Model):
         return f"{self.actor_label}: {self.action}"
 
 
+class RegulatoryDocument(models.Model):
+    """A curated law, regulation, or internal SOP backing the regulatory grounding
+    corpus (FR-31.1). Kept separate from the mention content index and managed by a
+    Compliance Officer or Super Admin through the console (FR-31.5)."""
+
+    title = models.CharField(max_length=300)
+    source_ref = models.CharField(max_length=200)
+    body = models.TextField()
+    indexed_at = models.DateTimeField(auto_now=True)
+    retired_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["title"]
+
+    @property
+    def is_active(self):
+        return self.retired_at is None
+
+    def __str__(self):
+        return self.title
+
+
 class CollectionRun(models.Model):
     """One collection cycle for a single source (Apify platform or news), with a
     status claim that lets the orchestrator skip overlapping runs (REQ-SC-05) and

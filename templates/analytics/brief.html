@@ -1,0 +1,76 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Brief Harian{% endblock %}
+{% block content %}
+<div class="pantau-page-head">
+  <h1 class="pantau-page-title">Brief Eksekutif Harian</h1>
+  <p class="pantau-page-sub">Ringkasan H-1 untuk pimpinan. Konten dihasilkan AI sebagai <strong>draf</strong> dan wajib ditinjau manusia sebelum difinalisasi (FR-30.2/30.3).</p>
+</div>
+
+<div class="pantau-card">
+  <form method="post" action="{% url 'analytics:generate_brief' %}" class="pantau-inline-form">
+    {% csrf_token %}
+    <input class="pantau-input" type="date" name="tanggal" value="{{ brief_date|date:'Y-m-d' }}">
+    <button type="submit" class="pantau-btn">Buat / perbarui draf</button>
+    {% if brief and brief.is_locked %}
+      <span class="pantau-chip pantau-chip-locked">Final — terkunci 🔒</span>
+    {% elif brief %}
+      <span class="pantau-chip pantau-chip-deny">{{ brief.get_status_display }}</span>
+    {% endif %}
+  </form>
+</div>
+
+{% if brief and brief.issues.exists %}
+  {% for item in brief.issues.all %}
+  <div class="pantau-card">
+    <div class="pantau-card-header">
+      <div class="pantau-card-title">{{ forloop.counter }}. {{ item.title }}</div>
+      <div>
+        <span class="pantau-chip pantau-risk-{{ item.risk_level }}">Risiko: {{ risk_labels|default_if_none:'' }}{{ item.get_risk_display|default:item.risk_level }}</span>
+        {% if item.approved %}<span class="pantau-chip pantau-chip-allow">Disetujui</span>
+        {% else %}<span class="pantau-chip pantau-chip-deny">Belum ditinjau</span>{% endif %}
+      </div>
+    </div>
+    <div class="pantau-hint">{{ item.mention_count }} sebutan · {{ item.negative_pct }}% negatif</div>
+
+    {% if brief.is_locked %}
+      <pre class="pantau-brief-content">{{ item.content }}</pre>
+    {% else %}
+      <form method="post" action="{% url 'analytics:review_brief_issue' item.pk %}">
+        {% csrf_token %}
+        <textarea class="pantau-input pantau-brief-editor" name="content" rows="10">{{ item.content }}</textarea>
+        <div class="pantau-inline-form">
+          <button type="submit" name="action" value="save" class="pantau-btn">Simpan suntingan</button>
+          <button type="submit" name="action" value="approve" class="pantau-chip pantau-chip-allow">Setujui isu ini</button>
+        </div>
+      </form>
+    {% endif %}
+
+    <div class="pantau-regulatory">
+      <div class="pantau-card-title">Dasar regulasi terambil — verifikasi terhadap sumber asli</div>
+      {% for ref in item.regulatory_context %}
+        <blockquote class="pantau-passage">
+          <div class="pantau-passage-src">{{ ref.source_ref }}</div>
+          <div>“{{ ref.passage }}”</div>
+        </blockquote>
+      {% empty %}
+        <div class="pantau-hint">Tidak ada rujukan regulasi relevan pada korpus. Jangan mengarang kutipan.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if not brief.is_locked %}
+  <div class="pantau-card">
+    <form method="post" action="{% url 'analytics:finalize_brief' brief.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="pantau-btn">Finalisasi &amp; kunci brief</button>
+      <span class="pantau-hint">Semua isu harus disetujui lebih dulu. Setelah final, brief tidak dapat disunting (FR-30.4).</span>
+    </form>
+  </div>
+  {% endif %}
+{% elif brief %}
+  <div class="pantau-card"><div class="pantau-hint">Tidak ada isu yang memenuhi ambang prioritas untuk tanggal ini.</div></div>
+{% else %}
+  <div class="pantau-card"><div class="pantau-hint">Belum ada brief untuk {{ brief_date }}. Klik “Buat / perbarui draf”.</div></div>
+{% endif %}
+{% endblock %}

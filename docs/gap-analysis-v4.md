@@ -171,8 +171,14 @@ Implemented TDD; +47 tests (197 → 244 passing).
 
 **Demo-data caveat:** the seeded corpus never names a party, so actor tagging matches nothing and Share-of-Voice renders 0%/0% until real collected data (or an enriched seed) is present. Program tagging does work on the seed (134 mentions → "Program Pangan Rakyat").
 
-### Workstream E — Platform/non-functional (defer / parallel)
-19. REST/GraphQL API + WebSocket (§7), i18n framework (§8.8), observability (§3.6), search index, then the microservices decomposition (§3.3) once load/team justify it.
+### Workstream E — Daily Brief + Regulatory RAG — 🟢 DONE (2026-07-14)
+Implemented TDD; +41 tests (244 → 285 passing). Closes the two largest remaining Phase-3 items.
+19. ✅ **Daily Executive Brief Engine** (FR-30): `DailyBrief`/`DailyBriefIssue`/`DailyBriefRun`; H-1 per-issue generation shortlisted by negative sentiment or unusual volume; output is **always a draft requiring human review** (FR-30.2) and generated text carries an explicit draft banner (FR-31.4); edit/approve/reorder workflow (FR-30.3); **finalize locks the brief** so the record of what leadership read cannot be rewritten (FR-30.4); **DB-level status claim** means a scheduled and a manual run arriving together cannot duplicate or corrupt output (FR-30.6). `manage.py generate_brief`.
+20. ✅ **Regulatory & policy grounding** (FR-31): `RegulatoryDocument` corpus kept separate from the mention index (FR-31.1); lexical retrieval with a light **Indonesian stemmer** (agglutinative affixes — `disalurkan`/`penyaluran` → `salur`); every hit returns its **source passage alongside the citation** so a reviewer can verify it independently (FR-31.2/31.4); **risk classification** Rendah/Sedang/Tinggi (FR-31.3); corpus managed in the console (FR-31.5). Returns *nothing* rather than a weak match — better no citation than a fabricated-sounding one.
+    - **Retrieval defect found by running it, not by testing it:** a food-price issue cited the *fuel-subsidy* Perpres first, because the taxonomy keyword "harga bahan" incidentally overlapped "bahan bakar" and the shorter doc won on term frequency. A wrong top-ranked citation is exactly the risk FR-31.4 exists to mitigate. Fixed by weighting title matches (a regulation's title states its subject): the food regulation now ranks 1.042 vs 0.106.
+
+### Workstream F — Platform/non-functional (deferred)
+21. REST/GraphQL API + WebSocket (§7), i18n framework (§8.8), observability (§3.6), search index, OCEAN (FR-7) + demographics (FR-8), real LLM provider as primary NLP tier, PDF/DOCX brief export (FR-30.5), then the microservices decomposition (§3.3) once load/team justify it.
 
 ### Suggested near-term sequencing
 - **Sprint 1–2:** A1–A5 (RBAC, permission matrix, runtime settings/Apify cred, tenant guard, export) — turns the demo into a governable Phase-1 base.

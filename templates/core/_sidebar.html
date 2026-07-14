@@ -23,6 +23,7 @@
     <a class="pantau-nav-item{% if active_nav == 'koordinasi' %} active{% endif %}" href="{% url 'coordination:koordinasi' %}">Deteksi Koordinasi</a>
     <a class="pantau-nav-item{% if active_nav == 'regional' %} active{% endif %}" href="{% url 'analytics:regional' %}">Regional</a>
     <span class="pantau-nav-item disabled" title="Segera hadir">Sosiograf</span>
+    <a class="pantau-nav-item{% if active_nav == 'brief' %} active{% endif %}" href="{% url 'analytics:brief' %}">Brief Harian</a>
     <span class="pantau-nav-item disabled" title="Segera hadir">Laporan</span>
   </nav>
   <div class="pantau-nav-footer">

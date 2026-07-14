@@ -386,3 +386,87 @@ class ResponseAction(models.Model):
 
     def __str__(self):
         return f"{self.get_action_type_display()} — {self.occurred_at:%d %b %H:%M}"
+
+
+class DailyBrief(models.Model):
+    """A per-day executive briefing document for leadership (FR-30).
+
+    A brief is generated as a *draft* and must be reviewed by a human before it is
+    finalized. Once finalized it is locked and snapshotted, so the record of what
+    leadership actually read cannot change afterwards (FR-30.4).
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_GENERATING = "generating"
+    STATUS_DRAFT = "draft"
+    STATUS_FINAL = "final"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Belum dibuat"),
+        (STATUS_GENERATING, "Sedang dibuat"),
+        (STATUS_DRAFT, "Draf — menunggu tinjauan"),
+        (STATUS_FINAL, "Final (terkunci)"),
+        (STATUS_FAILED, "Gagal"),
+    ]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="briefs")
+    brief_date = models.DateField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    finalized_by = models.CharField(max_length=150, blank=True)
+    finalized_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("project", "brief_date")
+        ordering = ["-brief_date"]
+
+    @property
+    def is_locked(self):
+        return self.status == self.STATUS_FINAL
+
+    def __str__(self):
+        return f"Brief {self.brief_date} ({self.get_status_display()})"
+
+
+class DailyBriefIssue(models.Model):
+    """One prioritized issue within a daily brief. Content is AI-generated and is
+    always labeled a draft pending human review (FR-31.4); the regulatory passages
+    used to ground it are stored alongside so a reviewer can verify them."""
+
+    brief = models.ForeignKey(DailyBrief, on_delete=models.CASCADE, related_name="issues")
+    title = models.CharField(max_length=250)
+    content = models.TextField()
+    preview_summary = models.CharField(max_length=500, blank=True)
+    risk_level = models.CharField(max_length=10, default="low")
+    order = models.PositiveIntegerField(default=0)
+    approved = models.BooleanField(default=False)
+    edited_by = models.CharField(max_length=150, blank=True)
+    # Retrieved regulatory grounding: [{source_ref, passage, score}, ...] (FR-31.2)
+    regulatory_context = models.JSONField(default=list, blank=True)
+    mention_count = models.PositiveIntegerField(default=0)
+    negative_pct = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return self.title
+
+
+class DailyBriefRun(models.Model):
+    """One generation attempt for a brief. The DB-level status claim on DailyBrief
+    is what prevents a scheduled run and a manual run arriving together from
+    producing duplicate or corrupted output (FR-30.6)."""
+
+    brief = models.ForeignKey(DailyBrief, on_delete=models.CASCADE, related_name="runs")
+    triggered_by = models.CharField(max_length=150)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    succeeded = models.BooleanField(default=False)
+    detail = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+
+    def __str__(self):
+        return f"run {self.brief.brief_date} oleh {self.triggered_by}"

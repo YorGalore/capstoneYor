@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from apps.analytics.seed import seed_analytics
 from apps.coordination.seed import seed_coordination
 from apps.core.seed import seed_core
-from apps.governance.seed import seed_governance
+from apps.governance.seed import seed_governance, seed_regulatory_corpus
 
 
 class Command(BaseCommand):
@@ -21,5 +21,8 @@ class Command(BaseCommand):
 
         seed_governance(tenant)
         self.stdout.write(self.style.SUCCESS("Governance integrations, permissions, and audit log seeded"))
+
+        seed_regulatory_corpus()
+        self.stdout.write(self.style.SUCCESS("Regulatory corpus seeded for RAG grounding"))
 
         self.stdout.write(self.style.SUCCESS("seed_demo_data complete."))
