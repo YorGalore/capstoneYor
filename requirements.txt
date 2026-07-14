@@ -1,1 +1,5 @@
-Django>=5.0,<6.0
+Django>=6.0,<6.1
+# Fernet encryption for Runtime Settings secrets and the Apify token (governance/crypto.py)
+cryptography>=45,<47
+# XLSX export (analytics/exports.py)
+openpyxl>=3.1,<4
