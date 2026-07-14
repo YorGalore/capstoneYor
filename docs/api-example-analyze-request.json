@@ -1,0 +1,18 @@
+{
+  "_description": "POST /v1/workflow/analyze - Analisis Narasi per Issue",
+  "_auth": "Bearer <JWT_TOKEN>",
+  "_method": "POST",
+  "_url": "/v1/workflow/analyze",
+  "query": "Kenaikan Harga BBM Pertamax",
+  "issue_id": 619,
+  "channel": "press",
+  "tone": "formal",
+  "top_k": null,
+  "issue_category": null,
+  "sentiment": null,
+  "region": null,
+  "date_from": null,
+  "date_to": null,
+  "session_id": null,
+  "user_id": null
+}

@@ -1,14 +1,16 @@
 from django.contrib import admin
 
 from .models import (
-    ApifyCredential, AuditLogEntry, MonitoredDomain, PlatformIntegration,
-    PoliticalMonitoringPermission, PolicyAcknowledgment,
+    ApifyCredential, AuditLogEntry, CollectionRun, MonitoredDomain, MonitoringKeyword,
+    PlatformIntegration, PoliticalMonitoringPermission, PolicyAcknowledgment,
 )
 
 admin.site.register(PlatformIntegration)
 admin.site.register(ApifyCredential)
 admin.site.register(MonitoredDomain)
+admin.site.register(MonitoringKeyword)
 admin.site.register(PoliticalMonitoringPermission)
+admin.site.register(CollectionRun)
 
 
 @admin.register(AuditLogEntry)

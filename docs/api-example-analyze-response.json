@@ -1,0 +1,57 @@
+{
+  "_description": "Response POST /v1/workflow/analyze - dengan wiring cc.summary + input budgeting",
+  "_flow": "cc.summary (LLM) > full content (fallback) > _apply_input_budget (drop artikel/min 3 > halve last resort)",
+  "success": true,
+  "message": "Analisis workflow berhasil dibuat.",
+  "data": {
+    "status": "success",
+    "session_id": "s-48a8a9e3",
+    "narasi": {
+      "isu": "Ringkasan Berita",
+      "title": "Ringkasan Berita",
+      "query": "Kenaikan Harga BBM Pertamax",
+      "narasi": "# MONITORING PEMBERITAAN & PERCAKAPAN\n... (full markdown, max_tokens=2000)",
+      "preview_summary": "Kenaikan harga BBM Pertamax menjadi isu utama dengan sentimen negatif dominan..."
+    },
+    "retrieved_docs": [],
+    "regulasi": [],
+    "export_url": null,
+    "step_meta": {
+      "tim2_article_selection": {
+        "status": "ok",
+        "mode": "auto",
+        "source": "issue_id",
+        "selected_count": 6,
+        "max_batch_articles": 8
+      },
+      "tim2_task_a_summary": {
+        "_note": "cc.summary wired. llm_summary_count = artikel pakai LLM summary, count = total. fallback_used = True jika ada yg fallback ke full content.",
+        "status": "crawler_only",
+        "mode": "stored_in_crawler_content_summary",
+        "count": 6,
+        "llm_summary_count": 0,
+        "fallback_used": true,
+        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+      },
+      "tim2_task_b_analysis": {
+        "_note": "Input budgeting: drop artikel (min 3) → halve content last resort. max_tokens=2000.",
+        "status": "ok",
+        "latency_ms": 20046,
+        "fallback_used": false,
+        "provider": "tim2",
+        "model_id": "aitfkpmugmtext",
+        "usage": {
+          "prompt_tokens": 4135,
+          "completion_tokens": 1747,
+          "total_tokens": 5882
+        }
+      },
+      "tim2_task_c_preview": {
+        "status": "ok",
+        "fallback_used": false,
+        "provider": "tim2",
+        "usage": {"prompt_tokens": 2095, "completion_tokens": 121, "total_tokens": 2216}
+      }
+    }
+  }
+}

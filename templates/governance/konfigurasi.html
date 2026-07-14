@@ -4,13 +4,14 @@
 <div class="pantau-card">
   <div class="pantau-card-title">Platform Terpantau</div>
   {% for integration in integrations %}
-    <div class="pantau-source-row">
+    <form method="post" action="{% url 'governance:toggle_integration' integration.pk %}" class="pantau-source-row pantau-source-row-form">
+      {% csrf_token %}
       <span>{{ integration.platform.display_name }}</span>
       <span class="mono-muted">{{ integration.actor_id }}{% if integration.status_note %} ⚠ {{ integration.status_note }}{% endif %}</span>
-      <span class="{% if integration.is_active %}pantau-status-active{% else %}pantau-status-inactive{% endif %}">
+      <button type="submit" class="pantau-toggle-btn {% if integration.is_active %}pantau-status-active{% else %}pantau-status-inactive{% endif %}">
         {% if integration.is_active %}● Aktif{% else %}● Nonaktif{% endif %}
-      </span>
-    </div>
+      </button>
+    </form>
   {% endfor %}
 </div>
 
@@ -37,17 +38,100 @@
 
 <div class="pantau-card">
   <div class="pantau-card-header">
+    <div class="pantau-card-title">Kata Kunci Pemantauan</div>
+  </div>
+  <div class="pantau-hint">Berita akan dicocokkan terhadap kata kunci aktif ini saat pemindaian dijalankan. Nonaktifkan kata kunci untuk mengecualikannya tanpa menghapus riwayatnya.</div>
+  <div class="pantau-keyword-tags">
+    {% for keyword in keywords %}
+      <div class="pantau-keyword-tag {% if not keyword.is_active %}pantau-keyword-tag-inactive{% endif %}">
+        <span>{{ keyword.keyword }}</span>
+        <span class="mono-muted">({{ keyword.match_count }} hasil)</span>
+        <form method="post" action="{% url 'governance:toggle_keyword' keyword.pk %}" class="pantau-inline-form">
+          {% csrf_token %}
+          <button type="submit" title="Aktifkan/nonaktifkan">{% if keyword.is_active %}⏸{% else %}▶{% endif %}</button>
+        </form>
+        <form method="post" action="{% url 'governance:delete_keyword' keyword.pk %}" class="pantau-inline-form">
+          {% csrf_token %}
+          <button type="submit" title="Hapus">✕</button>
+        </form>
+      </div>
+    {% empty %}
+      <div class="mono-muted">Belum ada kata kunci. Tambahkan di bawah ini.</div>
+    {% endfor %}
+  </div>
+  <form method="post" action="{% url 'governance:add_keyword' %}" class="pantau-add-form">
+    {% csrf_token %}
+    {{ keyword_form.keyword }}
+    <button type="submit" class="pantau-btn-primary">+ Tambah kata kunci</button>
+  </form>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
     <div class="pantau-card-title">Situs &amp; Domain Pantauan</div>
-    <div class="pantau-btn-dark">+ Tambah domain</div>
   </div>
   {% for domain in domains %}
     <div class="pantau-domain-row">
-      <span class="mono-strong">{{ domain.domain }}</span>
+      <span class="mono-strong">{{ domain.domain }}{% if not domain.feed_url %} <span class="mono-muted">(belum ada feed)</span>{% endif %}</span>
       <span class="mono-muted">{{ domain.adapter }}</span>
       <span>{{ domain.get_status_display }}</span>
       <span class="mono-muted">{% if domain.last_tested_at %}{{ domain.last_tested_at|timesince }} lalu{% else %}—{% endif %}</span>
+      <div class="pantau-domain-actions">
+        <form method="post" action="{% url 'governance:test_domain_connection' domain.pk %}" class="pantau-inline-form">
+          {% csrf_token %}
+          <button type="submit" class="pantau-btn-outline pantau-btn-small">Uji koneksi</button>
+        </form>
+        <form method="post" action="{% url 'governance:delete_domain' domain.pk %}" class="pantau-inline-form">
+          {% csrf_token %}
+          <button type="submit" class="pantau-btn-outline pantau-btn-small">Hapus</button>
+        </form>
+      </div>
     </div>
   {% endfor %}
+  <form method="post" action="{% url 'governance:add_domain' %}" class="pantau-add-form pantau-add-domain-form">
+    {% csrf_token %}
+    {{ domain_form.domain }}
+    {{ domain_form.adapter }}
+    {{ domain_form.feed_url }}
+    <button type="submit" class="pantau-btn-primary">+ Tambah domain</button>
+  </form>
 </div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Jalankan Pemindaian Berita</div>
+  </div>
+  <div class="pantau-hint">Memindai setiap domain yang memiliki URL feed RSS secara langsung melalui internet, mencocokkan artikel terhadap kata kunci aktif, lalu menyimpan hasil yang cocok sebagai mention baru di dasbor.</div>
+  <form method="post" action="{% url 'governance:run_scan' %}">
+    {% csrf_token %}
+    <button type="submit" class="pantau-btn-dark">▶ Jalankan Sekarang</button>
+  </form>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Riwayat Siklus Koleksi</div>
+  </div>
+  <div class="pantau-hint">Status terpadu koleksi Apify &amp; berita (REQ-SC-03). Jalankan siklus Apify via perintah <code>manage.py collect</code>.</div>
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead><tr><th>Sumber</th><th>Status</th><th>Item</th><th>Estimasi biaya</th><th>Selesai</th></tr></thead>
+      <tbody>
+        {% for run in recent_runs %}
+        <tr>
+          <td>{{ run.source }}</td>
+          <td>{{ run.get_status_display }}</td>
+          <td>{{ run.items_found }}</td>
+          <td>{% if run.cost_estimate %}${{ run.cost_estimate }}{% else %}—{% endif %}</td>
+          <td>{{ run.finished_at|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5">Belum ada siklus koleksi.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <div class="pantau-hint pantau-hint-highlight">Setiap perubahan pada konsol ini tercatat ke log audit — siapa, kapan, nilai sebelum/sesudah (FR-2A.7).</div>
 {% endblock %}

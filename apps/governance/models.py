@@ -20,11 +20,42 @@ class PlatformIntegration(models.Model):
 
 
 class ApifyCredential(models.Model):
+    STATUS_ACTIVE = "active"
+    STATUS_INVALID = "invalid"
+    STATUS_REVOKED = "revoked"
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Aktif"),
+        (STATUS_INVALID, "Tidak valid"),
+        (STATUS_REVOKED, "Dicabut"),
+    ]
+
     masked_token = models.CharField(max_length=100)
+    token_encrypted = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
     last_verified_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return self.masked_token
+        return f"{self.masked_token} ({self.get_status_display()})"
+
+
+class RuntimeSetting(models.Model):
+    """Database-backed cross-service configuration (FR-2A.9-11). Secret values are
+    stored encrypted and only ever displayed masked; a small set of reserved keys
+    cannot be edited through the Configuration Console.
+    """
+
+    key = models.CharField(max_length=150, unique=True)
+    value = models.TextField(blank=True)
+    is_secret = models.BooleanField(default=False)
+    scope = models.CharField(max_length=50, default="platform")
+    updated_by = models.CharField(max_length=150, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["key"]
+
+    def __str__(self):
+        return self.key
 
 
 class MonitoredDomain(models.Model):
@@ -41,9 +72,24 @@ class MonitoredDomain(models.Model):
     adapter = models.CharField(max_length=100)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
     last_tested_at = models.DateTimeField(null=True, blank=True)
+    feed_url = models.URLField(max_length=500, blank=True)
 
     def __str__(self):
         return self.domain
+
+
+class MonitoringKeyword(models.Model):
+    keyword = models.CharField(max_length=150, unique=True)
+    is_active = models.BooleanField(default=True)
+    match_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.CharField(max_length=150, blank=True)
+
+    class Meta:
+        ordering = ["keyword"]
+
+    def __str__(self):
+        return self.keyword
 
 
 class PoliticalMonitoringPermission(models.Model):
@@ -71,6 +117,38 @@ class AuditLogEntry(models.Model):
 
     def __str__(self):
         return f"{self.actor_label}: {self.action}"
+
+
+class CollectionRun(models.Model):
+    """One collection cycle for a single source (Apify platform or news), with a
+    status claim that lets the orchestrator skip overlapping runs (REQ-SC-05) and
+    a per-run cost estimate for usage metering (REQ-DC-04)."""
+
+    STATUS_RUNNING = "running"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_SKIPPED = "skipped"
+    STATUS_CHOICES = [
+        (STATUS_RUNNING, "Berjalan"),
+        (STATUS_COMPLETED, "Selesai"),
+        (STATUS_FAILED, "Gagal"),
+        (STATUS_SKIPPED, "Dilewati"),
+    ]
+
+    source = models.CharField(max_length=50)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_RUNNING)
+    keywords_count = models.PositiveIntegerField(default=0)
+    items_found = models.PositiveIntegerField(default=0)
+    cost_estimate = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+    error = models.CharField(max_length=500, blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+
+    def __str__(self):
+        return f"{self.source} — {self.get_status_display()} ({self.items_found})"
 
 
 class PolicyAcknowledgment(models.Model):
