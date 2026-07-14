@@ -3,3 +3,10 @@ __pycache__/
 *.pyc
 db.sqlite3
 .superpowers/
+
+# Real secrets: the deployment's SECRET_KEY and Postgres password. .env.example is the
+# committed template.
+.env
+
+# Build output of collectstatic.
+staticfiles/

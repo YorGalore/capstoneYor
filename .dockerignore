@@ -1,4 +1,5 @@
 .git
+.gitignore
 .venv
 __pycache__
 *.pyc
@@ -6,8 +7,19 @@ db.sqlite3
 .superpowers
 .claude
 docs
-*.docx
-*.pdf
-*.jpeg
-*.jpg
-*.png
+
+# Secrets must never enter the image; the deployment supplies them as env vars.
+.env
+
+# Rebuilt by collectstatic during the image build. Copying a stale local manifest in
+# would let the image serve assets that no longer exist.
+staticfiles/
+
+# Reference material and screenshots that live at the repo root. Scoped to the root on
+# purpose: an unanchored *.png would also silently drop any image added under static/,
+# and the missing logo would only surface in production.
+/*.docx
+/*.pdf
+/*.jpeg
+/*.jpg
+/*.png

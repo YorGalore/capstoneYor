@@ -1,0 +1,8 @@
+# Files that are executed inside the Linux container must keep LF endings regardless of
+# the checkout platform. With Windows' core.autocrlf, entrypoint.sh would otherwise be
+# checked out with CRLF, making the shebang literally "#!/bin/sh\r" — and the container
+# then fails with "no such file or directory", naming a file that plainly exists.
+*.sh text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+.dockerignore text eol=lf

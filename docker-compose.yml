@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pantau}
+      POSTGRES_USER: ${POSTGRES_USER:-pantau}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (see .env.example)}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready, not a port check: Postgres listens on the socket before it is ready
+      # to answer queries, and the web container's first migration would race it.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pantau} -d ${POSTGRES_DB:-pantau}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  web:
+    build: .
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-pantau}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pantau}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set (see .env.example)}
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
+      # There is no TLS terminator in this compose file, so the https redirect and the
+      # Secure cookie flags all have to come off together — otherwise the app is either
+      # unreachable over http://localhost or silently unable to hold a session. Behind a
+      # real proxy this goes back to its default of 1.
+      DJANGO_BEHIND_TLS: ${DJANGO_BEHIND_TLS:-0}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-0}
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

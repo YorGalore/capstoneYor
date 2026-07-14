@@ -3,3 +3,11 @@ Django>=6.0,<6.1
 cryptography>=45,<47
 # XLSX export (analytics/exports.py)
 openpyxl>=3.1,<4
+
+# --- production serving ---
+# WSGI server. runserver is single-threaded, unaudited for production, and says so.
+gunicorn>=23,<24
+# Serves collected static files from the app process; gunicorn will not do it.
+whitenoise[brotli]>=6.7,<7
+# Postgres driver. The binary wheel avoids needing libpq + a compiler in the image.
+psycopg[binary]>=3.2,<4
