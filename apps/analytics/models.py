@@ -22,6 +22,10 @@ class PoliticalIssue(models.Model):
     STATUS_CLOSED = "closed"
     STATUS_CHOICES = [(STATUS_ACTIVE, "Aktif"), (STATUS_CLOSED, "Ditutup")]
 
+    # Tenant isolation (FR-1.2). Without this the issue pool is global: every tenant's War
+    # Room would surface whichever active issue happened to be created first, across all
+    # institutions, and the response-log endpoint would accept any issue id.
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="political_issues")
     title = models.CharField(max_length=200)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
     opened_at = models.DateTimeField()

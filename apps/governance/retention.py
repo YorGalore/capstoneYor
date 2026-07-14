@@ -52,11 +52,8 @@ def _protected_mention_ids(project, candidates):
     rather than blanket-protecting the whole issue: over-retention is its own compliance
     problem, and REQ-LC exists to make the platform hold less, not more.
     """
-    # PoliticalIssue carries no project FK (it is global today), so clusters cannot be
-    # filtered by project here. That is safe: `candidates` is already scoped to this
-    # project, so intersecting against it cannot protect another tenant's rows.
     open_clusters = CoordinationCluster.objects.filter(
-        status=CoordinationCluster.STATUS_FLAGGED
+        issue__project=project, status=CoordinationCluster.STATUS_FLAGGED
     )
     if not open_clusters.exists():
         return set()

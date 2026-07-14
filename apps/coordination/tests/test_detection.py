@@ -40,6 +40,7 @@ class DetectionEngineTest(TestCase):
         self.tenant = Tenant.objects.create(name="Instansi A")
         self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
         self.issue = PoliticalIssue.objects.create(
+            project=self.project,
             title="Distribusi Pangan", opened_at=timezone.now(), owner_label="Humas"
         )
         self.now = timezone.now()

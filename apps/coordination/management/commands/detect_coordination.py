@@ -21,7 +21,9 @@ class Command(BaseCommand):
             return
 
         total = 0
-        for issue in PoliticalIssue.objects.filter(status=PoliticalIssue.STATUS_ACTIVE):
+        for issue in PoliticalIssue.objects.filter(
+            project=project, status=PoliticalIssue.STATUS_ACTIVE
+        ):
             clusters = detection.detect(project, issue, threshold=options["threshold"])
             for cluster in clusters:
                 self.stdout.write(

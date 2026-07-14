@@ -20,6 +20,7 @@ class AlertEngineTest(TestCase):
         self.tenant = Tenant.objects.create(name="Instansi A")
         self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
         self.issue = PoliticalIssue.objects.create(
+            project=self.project,
             title="Distribusi Pangan", opened_at=timezone.now(), owner_label="Humas"
         )
         self.rule = AlertRule.objects.create(
@@ -105,6 +106,7 @@ class WarRoomResponseLogTest(TestCase):
         self.tenant = Tenant.objects.create(name="Instansi A")
         self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
         self.issue = PoliticalIssue.objects.create(
+            project=self.project,
             title="Distribusi Pangan", opened_at=timezone.now(), owner_label="Humas"
         )
         self.user = User.objects.create(username="humas")

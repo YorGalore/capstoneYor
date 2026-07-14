@@ -124,7 +124,12 @@ def ringkasan(request):
 
 def war_room(request):
     project = get_active_project(request)
-    issue = PoliticalIssue.objects.filter(status=PoliticalIssue.STATUS_ACTIVE).first() if project else None
+    issue = (
+        PoliticalIssue.objects.filter(
+            project=project, status=PoliticalIssue.STATUS_ACTIVE
+        ).first()
+        if project else None
+    )
     summary = selectors.war_room_summary(issue) if issue else None
     return render(request, "analytics/war_room.html", {
         "active_nav": "war_room",
@@ -140,7 +145,12 @@ def war_room(request):
 @require_political_monitoring("Narasi & perbandingan kubu")
 def narasi(request):
     project = get_active_project(request)
-    issue = PoliticalIssue.objects.filter(status=PoliticalIssue.STATUS_ACTIVE).first() if project else None
+    issue = (
+        PoliticalIssue.objects.filter(
+            project=project, status=PoliticalIssue.STATUS_ACTIVE
+        ).first()
+        if project else None
+    )
     summary = selectors.narasi_summary(issue) if issue else None
     return render(request, "analytics/narasi.html", {
         "active_nav": "narasi",
@@ -216,7 +226,11 @@ def unmerge_issues(request, history_id):
 def log_response(request, issue_id):
     """Log a response action against the War Room timeline (FR-28.2), creating a
     single auditable record of the narrative event and the institution's response."""
-    issue = get_object_or_404(PoliticalIssue, pk=issue_id)
+    # Scoped to the caller's project, not looked up by bare id: without the project in the
+    # lookup, any analyst could write into another tenant's War Room timeline by guessing
+    # an integer (FR-1.2).
+    project = get_active_project(request)
+    issue = get_object_or_404(PoliticalIssue, pk=issue_id, project=project)
     description = (request.POST.get("description") or "").strip()
     action_type = request.POST.get("action_type", "")
     valid = {key for key, _label in ResponseAction.ACTION_CHOICES}

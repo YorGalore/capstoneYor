@@ -32,6 +32,7 @@ class AnalyticsModelsTest(TestCase):
             stance=Coalition.STANCE_PETAHANA, color="#4656C9",
         )
         issue = PoliticalIssue.objects.create(
+            project=self.project,
             title="Distribusi Pangan Wilayah Timur", opened_at=timezone.now(),
             owner_label="Tim Respons Cepat",
         )

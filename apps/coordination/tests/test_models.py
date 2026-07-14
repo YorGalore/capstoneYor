@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from apps.analytics.models import PoliticalIssue
+from apps.core.models import Project, Tenant
 from apps.coordination.models import (
     ClusterAccount, CoordinationCluster, CoordinationSignal, DuplicateTextSample,
 )
@@ -9,7 +10,10 @@ from apps.coordination.models import (
 
 class CoordinationModelsTest(TestCase):
     def setUp(self):
+        self.tenant = Tenant.objects.create(name="Instansi A")
+        self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
         self.issue = PoliticalIssue.objects.create(
+            project=self.project,
             title="Distribusi Pangan Wilayah Timur", opened_at=timezone.now(),
             owner_label="Tim Respons Cepat",
         )

@@ -191,6 +191,7 @@ def seed_analytics(project, mention_count=4000):
 
 def _seed_political_issue(project, rng, now):
     issue, _ = PoliticalIssue.objects.get_or_create(
+        project=project,
         title="Distribusi Pangan Wilayah Timur",
         defaults={
             "status": PoliticalIssue.STATUS_ACTIVE,

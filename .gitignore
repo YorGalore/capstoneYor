@@ -10,3 +10,11 @@ db.sqlite3
 
 # Build output of collectstatic.
 staticfiles/
+
+# Reference material dropped into the repo (SRS source documents, screenshots). Kept out
+# of history deliberately: they are large binaries that git cannot diff, and they are
+# inputs to the work rather than part of it.
+*.docx
+*.pdf
+*.jpeg
+*.jpg

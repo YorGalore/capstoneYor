@@ -83,9 +83,9 @@ def _run_detect_coordination(project):
     from apps.coordination import detection
 
     flagged = 0
-    # PoliticalIssue has no project FK today, so every active issue is considered; detect()
-    # itself scopes the mentions it reads to this project.
-    for issue in PoliticalIssue.objects.filter(status=PoliticalIssue.STATUS_ACTIVE):
+    for issue in PoliticalIssue.objects.filter(
+        project=project, status=PoliticalIssue.STATUS_ACTIVE
+    ):
         flagged += len(detection.detect(project, issue))
     return f"{flagged} klaster ditandai untuk tinjauan"
 

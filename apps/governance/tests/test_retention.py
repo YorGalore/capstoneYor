@@ -23,6 +23,7 @@ class RetentionTest(TestCase):
             slug="x", display_name="X", method=Platform.METHOD_APIFY
         )
         self.issue = PoliticalIssue.objects.create(
+            project=self.project,
             title="Distribusi bansos",
             status=PoliticalIssue.STATUS_ACTIVE,
             opened_at=timezone.now(),
