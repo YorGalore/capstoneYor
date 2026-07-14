@@ -3,7 +3,10 @@
 {% block topbar_actions %}
   <div class="pantau-topbar-filter">Semua Platform ▾</div>
   <div class="pantau-topbar-filter mono">30 hari terakhir</div>
-  <div class="pantau-btn-primary">Ekspor</div>
+  {% if can_export %}
+  <a class="pantau-btn-primary" href="{% url 'analytics:export_mentions' %}?format=csv">Ekspor CSV</a>
+  <a class="pantau-btn-primary" href="{% url 'analytics:export_mentions' %}?format=xlsx">Ekspor XLSX</a>
+  {% endif %}
 {% endblock %}
 {% block content %}
 <div class="pantau-kpi-row">

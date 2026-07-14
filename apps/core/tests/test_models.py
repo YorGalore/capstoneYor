@@ -27,8 +27,17 @@ class CoreModelsTest(TestCase):
         user = get_user_model().objects.create_user(
             username="dewi.anjani", first_name="Dewi", last_name="Anjani"
         )
-        profile = AnalystProfile.objects.create(
-            user=user, tenant=tenant, role_label="Analis Humas",
-            has_political_monitoring_permission=True,
+        profile, _ = AnalystProfile.objects.update_or_create(
+            user=user,
+            defaults={
+                "tenant": tenant,
+                "role_label": "Analis Humas",
+                "has_political_monitoring_permission": True,
+            },
         )
         self.assertIn("Analis Humas", str(profile))
+
+    def test_new_user_automatically_gets_an_analyst_profile(self):
+        Tenant.objects.create(name="Kemenko PMK")
+        user = get_user_model().objects.create_user(username="baru.pengguna")
+        self.assertTrue(AnalystProfile.objects.filter(user=user).exists())

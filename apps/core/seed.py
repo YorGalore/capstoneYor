@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model
 
 from .models import AnalystProfile, Platform, Province, Regency, Project, Tenant
+from .permissions import seed_permission_matrix
 
 DEMO_USERNAME = "dewi.anjani"
+DEMO_PASSWORD = "demo12345"
 
 PLATFORMS = [
     ("x", "X (Twitter)", "#0B1F33", Platform.METHOD_INTERNAL),
@@ -53,16 +55,24 @@ def seed_core():
             Regency.objects.get_or_create(province=province, name=regency_name)
 
     User = get_user_model()
-    demo_user, _ = User.objects.get_or_create(
+    demo_user, created = User.objects.get_or_create(
         username=DEMO_USERNAME,
         defaults={"first_name": "Dewi", "last_name": "Anjani", "is_staff": True},
     )
-    AnalystProfile.objects.get_or_create(
+    if created:
+        demo_user.set_password(DEMO_PASSWORD)
+        demo_user.save()
+    AnalystProfile.objects.update_or_create(
         user=demo_user,
         defaults={
             "tenant": tenant,
             "role_label": "Analis Humas",
+            # Structured role governs page access (FR-1A). The single demo user is
+            # a Platform Super Admin so every screen — including the reserved
+            # Dev/Ops runtime settings — is reachable in the demo.
+            "role": AnalystProfile.ROLE_SUPER_ADMIN,
             "has_political_monitoring_permission": True,
         },
     )
+    seed_permission_matrix()
     return tenant, project

@@ -75,6 +75,11 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-user-name { font: 600 11.5px 'IBM Plex Sans', sans-serif; color: #D7E3F0; }
 .pantau-user-role { font: 400 10px 'IBM Plex Sans', sans-serif; color: #5F7A93; }
 
+.pantau-logout-form { margin: 0; }
+.pantau-logout-btn {
+  width: 100%; text-align: left; background: none; border: none; font-family: inherit;
+}
+
 .pantau-main { display: flex; flex-direction: column; background: var(--content-bg); }
 
 .pantau-topbar {
@@ -237,7 +242,40 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-credential-status { font: 600 11.5px 'IBM Plex Sans', sans-serif; color: var(--positive); margin-bottom: 10px; }
 .pantau-hint { padding: 10px 12px; border-radius: 8px; background: #F8FAFB; border: 1px solid #EEF2F5; font: 400 10.5px 'IBM Plex Sans', sans-serif; color: var(--text-faint); }
 .pantau-hint-highlight { background: #EAF4F5; border-color: #D3E8EA; color: var(--teal); }
-.pantau-domain-row { display: grid; grid-template-columns: 1.6fr 1fr 110px 110px; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #F5F7F8; font: 500 12px 'IBM Plex Sans', sans-serif; }
+.pantau-domain-row { display: grid; grid-template-columns: 1.5fr 0.9fr 100px 100px auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #F5F7F8; font: 500 12px 'IBM Plex Sans', sans-serif; }
+
+.pantau-source-row-form { margin: 0 0 9px; }
+.pantau-toggle-btn { background: none; border: none; padding: 0; font: 500 11px 'IBM Plex Sans', sans-serif; cursor: pointer; text-align: left; }
+.pantau-inline-form { display: inline; margin: 0; }
+.pantau-domain-actions { display: flex; gap: 8px; justify-self: end; }
+.pantau-btn-small { padding: 5px 10px; font-size: 11px; }
+
+.pantau-input {
+  padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; background: #fff;
+  font: 500 12px 'IBM Plex Sans', sans-serif; color: var(--navy-2);
+}
+.pantau-input:focus { outline: 2px solid var(--teal-light); outline-offset: 1px; }
+.pantau-add-form { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.pantau-add-form .pantau-input { flex: 1; }
+.pantau-add-domain-form .pantau-input:nth-child(2) { flex: 0.6; }
+.pantau-add-domain-form .pantau-input:nth-child(3) { flex: 1.4; }
+
+.pantau-keyword-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.pantau-keyword-tag {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 20px;
+  background: #EAF4F5; color: var(--navy-2); font: 500 11.5px 'IBM Plex Sans', sans-serif;
+}
+.pantau-keyword-tag-inactive { background: #EEF2F5; color: var(--text-faint); }
+.pantau-keyword-tag button {
+  background: none; border: none; cursor: pointer; padding: 0 2px; font-size: 11px; color: inherit;
+}
+
+.pantau-messages { display: flex; flex-direction: column; gap: 8px; padding: 14px 24px 0; }
+.pantau-message { padding: 10px 14px; border-radius: 8px; font: 500 12px 'IBM Plex Sans', sans-serif; }
+.pantau-message-success { background: #EAF5F0; color: var(--positive); border: 1px solid #CFE9DD; }
+.pantau-message-error { background: #FBEDEC; color: var(--negative); border: 1px solid #F2D8D6; }
+.pantau-message-warning { background: #FDF3E3; color: #9A6B14; border: 1px solid #F0E4CC; }
+.pantau-message-info { background: #EEF2F5; color: var(--text-muted); border: 1px solid var(--border); }
 
 .pantau-purpose-banner { padding: 10px 24px; background: #EAF4F5; border-bottom: 1px solid #D3E8EA; font: 400 11px/1.6 'IBM Plex Sans', sans-serif; color: #0B4A52; }
 .pantau-kpi-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
@@ -246,3 +284,44 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-permission-row, .pantau-audit-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #F5F7F8; font: 500 12px 'IBM Plex Sans', sans-serif; }
 .pantau-audit-row { grid-template-columns: 120px 1fr 1.3fr 110px; }
 .pantau-policy-ack { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+
+/* ---- Admin pages: permission matrix, dev/ops runtime settings, export ---- */
+.pantau-page-head { margin-bottom: 18px; }
+.pantau-page-title { font: 700 22px Archivo, sans-serif; color: var(--navy); margin: 0 0 4px; }
+.pantau-page-sub { font: 400 13px 'IBM Plex Sans', sans-serif; color: var(--text-muted); margin: 0; }
+
+.pantau-table-scroll { overflow-x: auto; }
+.pantau-table, .pantau-matrix { width: 100%; border-collapse: collapse; font: 400 12.5px 'IBM Plex Sans', sans-serif; }
+.pantau-table th, .pantau-table td,
+.pantau-matrix th, .pantau-matrix td {
+  border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: middle;
+}
+.pantau-table th, .pantau-matrix th {
+  background: #F8FAFB; font-weight: 600; color: var(--navy-2); white-space: nowrap;
+}
+.pantau-table code, .pantau-matrix code { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+.pantau-matrix-page { font-weight: 600; color: var(--navy-2); white-space: nowrap; }
+.pantau-matrix-cell { text-align: center; }
+
+.pantau-chip {
+  display: inline-block; border: 0; cursor: pointer; border-radius: 6px;
+  padding: 4px 10px; font: 600 11.5px 'IBM Plex Sans', sans-serif;
+}
+.pantau-chip-allow { background: #EAF5F0; color: var(--positive); }
+.pantau-chip-deny { background: #FBEDEC; color: var(--negative); }
+.pantau-chip-locked { background: #EEF2F5; color: var(--text-faint); cursor: default; }
+
+.pantau-btn {
+  display: inline-block; border: 0; cursor: pointer; border-radius: 8px;
+  padding: 8px 14px; font: 600 12.5px 'IBM Plex Sans', sans-serif;
+  background: var(--teal); color: #fff;
+}
+.pantau-btn:hover { background: #0A5C64; text-decoration: none; }
+.pantau-btn-danger { background: var(--negative); }
+.pantau-btn-danger:hover { background: #9E3A32; }
+
+.pantau-inline-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.pantau-inline-form .pantau-input { flex: 1 1 220px; min-width: 160px; }
+.pantau-check { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); }
+
+.pantau-pager { display: flex; gap: 12px; align-items: center; margin-top: 14px; }

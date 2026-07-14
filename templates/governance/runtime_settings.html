@@ -1,0 +1,58 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Pengaturan Dev/Ops{% endblock %}
+{% block content %}
+<div class="pantau-page-head">
+  <h1 class="pantau-page-title">Pengaturan Dev/Ops</h1>
+  <p class="pantau-page-sub">Halaman khusus Platform Super Admin (FR-1A.3). Kredensial &amp; Runtime Settings dikelola di sini tanpa redeploy (FR-2A).</p>
+</div>
+
+<div class="pantau-card">
+  <h2 class="pantau-card-title">Kredensial Apify</h2>
+  {% if active_credential %}
+    <p>Status: <strong>{{ active_credential.get_status_display }}</strong> &middot;
+       Token: <code>{{ active_credential.masked_token }}</code> &middot;
+       Terakhir divalidasi: {{ active_credential.last_verified_at|default:"—" }}</p>
+    <form method="post" action="{% url 'governance:revoke_apify_token' %}" style="margin-bottom:12px">
+      {% csrf_token %}
+      <button type="submit" class="pantau-btn pantau-btn-danger">Cabut token</button>
+    </form>
+  {% else %}
+    <p>Belum ada token Apify aktif.</p>
+  {% endif %}
+  <form method="post" action="{% url 'governance:save_apify_token' %}" class="pantau-inline-form">
+    {% csrf_token %}
+    <input class="pantau-input" type="password" name="token" placeholder="Tempel token Apify baru" autocomplete="off">
+    <button type="submit" class="pantau-btn">Validasi &amp; simpan</button>
+  </form>
+  <p class="pantau-hint">Token diuji ke API Apify langsung sebelum disimpan, lalu disimpan terenkripsi dan hanya ditampilkan tersamar.</p>
+</div>
+
+<div class="pantau-card">
+  <h2 class="pantau-card-title">Runtime Settings</h2>
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead><tr><th>Kunci</th><th>Nilai</th><th>Rahasia</th><th>Diperbarui oleh</th></tr></thead>
+      <tbody>
+        {% for row in settings_rows %}
+        <tr>
+          <td><code>{{ row.key }}</code></td>
+          <td>{{ row.value|default:"—" }}</td>
+          <td>{% if row.is_secret %}ya{% else %}tidak{% endif %}</td>
+          <td>{{ row.updated_by|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">Belum ada pengaturan.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="{% url 'governance:save_runtime_setting' %}" class="pantau-inline-form">
+    {% csrf_token %}
+    <input class="pantau-input" type="text" name="key" placeholder="mis. collection.default_cadence">
+    <input class="pantau-input" type="text" name="value" placeholder="nilai">
+    <label class="pantau-check"><input type="checkbox" name="is_secret" value="1"> rahasia</label>
+    <button type="submit" class="pantau-btn">Simpan</button>
+  </form>
+  <p class="pantau-hint">Kunci dilindungi (tidak dapat diubah di sini): {{ reserved_keys|join:", " }}</p>
+</div>
+{% endblock %}

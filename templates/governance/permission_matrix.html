@@ -1,0 +1,47 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Matriks Izin Halaman{% endblock %}
+{% block content %}
+<div class="pantau-page-head">
+  <h1 class="pantau-page-title">Matriks Izin Halaman</h1>
+  <p class="pantau-page-sub">Kelola akses per peran &times; halaman (FR-1A). Sel terkunci dilindungi kebijakan dan tidak dapat diubah.</p>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-table-scroll">
+    <table class="pantau-matrix">
+      <thead>
+        <tr>
+          <th>Halaman</th>
+          {% for role in roles %}<th>{{ role.label }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="pantau-matrix-page">{{ row.label }}</td>
+          {% for cell in row.cells %}
+          <td class="pantau-matrix-cell">
+            {% if cell.reserved %}
+              <span class="pantau-chip pantau-chip-locked" title="Dilindungi">
+                {% if cell.allowed %}Izin&nbsp;🔒{% else %}Tolak&nbsp;🔒{% endif %}
+              </span>
+            {% else %}
+              <form method="post" action="{% url 'governance:toggle_permission' %}">
+                {% csrf_token %}
+                <input type="hidden" name="role" value="{{ cell.role }}">
+                <input type="hidden" name="page" value="{{ row.page }}">
+                <button type="submit"
+                  class="pantau-chip {% if cell.allowed %}pantau-chip-allow{% else %}pantau-chip-deny{% endif %}">
+                  {% if cell.allowed %}Izin{% else %}Tolak{% endif %}
+                </button>
+              </form>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
