@@ -110,9 +110,104 @@
 
 <div class="pantau-card">
   <div class="pantau-card-header">
+    <div class="pantau-card-title">Koleksi Data</div>
+  </div>
+  {% if collection_enabled %}
+    <div class="pantau-hint">Koleksi berjalan sesuai jadwal di bawah.</div>
+    <form method="post" action="{% url 'governance:toggle_collection' %}">
+      {% csrf_token %}
+      <input type="hidden" name="enabled" value="0">
+      <button type="submit" class="pantau-btn-danger">■ Hentikan Semua Koleksi</button>
+    </form>
+    <div class="pantau-hint">Menghentikan koleksi berlaku seketika untuk penjadwal, perintah CLI, dan tombol Pindai. Analisis atas data yang sudah ada tetap berjalan.</div>
+  {% else %}
+    <div class="pantau-neutrality-notice">
+      ⚠ Koleksi data <strong>dihentikan</strong>. Tidak ada data baru yang masuk — grafik yang datar berarti tidak ada data, bukan opini publik yang tenang.
+    </div>
+    <form method="post" action="{% url 'governance:toggle_collection' %}">
+      {% csrf_token %}
+      <input type="hidden" name="enabled" value="1">
+      <button type="submit" class="pantau-btn-dark">▶ Aktifkan Kembali Koleksi</button>
+    </form>
+  {% endif %}
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Kesehatan Kolektor</div>
+  </div>
+  <div class="pantau-hint">Kolektor yang mati diam-diam adalah kegagalan paling berbahaya: dasbor tetap tampil normal padahal tidak ada data baru (REQ-CS-07).</div>
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead><tr><th>Sumber</th><th>Status</th><th>Gagal berturut-turut</th><th>Sukses terakhir</th><th>Tingkat sukses</th><th>Galat terakhir</th></tr></thead>
+      <tbody>
+        {% for row in collector_health %}
+        <tr>
+          <td>{{ row.source }}</td>
+          <td>{{ row.status_label }}</td>
+          <td>{{ row.consecutive_failures }}</td>
+          <td>{{ row.last_success_at|default:"—" }}</td>
+          <td>{{ row.success_rate }}</td>
+          <td>{{ row.last_error|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">Belum ada siklus koleksi untuk dinilai.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Penjadwalan Pekerjaan</div>
+  </div>
+  <div class="pantau-hint">Kadensi per proyek (REQ-SC-01). Koleksi memakai kredit Apify tiap siklus — perpendek dengan sadar biaya.</div>
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead><tr><th>Pekerjaan</th><th>Proyek</th><th>Tiap (menit)</th><th>Aktif</th><th>Jalan berikutnya</th><th>Terakhir</th><th></th></tr></thead>
+      <tbody>
+        {% for job in schedules %}
+        {% comment %}
+          Each row's form element sits inside the last cell; the inputs in the other
+          cells join it by id through the HTML5 form= attribute. Putting the form
+          element directly inside the row instead is invalid markup — the parser hoists
+          it out of the table and orphans every input, so the row submits empty.
+        {% endcomment %}
+        <tr>
+          <td>{{ job.get_job_type_display }}</td>
+          <td>{{ job.project.name }}</td>
+          <td><input type="number" form="jadwal-{{ job.pk }}" name="cadence_minutes" value="{{ job.cadence_minutes }}" min="1" class="pantau-input"></td>
+          <td><input type="checkbox" form="jadwal-{{ job.pk }}" name="enabled" {% if job.enabled %}checked{% endif %}></td>
+          <td>{{ job.next_run_at }}</td>
+          <td>
+            {% if job.last_status %}
+              {{ job.get_last_status_display }}
+              {% if job.last_error %}<div class="pantau-hint">{{ job.last_error }}</div>
+              {% elif job.last_detail %}<div class="pantau-hint">{{ job.last_detail }}</div>{% endif %}
+              {% if job.consecutive_failures %}<div class="pantau-hint">{{ job.consecutive_failures }}× gagal berturut-turut</div>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <form id="jadwal-{{ job.pk }}" method="post" action="{% url 'governance:update_schedule' job.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="pantau-btn-outline pantau-btn-small">Simpan</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">Belum ada jadwal.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
     <div class="pantau-card-title">Riwayat Siklus Koleksi</div>
   </div>
-  <div class="pantau-hint">Status terpadu koleksi Apify &amp; berita (REQ-SC-03). Jalankan siklus Apify via perintah <code>manage.py collect</code>.</div>
+  <div class="pantau-hint">Status terpadu koleksi Apify &amp; berita (REQ-SC-03).</div>
   <div class="pantau-table-scroll">
     <table class="pantau-table">
       <thead><tr><th>Sumber</th><th>Status</th><th>Item</th><th>Estimasi biaya</th><th>Selesai</th></tr></thead>

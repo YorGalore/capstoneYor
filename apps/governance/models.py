@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
-from apps.core.models import Platform, Tenant
+from apps.core.models import Platform, Project, Tenant
 
 
 class PlatformIntegration(models.Model):
@@ -171,6 +172,56 @@ class CollectionRun(models.Model):
 
     def __str__(self):
         return f"{self.source} — {self.get_status_display()} ({self.items_found})"
+
+
+class ScheduledJob(models.Model):
+    """A recurring job on a per-project cadence (REQ-SC-01, REQ-SC-02).
+
+    Without this, the platform only monitors when somebody remembers to type a
+    management command. Cadence is per project because a national program under active
+    scrutiny and a dormant one should not cost the same in Apify credits.
+    """
+
+    JOB_COLLECT = "collect"
+    JOB_EVALUATE_ALERTS = "evaluate_alerts"
+    JOB_DETECT_COORDINATION = "detect_coordination"
+    JOB_GENERATE_BRIEF = "generate_brief"
+    JOB_PURGE_RETENTION = "purge_retention"
+    JOB_CHOICES = [
+        (JOB_COLLECT, "Koleksi data"),
+        (JOB_EVALUATE_ALERTS, "Evaluasi peringatan"),
+        (JOB_DETECT_COORDINATION, "Deteksi koordinasi"),
+        (JOB_GENERATE_BRIEF, "Brief harian"),
+        (JOB_PURGE_RETENTION, "Purge retensi"),
+    ]
+
+    STATUS_OK = "ok"
+    STATUS_FAILED = "failed"
+    STATUS_SKIPPED = "skipped"
+    STATUS_CHOICES = [
+        (STATUS_OK, "Berhasil"),
+        (STATUS_FAILED, "Gagal"),
+        (STATUS_SKIPPED, "Dilewati"),
+    ]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="scheduled_jobs")
+    job_type = models.CharField(max_length=40, choices=JOB_CHOICES)
+    cadence_minutes = models.PositiveIntegerField(default=60)
+    enabled = models.BooleanField(default=True)
+
+    next_run_at = models.DateTimeField(default=timezone.now, db_index=True)
+    last_run_at = models.DateTimeField(null=True, blank=True)
+    last_status = models.CharField(max_length=20, choices=STATUS_CHOICES, blank=True)
+    last_error = models.CharField(max_length=500, blank=True)
+    last_detail = models.CharField(max_length=255, blank=True)
+    consecutive_failures = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("project", "job_type")
+        ordering = ["project_id", "job_type"]
+
+    def __str__(self):
+        return f"{self.get_job_type_display()} — {self.project.name} (tiap {self.cadence_minutes}m)"
 
 
 class PolicyAcknowledgment(models.Model):

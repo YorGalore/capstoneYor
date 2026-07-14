@@ -15,11 +15,12 @@ from apps.core.permissions import (
     require_page,
 )
 
-from . import apify, runtime, scraping
+from . import apify, health, runtime, scheduling, scraping
 from .forms import MonitoredDomainForm, MonitoringKeywordForm
 from .models import (
     ApifyCredential, AuditLogEntry, CollectionRun, MonitoredDomain, MonitoringKeyword,
     PlatformIntegration, PoliticalMonitoringPermission, PolicyAcknowledgment, RuntimeSetting,
+    ScheduledJob,
 )
 from .services import record_audit_entry
 
@@ -51,7 +52,59 @@ def konfigurasi(request):
         "recent_runs": recent_runs,
         "domain_form": MonitoredDomainForm(),
         "keyword_form": MonitoringKeywordForm(),
+        "schedules": ScheduledJob.objects.select_related("project"),
+        "collector_health": health.collection_health(),
+        "health_labels": health.STATUS_LABELS,
+        "collection_enabled": scheduling.collection_enabled(),
     })
+
+
+@require_page("konfigurasi")
+@require_POST
+def update_schedule(request, job_id):
+    """Change a job's cadence or switch it off (REQ-SC-01)."""
+    job = get_object_or_404(ScheduledJob, pk=job_id)
+    try:
+        cadence = int(request.POST.get("cadence_minutes", job.cadence_minutes))
+    except ValueError:
+        cadence = 0
+
+    if cadence < 1:
+        # A zero cadence would make the job due again the instant it finished, spending
+        # Apify credits as fast as the scheduler can turn. Refuse rather than accept a
+        # value that quietly becomes a runaway bill.
+        messages.error(request, "Kadensi harus minimal 1 menit.")
+        return redirect("governance:konfigurasi")
+
+    job.cadence_minutes = cadence
+    job.enabled = request.POST.get("enabled") == "on"
+    job.save(update_fields=["cadence_minutes", "enabled"])
+
+    record_audit_entry(
+        actor_label=_actor_label(request),
+        action=(
+            f"Mengubah jadwal {job.get_job_type_display()}: tiap {cadence} menit, "
+            f"{'aktif' if job.enabled else 'nonaktif'}"
+        ),
+        target=f"scheduled_job:{job.pk}",
+    )
+    messages.success(request, f"Jadwal {job.get_job_type_display()} diperbarui.")
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+def toggle_collection(request):
+    """The collection kill switch (REQ-LC-03) — halts or resumes all collection."""
+    enabled = request.POST.get("enabled") == "1"
+    scheduling.set_collection_enabled(enabled, actor=_actor_label(request))
+    if enabled:
+        messages.success(request, "Koleksi data diaktifkan kembali.")
+    else:
+        messages.warning(
+            request, "Koleksi data dihentikan. Tidak ada data baru yang akan masuk."
+        )
+    return redirect("governance:konfigurasi")
 
 
 @require_POST

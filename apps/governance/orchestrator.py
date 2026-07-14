@@ -63,6 +63,14 @@ def collect_platform(project, platform, keywords, token):
 def run_apify_collection(project, token, platforms=None):
     """Collect from every enabled Apify platform. Returns the CollectionRun list.
     Degrades gracefully (no runs) when there is no token or no active keyword."""
+    # The kill switch is enforced here, at the collection boundary, rather than in the
+    # scheduler — `manage.py collect` and the console's "Pindai" button also land here,
+    # and a halt that only the scheduler honors would be undone by the next person to
+    # press the button (REQ-LC-03).
+    from .scheduling import collection_enabled
+
+    if not collection_enabled():
+        return []
     if not token:
         return []
     active_keywords = list(MonitoringKeyword.objects.filter(is_active=True))

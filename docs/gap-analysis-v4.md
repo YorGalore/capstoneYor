@@ -177,8 +177,62 @@ Implemented TDD; +41 tests (244 → 285 passing). Closes the two largest remaini
 20. ✅ **Regulatory & policy grounding** (FR-31): `RegulatoryDocument` corpus kept separate from the mention index (FR-31.1); lexical retrieval with a light **Indonesian stemmer** (agglutinative affixes — `disalurkan`/`penyaluran` → `salur`); every hit returns its **source passage alongside the citation** so a reviewer can verify it independently (FR-31.2/31.4); **risk classification** Rendah/Sedang/Tinggi (FR-31.3); corpus managed in the console (FR-31.5). Returns *nothing* rather than a weak match — better no citation than a fabricated-sounding one.
     - **Retrieval defect found by running it, not by testing it:** a food-price issue cited the *fuel-subsidy* Perpres first, because the taxonomy keyword "harga bahan" incidentally overlapped "bahan bakar" and the shorter doc won on term frequency. A wrong top-ranked citation is exactly the risk FR-31.4 exists to mitigate. Fixed by weighting title matches (a regulation's title states its subject): the food regulation now ranks 1.042 vs 0.106.
 
+### Workstream G — Scheduling & operations — 🟢 DONE (2026-07-14)
+Implemented TDD; +41 tests (313 → 354 passing). Prompted by deployment: the platform ran
+in production but **nothing ran on a cadence** — collection, alerting, briefs and CIB
+detection all waited for a human to type a management command.
+21. ✅ **Cadence scheduler** (REQ-SC-01/02): `ScheduledJob` (per-project cadence) +
+    `apps/governance/scheduling.py` + a `scheduler` container running `manage.py
+    run_scheduler`. Deliberately a DB-backed loop, not Celery/Redis: the job set is small
+    and fixed, and Postgres already provides the one primitive a scheduler needs —
+    `SELECT … FOR UPDATE SKIP LOCKED` — so two replicas cannot run the same job twice
+    (and cannot pay Apify twice for it). A broker would add an operational component and
+    a failure mode without adding a capability.
+    - **Missed windows do not replay.** If the scheduler is down for a day, a 15-minute
+      job is 96 windows overdue; catching up would fire 96 collection runs at once — a
+      self-inflicted stampede against Apify and 96 duplicate briefs. It runs once and
+      resumes cadence.
+    - Repeated failures back off geometrically (capped at 60m) rather than hammering a
+      dead upstream every cycle; one failing job never stops the others.
+    - The scheduler runs in its own container, so a four-minute collection cannot occupy
+      a gunicorn worker that should be answering an analyst.
+22. ✅ **Collection kill switch** (REQ-LC-03): halts all collection platform-wide, from
+    the console, effective immediately. **Enforced at the collection boundary, not in the
+    scheduler** — `manage.py collect` and the console's "Pindai" button call the
+    orchestrator directly, so a halt only the scheduler honored would be undone by the
+    next person to press the button. It does *not* stop alerting or briefs: those run over
+    data already held, which is exactly what people need during the incident that made
+    someone hit the switch. Toggling is audited.
+23. ✅ **Collector health** (REQ-CS-07): per-source status on the console. Explicitly
+    models the failure that hides — a collector that reports success and simply *stops
+    producing* is reported `stale`, not green, because a flat trend line read as calm
+    public opinion is the most dangerous thing this platform can show. Overlap-skips are
+    not counted as failures.
+24. ✅ **Retention purge** (REQ-LC-01/02/04): `apps/governance/retention.py` +
+    `manage.py purge_retention` (dry-run by default). Two rules, both load-bearing:
+    **no policy means no deletion** (the platform must never start deleting a ministry's
+    archive on its own), and **an open coordination investigation is never purged** — a
+    flagged cluster is a case a human is still reviewing, and deleting the posts under it
+    on a date boundary would destroy the evidence and leave the cluster pointing at
+    nothing. Purges are audited; dry runs are not.
+
+**Bug found by driving a real browser, not by the tests:** the schedule form silently
+submitted nothing. Django's `{# … #}` comment is *single-line only*, so a multi-line
+`{# … #}` explaining an HTML pitfall was emitted verbatim into the page — and because it
+contained the literal text `<form>`, the browser parsed it as a real form start tag inside
+`<tbody>`, foster-parented it out, and then (nested-form rule) stripped the `id` and
+`action` off every real schedule form. The comment caused the exact bug it described. The
+Django test client never parses HTML, so all 9 view tests passed against a page that was
+broken in every real browser.
+
 ### Workstream F — Platform/non-functional (deferred)
-21. REST/GraphQL API + WebSocket (§7), i18n framework (§8.8), observability (§3.6), search index, OCEAN (FR-7) + demographics (FR-8), real LLM provider as primary NLP tier, PDF/DOCX brief export (FR-30.5), then the microservices decomposition (§3.3) once load/team justify it.
+25. REST/GraphQL API + WebSocket (§7), i18n framework (§8.8), observability (§3.6), search index, OCEAN (FR-7) + demographics (FR-8), real LLM provider as primary NLP tier, PDF/DOCX brief export (FR-30.5), then the microservices decomposition (§3.3) once load/team justify it.
+
+### Known gap surfaced while building Workstream G
+- **`PoliticalIssue` has no `project` FK** — issues are global, shared across every tenant.
+  This contradicts FR-1.2 (strict tenant isolation). `detect()` and the retention purge both
+  scope the *mentions* they read to a project, so nothing leaks today, but the issue list
+  itself is not tenant-scoped and should be.
 
 ### Suggested near-term sequencing
 - **Sprint 1–2:** A1–A5 (RBAC, permission matrix, runtime settings/Apify cred, tenant guard, export) — turns the demo into a governable Phase-1 base.

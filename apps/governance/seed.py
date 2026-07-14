@@ -5,8 +5,26 @@ from apps.core.models import Platform
 
 from .models import (
     ApifyCredential, AuditLogEntry, MonitoredDomain, MonitoringKeyword, PlatformIntegration,
-    PoliticalMonitoringPermission, PolicyAcknowledgment,
+    PoliticalMonitoringPermission, PolicyAcknowledgment, ScheduledJob,
 )
+
+# Default cadences (REQ-SC-01). Collection is the expensive one — every cycle spends Apify
+# credits — so it runs least often of the data-touching jobs; alerting is cheap and is what
+# an analyst is waiting on, so it runs most often.
+DEFAULT_SCHEDULES = [
+    # (job_type, cadence_minutes, enabled)
+    #
+    # Collection starts disabled: it cannot work until a Super Admin has entered an Apify
+    # token on the Dev/Ops page. Shipping it enabled would just paint the health dashboard
+    # red for a reason the operator has not been asked about yet.
+    (ScheduledJob.JOB_COLLECT, 60, False),
+    (ScheduledJob.JOB_EVALUATE_ALERTS, 15, True),
+    (ScheduledJob.JOB_DETECT_COORDINATION, 180, True),
+    (ScheduledJob.JOB_GENERATE_BRIEF, 1440, True),
+    # A no-op until someone sets a retention policy, which is the point: the platform must
+    # not start deleting a ministry's archive on its own.
+    (ScheduledJob.JOB_PURGE_RETENTION, 1440, True),
+]
 
 # feed_url is left blank for sources with no known public RSS feed — the
 # console still lists them, but "Jalankan Sekarang" skips them until an
@@ -45,6 +63,16 @@ ACTOR_IDS = {
     "facebook": "apify/facebook-posts-scraper",
     "x": "scraper internal v2.4.1",
 }
+
+
+def seed_schedules(project):
+    """Give every project a default cadence so the platform monitors without being asked."""
+    for job_type, cadence, enabled in DEFAULT_SCHEDULES:
+        ScheduledJob.objects.get_or_create(
+            project=project,
+            job_type=job_type,
+            defaults={"cadence_minutes": cadence, "enabled": enabled},
+        )
 
 
 def seed_governance(tenant):

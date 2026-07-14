@@ -28,8 +28,27 @@ fi
 # Migrations run here rather than in the image build, because a build has no database
 # and because the schema belongs to the deployment, not the artifact. With more than
 # one replica this needs to move to a release step so that N containers do not race.
-echo "Applying migrations..."
-python manage.py migrate --noinput
+#
+# Sidecars that share this image (the scheduler) set RUN_MIGRATIONS=0: two containers
+# applying the same migration concurrently is a race with a corrupt-schema ending, and
+# only one of them should own it.
+if [ "${RUN_MIGRATIONS:-1}" = "1" ]; then
+  echo "Applying migrations..."
+  python manage.py migrate --noinput
+else
+  echo "RUN_MIGRATIONS=0 -- another container owns migrations; waiting for the schema."
+  # Do not start work against a half-migrated schema.
+  attempts=0
+  until python manage.py migrate --check >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge 60 ]; then
+      echo "Schema is still not migrated after 60 attempts; giving up." >&2
+      exit 1
+    fi
+    sleep 2
+  done
+  echo "Schema is up to date."
+fi
 
 # Demo data is opt-in. Seeding a real deployment with fabricated mentions and fake
 # political actors would be indistinguishable from real intelligence to anyone reading

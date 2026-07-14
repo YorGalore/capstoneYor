@@ -37,5 +37,28 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  scheduler:
+    # Runs collection, alerting, brief generation, CIB detection and the retention purge
+    # on their configured cadences. A separate container on purpose: a four-minute
+    # collection run inside a gunicorn worker is a worker not answering an analyst.
+    build: .
+    command: ["python", "manage.py", "run_scheduler"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-pantau}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pantau}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set (see .env.example)}
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DJANGO_BEHIND_TLS: ${DJANGO_BEHIND_TLS:-0}
+      # The web container owns migrations and seeding; the scheduler waits for the schema
+      # rather than racing to apply it.
+      RUN_MIGRATIONS: "0"
+      SEED_DEMO_DATA: "0"
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   pgdata:

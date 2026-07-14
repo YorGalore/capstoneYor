@@ -56,6 +56,32 @@ docker compose exec -e DJANGO_BEHIND_TLS=1 web python manage.py check --deploy
 # System check identified no issues (0 silenced).
 ```
 
+## The scheduler
+
+`docker compose up` starts a **scheduler** container alongside the web workers. It runs
+collection, alert evaluation, brief generation, CIB detection and the retention purge on
+the cadences configured per project on the Configuration Console.
+
+- Cadences, enable/disable, last outcome and failure counts are all on **Konfigurasi →
+  Penjadwalan Pekerjaan**.
+- **Collection ships disabled**: it cannot work until a Super Admin enters an Apify token
+  on the Dev/Ops page. Enable it there once the token is in.
+- **Kill switch**: *Konfigurasi → Koleksi Data → Hentikan Semua Koleksi* stops all
+  collection immediately — scheduler, CLI and the "Pindai" button alike. Alerting and
+  briefs keep running over data already held. The toggle is audited.
+- **Collector health** (*Kesehatan Kolektor*) reports a source that has silently stopped
+  producing as `stale`, not green. A flat trend line means "no data", not "calm".
+- **Retention is off until you set it.** `retention.days` on the Dev/Ops page; until then
+  the purge job is a no-op. Mentions belonging to an open (flagged) coordination cluster
+  are never purged. Preview with:
+  ```bash
+  docker compose exec web python manage.py purge_retention        # dry run
+  docker compose exec web python manage.py purge_retention --apply
+  ```
+
+Scaling the scheduler past one replica is safe (`SELECT … FOR UPDATE SKIP LOCKED`), but
+there is no reason to until job durations approach the cadence.
+
 ## What the container does at start
 
 `entrypoint.sh` waits for the database to answer a real query (not merely accept a TCP

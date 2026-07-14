@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from apps.analytics.seed import seed_analytics
 from apps.coordination.seed import seed_coordination
 from apps.core.seed import seed_core
-from apps.governance.seed import seed_governance, seed_regulatory_corpus
+from apps.governance.seed import seed_governance, seed_regulatory_corpus, seed_schedules
 
 
 class Command(BaseCommand):
@@ -24,5 +24,8 @@ class Command(BaseCommand):
 
         seed_regulatory_corpus()
         self.stdout.write(self.style.SUCCESS("Regulatory corpus seeded for RAG grounding"))
+
+        seed_schedules(project)
+        self.stdout.write(self.style.SUCCESS("Default job schedules seeded"))
 
         self.stdout.write(self.style.SUCCESS("seed_demo_data complete."))
