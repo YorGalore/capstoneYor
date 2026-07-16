@@ -24,6 +24,7 @@ class AlertEngineTest(TestCase):
             title="Distribusi Pangan", opened_at=timezone.now(), owner_label="Humas"
         )
         self.rule = AlertRule.objects.create(
+            project=self.project,
             name="Lonjakan sentimen negatif",
             condition_summary="Rasio negatif > 60% dalam 60 menit",
             channel=AlertRule.CHANNEL_EMAIL,
@@ -85,8 +86,49 @@ class AlertEngineTest(TestCase):
 
         self.assertEqual(Alert.objects.filter(rule=self.rule, status=Alert.STATUS_ACTIVE).count(), 1)
 
+    def test_only_rules_owned_by_the_supplied_project_are_evaluated(self):
+        other_tenant = Tenant.objects.create(name="Instansi B")
+        other_project = Project.objects.create(tenant=other_tenant, name="Proyek B")
+        other_rule = AlertRule.objects.create(
+            project=other_project,
+            name="Aturan proyek lain",
+            condition_summary="Rasio negatif > 60% dalam 60 menit",
+            channel=AlertRule.CHANNEL_EMAIL,
+            condition_type=AlertRule.CONDITION_NEGATIVE_RATIO,
+            threshold=0.6,
+            window_minutes=60,
+        )
+        for _ in range(9):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+
+        triggered = alerting.evaluate_rules(self.project)
+
+        self.assertEqual([alert.rule for alert in triggered], [self.rule])
+        self.assertFalse(Alert.objects.filter(rule=other_rule).exists())
+        self.assertEqual(triggered[0].project, self.project)
+
+    def test_active_alert_for_another_project_does_not_block_this_project(self):
+        other_tenant = Tenant.objects.create(name="Instansi B")
+        other_project = Project.objects.create(tenant=other_tenant, name="Proyek B")
+        Alert.objects.create(
+            project=other_project,
+            rule=self.rule,
+            severity=Alert.SEVERITY_WARNING,
+            title=self.rule.name,
+            detail="breach in project B",
+            triggered_at=timezone.now(),
+        )
+        for _ in range(9):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+
+        triggered = alerting.evaluate_rules(self.project)
+
+        self.assertEqual(len(triggered), 1)
+        self.assertEqual(triggered[0].project, self.project)
+
     def test_volume_spike_rule(self):
         spike = AlertRule.objects.create(
+            project=self.project,
             name="Lonjakan volume", condition_summary="Volume > 5 dalam 60 menit",
             channel=AlertRule.CHANNEL_PUSH, condition_type=AlertRule.CONDITION_VOLUME_SPIKE,
             threshold=5, window_minutes=60,

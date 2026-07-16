@@ -1,7 +1,7 @@
 from django.test import TestCase
 
 from apps.core.seed import seed_core
-from apps.analytics.models import Alert, Coalition, Mention, PoliticalIssue
+from apps.analytics.models import Alert, AlertRule, Coalition, Mention, PoliticalIssue
 from apps.analytics.seed import seed_analytics
 
 
@@ -17,6 +17,8 @@ class SeedAnalyticsTest(TestCase):
             PoliticalIssue.objects.filter(title="Distribusi Pangan Wilayah Timur").exists()
         )
         self.assertEqual(Alert.objects.count(), 5)
+        self.assertFalse(AlertRule.objects.exclude(project=project).exists())
+        self.assertFalse(Alert.objects.exclude(project=project).exists())
 
     def test_seed_analytics_is_idempotent(self):
         tenant, project = seed_core()

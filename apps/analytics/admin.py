@@ -9,8 +9,17 @@ from .models import (
 admin.site.register(Coalition)
 admin.site.register(PoliticalIssue)
 admin.site.register(Mention)
-admin.site.register(AlertRule)
-admin.site.register(Alert)
+@admin.register(AlertRule)
+class AlertRuleAdmin(admin.ModelAdmin):
+    list_display = ("name", "project", "condition_type", "channel", "is_active")
+    list_filter = ("project", "condition_type", "channel", "is_active")
+
+
+@admin.register(Alert)
+class AlertAdmin(admin.ModelAdmin):
+    list_display = ("title", "project", "severity", "status", "triggered_at")
+    list_filter = ("project", "severity", "status")
+    list_select_related = ("project", "rule")
 admin.site.register(Author)
 admin.site.register(Category)
 admin.site.register(SubCategory)

@@ -9,6 +9,29 @@ class Tenant(models.Model):
         return self.name
 
 
+class OnboardingRequest(models.Model):
+    ORGANIZATION_CHOICES = [("brand", "Brand / Perusahaan"), ("government", "Pemerintah / Instansi Publik")]
+
+    organization_type = models.CharField(max_length=20, choices=ORGANIZATION_CHOICES)
+    organization_name = models.CharField(max_length=200)
+    contact_name = models.CharField(max_length=150)
+    work_email = models.EmailField()
+    phone = models.CharField(max_length=30)
+    role = models.CharField(max_length=120)
+    monitoring_goal = models.TextField()
+    platforms = models.CharField(max_length=300, blank=True)
+    team_size = models.CharField(max_length=50, blank=True)
+    consent = models.BooleanField(default=False)
+    status = models.CharField(max_length=30, default="new")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.organization_name} — {self.get_organization_type_display()}"
+
+
 class Project(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="projects")
     name = models.CharField(max_length=200)

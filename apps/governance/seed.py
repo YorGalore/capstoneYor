@@ -76,13 +76,17 @@ def seed_schedules(project):
 
 
 def seed_governance(tenant):
-    if PlatformIntegration.objects.exists():
+    project = tenant.projects.order_by("pk").first()
+    if project is None:
+        raise ValueError("Tenant harus memiliki proyek sebelum konfigurasi governance dibuat.")
+    if PlatformIntegration.objects.filter(project=project).exists():
         return
 
     now = timezone.now()
     social_platforms = Platform.objects.exclude(slug__in=["berita", "forum"])
     for platform in social_platforms:
         PlatformIntegration.objects.get_or_create(
+            project=project,
             platform=platform,
             defaults={
                 "method": platform.method,
@@ -93,12 +97,14 @@ def seed_governance(tenant):
         )
 
     ApifyCredential.objects.get_or_create(
+        project=project,
         masked_token="apify_••••••••••••••••••3f9a",
         defaults={"last_verified_at": now - timezone.timedelta(hours=2)},
     )
 
     for domain, adapter, status, feed_url in DOMAINS:
         MonitoredDomain.objects.get_or_create(
+            project=project,
             domain=domain,
             defaults={
                 "adapter": adapter, "status": status, "feed_url": feed_url,
@@ -107,7 +113,9 @@ def seed_governance(tenant):
         )
 
     for keyword in MONITORING_KEYWORDS:
-        MonitoringKeyword.objects.get_or_create(keyword=keyword, defaults={"created_by": "Sistem (seed)"})
+        MonitoringKeyword.objects.get_or_create(
+            project=project, keyword=keyword, defaults={"created_by": "Sistem (seed)"}
+        )
 
     User = get_user_model()
     demo_user = User.objects.filter(username="dewi.anjani").first()

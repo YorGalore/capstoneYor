@@ -18,9 +18,10 @@ class CollectCommandTest(TestCase):
             slug="x", display_name="X", method=Platform.METHOD_APIFY
         )
         PlatformIntegration.objects.create(
-            platform=self.platform, method=PlatformIntegration.METHOD_APIFY, is_active=True
+            project=self.project, platform=self.platform,
+            method=PlatformIntegration.METHOD_APIFY, is_active=True
         )
-        MonitoringKeyword.objects.create(keyword="pangan", is_active=True)
+        MonitoringKeyword.objects.create(project=self.project, keyword="pangan", is_active=True)
 
     def test_command_runs_collection_when_token_present(self):
         items = [{

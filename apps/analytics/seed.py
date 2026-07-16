@@ -186,7 +186,7 @@ def seed_analytics(project, mention_count=4000):
     Mention.objects.bulk_create(mentions)
 
     _seed_political_issue(project, rng, now)
-    _seed_alerts(now)
+    _seed_alerts(project, now)
 
 
 def _seed_political_issue(project, rng, now):
@@ -255,8 +255,9 @@ def _seed_political_issue(project, rng, now):
     Mention.objects.bulk_create(political_mentions)
 
 
-def _seed_alerts(now):
+def _seed_alerts(project, now):
     rule_spike, _ = AlertRule.objects.get_or_create(
+        project=project,
         name="Rasio-Neg-3J",
         defaults={
             "condition_summary": "Volume negatif naik >150% dalam 3 jam",
@@ -264,15 +265,19 @@ def _seed_alerts(now):
         },
     )
     rule_influencer, _ = AlertRule.objects.get_or_create(
+        project=project,
         name="Akun-Berpengaruh",
         defaults={
             "condition_summary": "Sebutan dari akun >1 juta pengikut",
             "channel": AlertRule.CHANNEL_PUSH,
         },
     )
-    issue = PoliticalIssue.objects.filter(title="Distribusi Pangan Wilayah Timur").first()
+    issue = PoliticalIssue.objects.filter(
+        project=project, title="Distribusi Pangan Wilayah Timur"
+    ).first()
 
     Alert.objects.get_or_create(
+        project=project,
         title="Lonjakan sentimen negatif — distribusi wilayah timur",
         defaults={
             "rule": rule_spike, "issue": issue, "severity": Alert.SEVERITY_CRITICAL,
@@ -281,6 +286,7 @@ def _seed_alerts(now):
         },
     )
     Alert.objects.get_or_create(
+        project=project,
         title="Sebutan dari akun berpengaruh tinggi",
         defaults={
             "rule": rule_influencer, "issue": issue, "severity": Alert.SEVERITY_WARNING,
@@ -289,6 +295,7 @@ def _seed_alerts(now):
         },
     )
     Alert.objects.get_or_create(
+        project=project,
         title="Ambang volume harian tercapai — teratasi",
         defaults={
             "rule": rule_spike, "issue": None, "severity": Alert.SEVERITY_INFO,
@@ -297,6 +304,7 @@ def _seed_alerts(now):
         },
     )
     Alert.objects.get_or_create(
+        project=project,
         title="Klaster amplifikasi baru terdeteksi",
         defaults={
             "rule": rule_spike, "issue": issue, "severity": Alert.SEVERITY_WARNING,
@@ -305,6 +313,7 @@ def _seed_alerts(now):
         },
     )
     Alert.objects.get_or_create(
+        project=project,
         title="Sentimen positif melampaui rata-rata mingguan",
         defaults={
             "rule": rule_spike, "issue": None, "severity": Alert.SEVERITY_INFO,

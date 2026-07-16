@@ -47,17 +47,20 @@ def _classify(consecutive_failures, last_success_at, now):
     return HEALTHY
 
 
-def collection_health(now=None):
+def collection_health(now=None, project=None):
     """Per-source health, newest activity first. Sources that have never run are absent
     rather than invented — reporting a status for a collector that was never configured
     would be a fabrication."""
     now = now or timezone.now()
     report = []
 
-    sources = CollectionRun.objects.values_list("source", flat=True).distinct()
+    run_queryset = CollectionRun.objects.all()
+    if project is not None:
+        run_queryset = run_queryset.filter(project=project)
+    sources = run_queryset.values_list("source", flat=True).distinct()
     for source in sorted(sources):
         runs = list(
-            CollectionRun.objects.filter(source=source).order_by("-started_at")[:WINDOW]
+            run_queryset.filter(source=source).order_by("-started_at")[:WINDOW]
         )
         if not runs:
             continue

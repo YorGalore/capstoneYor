@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 
 from apps.analytics.seed import seed_analytics
 from apps.coordination.seed import seed_coordination
+from apps.core.demo_kulon_progo import seed_kulon_progo_demo
 from apps.core.seed import seed_core
 from apps.governance.seed import seed_governance, seed_regulatory_corpus, seed_schedules
 
@@ -27,5 +28,10 @@ class Command(BaseCommand):
 
         seed_schedules(project)
         self.stdout.write(self.style.SUCCESS("Default job schedules seeded"))
+
+        local_tenant, local_project = seed_kulon_progo_demo()
+        self.stdout.write(self.style.SUCCESS(
+            f"Contextual local-government demo ready ({local_tenant.name} / {local_project.name})"
+        ))
 
         self.stdout.write(self.style.SUCCESS("seed_demo_data complete."))

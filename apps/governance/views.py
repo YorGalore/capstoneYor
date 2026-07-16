@@ -1,10 +1,12 @@
 from django.contrib import messages
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from apps.core.models import AnalystProfile, PagePermission, Platform
+from apps.core.selectors import get_active_project
 from apps.core.permissions import (
     PAGE_LABELS,
     PAGES,
@@ -15,10 +17,10 @@ from apps.core.permissions import (
     require_page,
 )
 
-from . import apify, health, runtime, scheduling, scraping
+from . import apify, health, portal_crawler, runtime, scheduling, scraping
 from .forms import MonitoredDomainForm, MonitoringKeywordForm
 from .models import (
-    ApifyCredential, AuditLogEntry, CollectionRun, MonitoredDomain, MonitoringKeyword,
+    ApifyCredential, AuditLogEntry, CollectionRun, ManualCollectionRequest, MonitoredDomain, MonitoringKeyword,
     PlatformIntegration, PoliticalMonitoringPermission, PolicyAcknowledgment, RuntimeSetting,
     ScheduledJob,
 )
@@ -30,19 +32,20 @@ def _actor_label(request):
 
 
 def _current_project(request):
-    profile = AnalystProfile.objects.select_related("tenant").filter(user=request.user).first()
-    if profile is None:
-        return None
-    return profile.tenant.projects.first()
+    return get_active_project(request)
 
 
 @require_page("konfigurasi")
 def konfigurasi(request):
-    integrations = PlatformIntegration.objects.select_related("platform").order_by("platform__display_name")
-    credential = ApifyCredential.objects.order_by("-last_verified_at").first()
-    domains = MonitoredDomain.objects.order_by("domain")
-    keywords = MonitoringKeyword.objects.all()
-    recent_runs = CollectionRun.objects.all()[:10]
+    project = _current_project(request)
+    integrations = PlatformIntegration.objects.filter(project=project).select_related("platform").order_by("platform__display_name")
+    credential = ApifyCredential.objects.filter(
+        project=project,
+        status=ApifyCredential.STATUS_ACTIVE,
+    ).exclude(token_encrypted="").order_by("-last_verified_at").first()
+    domains = MonitoredDomain.objects.filter(project=project).order_by("domain")
+    keywords = MonitoringKeyword.objects.filter(project=project)
+    recent_runs = CollectionRun.objects.filter(project=project)[:10]
     return render(request, "governance/konfigurasi.html", {
         "active_nav": "konfigurasi",
         "integrations": integrations,
@@ -50,10 +53,11 @@ def konfigurasi(request):
         "domains": domains,
         "keywords": keywords,
         "recent_runs": recent_runs,
-        "domain_form": MonitoredDomainForm(),
-        "keyword_form": MonitoringKeywordForm(),
-        "schedules": ScheduledJob.objects.select_related("project"),
-        "collector_health": health.collection_health(),
+        "manual_requests": ManualCollectionRequest.objects.filter(project=project)[:10],
+        "domain_form": MonitoredDomainForm(project=project),
+        "keyword_form": MonitoringKeywordForm(project=project),
+        "schedules": ScheduledJob.objects.filter(project=project).select_related("project"),
+        "collector_health": health.collection_health(project=project),
         "health_labels": health.STATUS_LABELS,
         "collection_enabled": scheduling.collection_enabled(),
     })
@@ -61,9 +65,56 @@ def konfigurasi(request):
 
 @require_page("konfigurasi")
 @require_POST
+@transaction.atomic
+def save_project_apify_token(request):
+    """Let a tenant administrator manage only the active project's Apify token."""
+    token = request.POST.get("token", "").strip()
+    if not token:
+        messages.error(request, "Token tidak boleh kosong.")
+        return redirect("governance:konfigurasi")
+    try:
+        credential = apify.store_token(
+            token,
+            updated_by=_actor_label(request),
+            project=_current_project(request),
+        )
+    except apify.ApifyTokenInvalid:
+        messages.error(request, "Token Apify tidak valid — validasi API langsung gagal.")
+        record_audit_entry(
+            actor_label=_actor_label(request),
+            action="Percobaan menyimpan token Apify tenant gagal validasi",
+            target="Apify",
+        )
+        return redirect("governance:konfigurasi")
+    record_audit_entry(
+        actor_label=_actor_label(request),
+        action="Menyimpan/merotasi token Apify tenant",
+        target=credential.masked_token,
+    )
+    messages.success(request, "Token Apify tenant tervalidasi dan tersimpan terenkripsi.")
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def revoke_project_apify_token(request):
+    project = _current_project(request)
+    apify.revoke(updated_by=_actor_label(request), project=project)
+    record_audit_entry(
+        actor_label=_actor_label(request),
+        action="Mencabut token Apify tenant",
+        target=project.name,
+    )
+    messages.success(request, "Token Apify tenant dicabut.")
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
 def update_schedule(request, job_id):
     """Change a job's cadence or switch it off (REQ-SC-01)."""
-    job = get_object_or_404(ScheduledJob, pk=job_id)
+    job = get_object_or_404(ScheduledJob, pk=job_id, project=_current_project(request))
     try:
         cadence = int(request.POST.get("cadence_minutes", job.cadence_minutes))
     except ValueError:
@@ -107,10 +158,12 @@ def toggle_collection(request):
     return redirect("governance:konfigurasi")
 
 
+@require_page("konfigurasi")
 @require_POST
 @transaction.atomic
 def add_keyword(request):
-    form = MonitoringKeywordForm(request.POST)
+    project = _current_project(request)
+    form = MonitoringKeywordForm(request.POST, project=project)
     if form.is_valid():
         keyword = form.save(commit=False)
         keyword.created_by = _actor_label(request)
@@ -127,10 +180,11 @@ def add_keyword(request):
     return redirect("governance:konfigurasi")
 
 
+@require_page("konfigurasi")
 @require_POST
 @transaction.atomic
 def toggle_keyword(request, pk):
-    keyword = get_object_or_404(MonitoringKeyword, pk=pk)
+    keyword = get_object_or_404(MonitoringKeyword, pk=pk, project=_current_project(request))
     keyword.is_active = not keyword.is_active
     keyword.save(update_fields=["is_active"])
     record_audit_entry(
@@ -141,10 +195,11 @@ def toggle_keyword(request, pk):
     return redirect("governance:konfigurasi")
 
 
+@require_page("konfigurasi")
 @require_POST
 @transaction.atomic
 def delete_keyword(request, pk):
-    keyword = get_object_or_404(MonitoringKeyword, pk=pk)
+    keyword = get_object_or_404(MonitoringKeyword, pk=pk, project=_current_project(request))
     label = keyword.keyword
     keyword.delete()
     record_audit_entry(
@@ -154,10 +209,11 @@ def delete_keyword(request, pk):
     return redirect("governance:konfigurasi")
 
 
+@require_page("konfigurasi")
 @require_POST
 @transaction.atomic
 def add_domain(request):
-    form = MonitoredDomainForm(request.POST)
+    form = MonitoredDomainForm(request.POST, project=_current_project(request))
     if form.is_valid():
         domain = form.save()
         record_audit_entry(
@@ -170,10 +226,11 @@ def add_domain(request):
     return redirect("governance:konfigurasi")
 
 
+@require_page("konfigurasi")
 @require_POST
 @transaction.atomic
 def delete_domain(request, pk):
-    domain = get_object_or_404(MonitoredDomain, pk=pk)
+    domain = get_object_or_404(MonitoredDomain, pk=pk, project=_current_project(request))
     label = domain.domain
     domain.delete()
     record_audit_entry(
@@ -183,12 +240,16 @@ def delete_domain(request, pk):
     return redirect("governance:konfigurasi")
 
 
+@require_page("konfigurasi")
 @require_POST
 @transaction.atomic
 def test_domain_connection(request, pk):
-    domain = get_object_or_404(MonitoredDomain, pk=pk)
+    domain = get_object_or_404(MonitoredDomain, pk=pk, project=_current_project(request))
     probe_url = domain.feed_url or f"https://{domain.domain}"
-    reachable = scraping.check_reachable(probe_url)
+    if domain.domain in portal_crawler.PORTALS:
+        reachable = portal_crawler.check_reachable(domain)
+    else:
+        reachable = scraping.check_reachable(probe_url)
     domain.status = MonitoredDomain.STATUS_ACTIVE if reachable else MonitoredDomain.STATUS_NEEDS_REVIEW
     domain.last_tested_at = timezone.now()
     domain.save(update_fields=["status", "last_tested_at"])
@@ -202,20 +263,123 @@ def test_domain_connection(request, pk):
     return redirect("governance:konfigurasi")
 
 
+def _manual_request_payload(collection_request):
+    return {
+        "id": collection_request.pk,
+        "type": collection_request.collection_type,
+        "type_label": collection_request.get_collection_type_display(),
+        "status": collection_request.status,
+        "status_label": collection_request.get_status_display(),
+        "items_found": collection_request.items_found,
+        "sources_processed": collection_request.sources_processed,
+        "detail": collection_request.detail,
+        "requested_at": collection_request.requested_at.isoformat(),
+        "started_at": collection_request.started_at.isoformat() if collection_request.started_at else None,
+        "finished_at": collection_request.finished_at.isoformat() if collection_request.finished_at else None,
+        "terminal": collection_request.status in {
+            ManualCollectionRequest.STATUS_COMPLETED,
+            ManualCollectionRequest.STATUS_FAILED,
+            ManualCollectionRequest.STATUS_SKIPPED,
+        },
+    }
+
+
+def _enqueue_collection(request, collection_type):
+    project = _current_project(request)
+    wants_json = request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+    def reject(message):
+        if wants_json:
+            return JsonResponse({"ok": False, "message": message}, status=400)
+        messages.error(request, message)
+        return redirect("governance:konfigurasi")
+
+    if project is None:
+        return reject("Tidak ada proyek aktif untuk menyimpan hasil koleksi.")
+    if not scheduling.collection_enabled():
+        return reject("Koleksi sedang dihentikan. Aktifkan kembali sebelum menjalankan trigger manual.")
+    if not MonitoringKeyword.objects.filter(project=project, is_active=True).exists():
+        return reject("Tambahkan minimal satu kata kunci aktif sebelum menjalankan koleksi.")
+
+    if collection_type == ManualCollectionRequest.TYPE_NEWS:
+        available = MonitoredDomain.objects.filter(project=project).exclude(
+            status=MonitoredDomain.STATUS_INACTIVE
+        ).exclude(feed_url="").exists()
+        if not available:
+            return reject("Tambahkan minimal satu domain berita aktif dengan URL starter.")
+    else:
+        has_token = ApifyCredential.objects.filter(
+            project=project, status=ApifyCredential.STATUS_ACTIVE
+        ).exclude(token_encrypted="").exists()
+        if not has_token:
+            return reject("Simpan token Apify aktif sebelum menjalankan koleksi social media.")
+        if not PlatformIntegration.objects.filter(
+            project=project, method=PlatformIntegration.METHOD_APIFY, is_active=True,
+        ).exists():
+            return reject("Aktifkan minimal satu integrasi social media berbasis Apify.")
+
+    active_request = ManualCollectionRequest.objects.filter(
+        project=project,
+        collection_type=collection_type,
+        status__in=[ManualCollectionRequest.STATUS_QUEUED, ManualCollectionRequest.STATUS_RUNNING],
+    ).first()
+    if active_request:
+        message = f"Koleksi {active_request.get_collection_type_display()} sudah {active_request.get_status_display().lower()}."
+        if wants_json:
+            return JsonResponse({"ok": True, "message": message, "request": _manual_request_payload(active_request)}, status=202)
+        messages.info(request, message)
+        return redirect("governance:konfigurasi")
+
+    collection_request = ManualCollectionRequest.objects.create(
+        project=project, collection_type=collection_type, requested_by=_actor_label(request),
+    )
+    record_audit_entry(
+        actor_label=_actor_label(request),
+        action=f"Mengantrekan koleksi manual {collection_request.get_collection_type_display()}",
+        target=f"manual_collection:{collection_request.pk}",
+    )
+    message = f"Koleksi {collection_request.get_collection_type_display()} masuk antrean worker."
+    if wants_json:
+        return JsonResponse({"ok": True, "message": message, "request": _manual_request_payload(collection_request)}, status=202)
+    messages.success(request, message)
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+def queue_news_collection(request):
+    return _enqueue_collection(request, ManualCollectionRequest.TYPE_NEWS)
+
+
+@require_page("konfigurasi")
+@require_POST
+def queue_social_collection(request):
+    return _enqueue_collection(request, ManualCollectionRequest.TYPE_SOCIAL)
+
+
+@require_page("konfigurasi")
+def collection_request_status(request, pk):
+    collection_request = get_object_or_404(
+        ManualCollectionRequest, pk=pk, project=_current_project(request)
+    )
+    return JsonResponse({"ok": True, "request": _manual_request_payload(collection_request)})
+
+
+@require_page("konfigurasi")
 @require_POST
 @transaction.atomic
-def run_scan(request):
-    keywords = list(MonitoringKeyword.objects.filter(is_active=True))
+def _legacy_synchronous_run_scan(request):
+    project = _current_project(request)
+    keywords = list(MonitoringKeyword.objects.filter(project=project, is_active=True))
     if not keywords:
         messages.error(request, "Tambahkan minimal satu kata kunci aktif sebelum menjalankan pemindaian.")
         return redirect("governance:konfigurasi")
 
-    domains = list(MonitoredDomain.objects.exclude(feed_url=""))
+    domains = list(MonitoredDomain.objects.filter(project=project).exclude(feed_url=""))
     if not domains:
-        messages.error(request, "Tambahkan minimal satu domain dengan URL feed RSS sebelum menjalankan pemindaian.")
+        messages.error(request, "Tambahkan minimal satu domain dengan URL starter sebelum menjalankan pemindaian.")
         return redirect("governance:konfigurasi")
 
-    project = _current_project(request)
     if project is None:
         messages.error(request, "Tidak ada proyek aktif untuk menyimpan hasil pemindaian.")
         return redirect("governance:konfigurasi")
@@ -249,10 +413,13 @@ def run_scan(request):
     return redirect("governance:konfigurasi")
 
 
+@require_page("konfigurasi")
 @require_POST
 @transaction.atomic
 def toggle_integration(request, pk):
-    integration = get_object_or_404(PlatformIntegration, pk=pk)
+    integration = get_object_or_404(
+        PlatformIntegration, pk=pk, project=_current_project(request)
+    )
     integration.is_active = not integration.is_active
     integration.save(update_fields=["is_active"])
     record_audit_entry(
@@ -351,7 +518,9 @@ def runtime_settings(request):
         }
         for row in RuntimeSetting.objects.all()
     ]
+    project = _current_project(request)
     active_credential = ApifyCredential.objects.filter(
+        project=project,
         status=ApifyCredential.STATUS_ACTIVE
     ).order_by("-id").first()
     return render(request, "governance/runtime_settings.html", {
@@ -371,7 +540,9 @@ def save_apify_token(request):
         messages.error(request, "Token tidak boleh kosong.")
         return redirect("governance:runtime_settings")
     try:
-        cred = apify.store_token(token, updated_by=_actor_label(request))
+        cred = apify.store_token(
+            token, updated_by=_actor_label(request), project=_current_project(request)
+        )
     except apify.ApifyTokenInvalid:
         messages.error(request, "Token Apify tidak valid — validasi API langsung gagal.")
         record_audit_entry(
@@ -393,7 +564,7 @@ def save_apify_token(request):
 @require_POST
 @transaction.atomic
 def revoke_apify_token(request):
-    apify.revoke(updated_by=_actor_label(request))
+    apify.revoke(updated_by=_actor_label(request), project=_current_project(request))
     record_audit_entry(
         actor_label=_actor_label(request), action="Mencabut token Apify", target="Apify",
     )

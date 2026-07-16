@@ -1,0 +1,117 @@
+{% load static %}
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Ceritakan kebutuhan monitoring organisasi Anda dan jadwalkan sesi bersama tim PANTAU.">
+  <title>Mulai dengan PANTAU</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'core/css/landing.css' %}">
+  <link rel="stylesheet" href="{% static 'core/css/onboarding.css' %}">
+</head>
+<body class="onboarding-page">
+  <header class="onboarding-header">
+    <nav class="nav wrap" aria-label="Navigasi utama">
+      <a class="brand" href="{% url 'core:landing' %}" aria-label="PANTAU — kembali ke beranda">
+        <span class="logo" aria-hidden="true">P</span>
+        <span>PANTAU<small>NARASI &amp; OPINI</small></span>
+      </a>
+      <div class="onboarding-nav-actions">
+        <span>Sudah menggunakan PANTAU?</span>
+        <a class="login-link" href="{% url 'login' %}">Masuk ke dashboard <span aria-hidden="true">→</span></a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="onboarding-shell wrap">
+    <aside class="onboarding-intro">
+      <div>
+        <div class="intro-kicker"><span aria-hidden="true"></span> SESI DISCOVERY PANTAU</div>
+        <h1>Mulai dari kebutuhan, <em>bukan kerumitan.</em></h1>
+        <p class="intro-lead">Ceritakan apa yang perlu dipantau. Kami akan membantu mengubahnya menjadi ruang kendali yang relevan untuk tim Anda.</p>
+      </div>
+
+      <div class="next-steps">
+        <p class="next-steps-title">Setelah formulir dikirim</p>
+        <ol>
+          <li><span>01</span><div><strong>Diskusi singkat</strong><small>30 menit untuk memahami konteks dan tujuan.</small></div></li>
+          <li><span>02</span><div><strong>Rancangan awal</strong><small>Sumber, kata kunci, taksonomi, dan alur kerja.</small></div></li>
+          <li><span>03</span><div><strong>Demo yang relevan</strong><small>Disesuaikan dengan use case organisasi Anda.</small></div></li>
+        </ol>
+      </div>
+
+      <div class="intro-assurance">
+        <span aria-hidden="true">✓</span>
+        <p><strong>Tanpa komitmen pembelian.</strong><br>Informasi Anda hanya digunakan untuk menyiapkan sesi ini.</p>
+      </div>
+    </aside>
+
+    <section class="onboarding-form-card" aria-labelledby="onboarding-title">
+      <div class="form-heading">
+        <div>
+          <span class="form-eyebrow">CERITAKAN KEBUTUHAN ANDA</span>
+          <h2 id="onboarding-title">Siapkan sesi bersama tim PANTAU</h2>
+          <p>Kolom bertanda <span class="required-mark">*</span> wajib diisi.</p>
+        </div>
+        <span class="step-badge">1 langkah</span>
+      </div>
+
+      {% if form.non_field_errors %}
+        <div class="form-errors" role="alert">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <fieldset class="organization-picker">
+          <legend>{{ form.organization_type.label }} <span class="required-mark">*</span></legend>
+          <div class="organization-options">
+            {% for radio in form.organization_type %}
+              <label class="organization-option">
+                {{ radio.tag }}
+                <span class="option-icon" aria-hidden="true">{% if radio.data.value == 'brand' %}B{% else %}P{% endif %}</span>
+                <span class="option-copy">
+                  <strong>{% if radio.data.value == 'brand' %}Brand &amp; perusahaan{% else %}Pemerintah &amp; instansi{% endif %}</strong>
+                  <small>{% if radio.data.value == 'brand' %}Reputasi, pelanggan, dan kompetitor{% else %}Aspirasi, program, dan isu publik{% endif %}</small>
+                </span>
+                <span class="option-check" aria-hidden="true">✓</span>
+              </label>
+            {% endfor %}
+          </div>
+          {{ form.organization_type.errors }}
+        </fieldset>
+
+        <div class="public-form-grid">
+          {% for field in form %}
+            {% if field.name != 'organization_type' and field.name != 'consent' %}
+              <div class="public-field {% if field.name == 'monitoring_goal' or field.name == 'platforms' %}field-wide{% endif %}{% if field.errors %} has-error{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="required-mark">*</span>{% endif %}</label>
+                {{ field }}
+                {% if field.help_text %}<small class="field-help">{{ field.help_text }}</small>{% endif %}
+                {{ field.errors }}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <div class="form-consent {% if form.consent.errors %}has-error{% endif %}">
+          <label>{{ form.consent }}<span>{{ form.consent.label }}</span></label>
+          {{ form.consent.errors }}
+        </div>
+
+        <div class="form-submit-row">
+          <p><span aria-hidden="true">●</span> Biasanya kami merespons dalam 1 hari kerja.</p>
+          <button class="onboarding-submit" type="submit">Jadwalkan sesi <span aria-hidden="true">→</span></button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer class="onboarding-footer wrap">
+    <span>© 2026 PANTAU</span>
+    <span>Social intelligence untuk keputusan yang bertanggung jawab.</span>
+  </footer>
+</body>
+</html>

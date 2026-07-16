@@ -1,6 +1,5 @@
-"""Manual, on-demand collection cycle (REQ-SC-04). Resolves the active Apify token
-and the first project, then runs the Apify orchestrator across enabled platforms.
-"""
+"""Manual on-demand collection for online news and configured social sources."""
+
 from django.core.management.base import BaseCommand
 
 from apps.core.models import Project
@@ -8,7 +7,7 @@ from apps.governance import apify, orchestrator
 
 
 class Command(BaseCommand):
-    help = "Run an Apify collection cycle across enabled platforms for active keywords."
+    help = "Run online-news crawlers and available Apify social collectors."
 
     def add_arguments(self, parser):
         parser.add_argument("--project-id", type=int, default=None)
@@ -23,18 +22,22 @@ class Command(BaseCommand):
             self.stderr.write("Tidak ada proyek. Jalankan seed_demo_data dulu.")
             return
 
-        token = apify.get_active_token()
-        if not token:
-            self.stderr.write("Tidak ada token Apify aktif — atur di halaman Dev/Ops.")
-            return
+        runs = orchestrator.run_news_collection(project)
+        token = apify.get_active_token(project)
+        if token:
+            runs += orchestrator.run_apify_collection(project, token)
+        else:
+            self.stderr.write(
+                "Tidak ada token Apify aktif — koleksi berita tetap dijalankan; "
+                "sumber sosial dilewati."
+            )
 
-        runs = orchestrator.run_apify_collection(project, token)
         if not runs:
-            self.stdout.write("Tidak ada platform/kata kunci aktif untuk dikumpulkan.")
+            self.stdout.write("Tidak ada sumber/kata kunci aktif untuk dikumpulkan.")
             return
         for run in runs:
             self.stdout.write(
-                f"{run.source}: {run.status} — {run.items_found} item "
-                f"(≈${run.cost_estimate})"
+                f"{run.source}: {run.status} - {run.items_found} item "
+                f"(~${run.cost_estimate})"
             )
         self.stdout.write(self.style.SUCCESS("Siklus koleksi selesai."))

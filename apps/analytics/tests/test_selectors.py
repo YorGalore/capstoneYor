@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from apps.core.models import Platform, Project, Tenant
-from apps.analytics.models import Mention
+from apps.analytics.models import Alert, AlertRule, Mention
 from apps.analytics import selectors
 
 
@@ -43,6 +43,28 @@ class RingkasanSummaryTest(TestCase):
         )
         summary = selectors.ringkasan_summary(self.project)
         self.assertEqual(summary["total_mentions"], 0)
+
+    def test_recent_alerts_only_returns_the_supplied_projects_alerts(self):
+        other_tenant = Tenant.objects.create(name="Kementerian Lain")
+        other_project = Project.objects.create(tenant=other_tenant, name="Proyek Lain")
+        own_rule = AlertRule.objects.create(
+            project=self.project, name="Own", condition_summary="own",
+            channel=AlertRule.CHANNEL_EMAIL,
+        )
+        other_rule = AlertRule.objects.create(
+            project=other_project, name="Other", condition_summary="other",
+            channel=AlertRule.CHANNEL_EMAIL,
+        )
+        own_alert = Alert.objects.create(
+            project=self.project, rule=own_rule, severity=Alert.SEVERITY_WARNING,
+            title="Own alert", detail="own", triggered_at=timezone.now(),
+        )
+        Alert.objects.create(
+            project=other_project, rule=other_rule, severity=Alert.SEVERITY_CRITICAL,
+            title="Other alert", detail="other", triggered_at=timezone.now(),
+        )
+
+        self.assertEqual(selectors.recent_alerts(self.project), [own_alert])
 
 
 from apps.analytics.models import PoliticalIssue

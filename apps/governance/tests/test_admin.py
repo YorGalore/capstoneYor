@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from apps.core.seed import seed_core
@@ -47,3 +48,17 @@ class AuditLogEntryAdminTest(TestCase):
     def test_changelist_view_is_still_viewable(self):
         response = self.client.get("/admin/governance/auditlogentry/")
         self.assertEqual(response.status_code, 200)
+
+    def test_model_update_and_delete_are_rejected(self):
+        self.entry.action = "Tampered outside admin"
+        with self.assertRaises(ValidationError):
+            self.entry.save()
+        with self.assertRaises(ValidationError):
+            self.entry.delete()
+
+    def test_queryset_update_and_delete_are_rejected(self):
+        queryset = AuditLogEntry.objects.filter(pk=self.entry.pk)
+        with self.assertRaises(ValidationError):
+            queryset.update(action="Tampered in bulk")
+        with self.assertRaises(ValidationError):
+            queryset.delete()

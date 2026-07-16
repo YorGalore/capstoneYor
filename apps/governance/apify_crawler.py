@@ -31,6 +31,10 @@ APIFY_RUN_URL = "https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-i
 RUN_TIMEOUT_SECONDS = 300
 
 
+class ApifyCollectionError(RuntimeError):
+    """Raised when an Apify actor run cannot return a trustworthy dataset."""
+
+
 def supported_platforms():
     return list(ACTOR_CONFIG.keys())
 
@@ -170,7 +174,8 @@ def extract_platform_content(platform, item):
 
 def _run_and_fetch_items(actor_id, run_input, token):
     """Sole network boundary: trigger the actor run and return dataset items.
-    Stubbed in tests."""
+    Stubbed in tests. Upstream failures are raised so callers cannot mistake an
+    unavailable actor for a successful run with no results."""
     url = f"{APIFY_RUN_URL.format(actor_id=actor_id)}?token={token}"
     payload = json.dumps(run_input).encode("utf-8")
     request = urllib.request.Request(
@@ -179,9 +184,15 @@ def _run_and_fetch_items(actor_id, run_input, token):
     )
     try:
         with urllib.request.urlopen(request, timeout=RUN_TIMEOUT_SECONDS) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError):
-        return []
+            items = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, http.client.HTTPException, OSError) as exc:
+        raise ApifyCollectionError(f"Apify actor request failed: {exc}") from exc
+    except (json.JSONDecodeError, UnicodeError) as exc:
+        raise ApifyCollectionError("Apify returned an invalid JSON dataset") from exc
+
+    if not isinstance(items, list):
+        raise ApifyCollectionError("Apify returned an unexpected dataset payload")
+    return items
 
 
 def collect(platform, keywords, token, max_results=None):

@@ -27,9 +27,10 @@ class RunScanTest(TestCase):
         from apps.core.models import Platform
         self.platform = Platform.objects.get(slug="berita")
         self.domain = MonitoredDomain.objects.create(
+            project=self.project,
             domain="contoh-berita.co.id", adapter="RSS", feed_url="https://contoh-berita.co.id/rss.xml",
         )
-        self.keyword = MonitoringKeyword.objects.create(keyword="pangan")
+        self.keyword = MonitoringKeyword.objects.create(project=self.project, keyword="pangan")
 
     @patch("apps.governance.scraping.fetch_feed")
     def test_matching_item_creates_mention(self, mock_fetch):
@@ -89,6 +90,29 @@ class RunScanTest(TestCase):
         self.assertEqual(self.domain.status, MonitoredDomain.STATUS_NEEDS_REVIEW)
 
     def test_domain_without_feed_url_is_skipped(self):
-        blank_domain = MonitoredDomain.objects.create(domain="belum-ada-feed.co.id", adapter="RSS")
+        blank_domain = MonitoredDomain.objects.create(
+            project=self.project, domain="belum-ada-feed.co.id", adapter="RSS"
+        )
         result = run_scan(project=self.project, platform=self.platform, domains=[blank_domain], keywords=[self.keyword])
         self.assertEqual(result["sources_scanned"], 0)
+
+    @patch("apps.governance.scraping.portal_crawler.crawl")
+    def test_custom_adapter_uses_portal_crawler_and_stores_article_body(self, crawl):
+        self.domain.adapter = "portal-listing"
+        self.domain.save(update_fields=["adapter"])
+        crawl.return_value = [{
+            "title": "Bupati membahas pangan",
+            "link": "https://contoh-berita.co.id/artikel-custom",
+            "description": "",
+            "body": "Isi lengkap program pangan berhasil dan mendapat apresiasi warga.",
+            "posted_at": timezone.now(),
+        }]
+        result = run_scan(
+            project=self.project, platform=self.platform,
+            domains=[self.domain], keywords=[self.keyword],
+        )
+        self.assertEqual(result["new_mentions"], 1)
+        mention = Mention.objects.get(source_url="https://contoh-berita.co.id/artikel-custom")
+        self.assertIn("Isi lengkap", mention.content_snippet)
+        self.assertEqual(mention.sentiment_model, "lexicon-v1")
+        self.assertIsNotNone(mention.author)

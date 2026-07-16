@@ -1,7 +1,8 @@
 from django.test import TestCase
 
 from apps.analytics.models import (
-    Author, Category, Issue, IssueLabel, Mention, SubCategory,
+    Author, Camp, Category, GovernmentProgram, Issue, IssueLabel, Mention,
+    PoliticalActor, SubCategory,
 )
 from apps.core.models import Platform, Project, Tenant
 from apps.governance.ingestion import ingest_items
@@ -66,3 +67,36 @@ class IngestionTest(TestCase):
         negative = Mention.objects.get(external_id="tw-def456")
         self.assertEqual(positive.sentiment, Mention.SENTIMENT_POSITIVE)
         self.assertEqual(negative.sentiment, Mention.SENTIMENT_NEGATIVE)
+
+    def test_ingest_tags_registered_actor_and_government_program(self):
+        camp = Camp.objects.create(project=self.project, name="Koalisi Publik")
+        actor = PoliticalActor.objects.create(
+            project=self.project,
+            name="Partai Pangan",
+            actor_type=PoliticalActor.TYPE_PARTY,
+            camp=camp,
+            keywords=["partai pangan"],
+        )
+        program = GovernmentProgram.objects.create(
+            project=self.project,
+            name="Program Pangan Berhasil",
+            keywords=["program pangan berhasil"],
+        )
+        self.items[0]["content"] = "Partai Pangan mendukung Program Pangan Berhasil"
+
+        ingest_items(self.project, self.platform, [self.items[0]])
+
+        mention = Mention.objects.get(external_id="tw-abc123")
+        self.assertEqual(list(mention.political_actors.all()), [actor])
+        self.assertEqual(mention.program, program)
+        self.assertTrue(mention.is_political)
+
+    def test_ingest_does_not_profile_unregistered_private_individual(self):
+        self.items[0]["content"] = "Warga bernama Budi Santoso membahas pangan"
+        self.items[0]["author"] = "budi_pribadi"
+
+        ingest_items(self.project, self.platform, [self.items[0]])
+
+        mention = Mention.objects.get(external_id="tw-abc123")
+        self.assertEqual(mention.political_actors.count(), 0)
+        self.assertFalse(mention.is_political)

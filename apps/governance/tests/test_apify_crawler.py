@@ -1,3 +1,4 @@
+import urllib.error
 from unittest import mock
 
 from django.test import TestCase
@@ -91,3 +92,38 @@ class CollectTest(TestCase):
         self.assertEqual(len(results), 1)  # url-less item dropped
         self.assertEqual(results[0]["platform"], "x")
         self.assertEqual(results[0]["matched_keyword"], "pangan")
+
+
+class ApifyNetworkBoundaryTest(TestCase):
+    def test_transport_failure_raises_typed_collection_error(self):
+        with mock.patch.object(
+            ac.urllib.request,
+            "urlopen",
+            side_effect=urllib.error.URLError("network down"),
+        ):
+            with self.assertRaises(ac.ApifyCollectionError) as raised:
+                ac._run_and_fetch_items("actor-id", {"query": "pangan"}, "tok")
+
+        self.assertIn("network down", str(raised.exception))
+
+    def test_invalid_json_raises_typed_collection_error(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b"not-json"
+        with mock.patch.object(ac.urllib.request, "urlopen", return_value=response):
+            with self.assertRaises(ac.ApifyCollectionError):
+                ac._run_and_fetch_items("actor-id", {"query": "pangan"}, "tok")
+
+    def test_genuine_empty_dataset_is_successful(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b"[]"
+        with mock.patch.object(ac.urllib.request, "urlopen", return_value=response):
+            items = ac._run_and_fetch_items("actor-id", {"query": "pangan"}, "tok")
+
+        self.assertEqual(items, [])
+
+    def test_non_list_json_raises_typed_collection_error(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"error":"actor failed"}'
+        with mock.patch.object(ac.urllib.request, "urlopen", return_value=response):
+            with self.assertRaises(ac.ApifyCollectionError):
+                ac._run_and_fetch_items("actor-id", {"query": "pangan"}, "tok")

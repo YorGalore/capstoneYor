@@ -44,7 +44,8 @@ class SchedulingViewTest(TestCase):
 
     def test_console_shows_collector_health(self):
         CollectionRun.objects.create(
-            source="x", status=CollectionRun.STATUS_FAILED, error="token kedaluwarsa"
+            project=self.project, source="x",
+            status=CollectionRun.STATUS_FAILED, error="token kedaluwarsa"
         )
         response = self.client.get(reverse("governance:konfigurasi"))
         self.assertContains(response, "token kedaluwarsa")

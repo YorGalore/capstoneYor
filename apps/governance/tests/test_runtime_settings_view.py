@@ -14,7 +14,7 @@ User = get_user_model()
 
 class RuntimeSettingsViewTest(TestCase):
     def setUp(self):
-        self.tenant, _ = seed_core()
+        self.tenant, self.project = seed_core()
         self.super_admin = User.objects.get(username=DEMO_USERNAME)
         self.tenant_admin = User.objects.create(username="tadmin")
         AnalystProfile.objects.update_or_create(
@@ -56,7 +56,7 @@ class RuntimeSettingsViewTest(TestCase):
                 {"token": "bad"},
                 follow=True,
             )
-        self.assertIsNone(apify.get_active_token())
+        self.assertIsNone(apify.get_active_token(self.project))
 
     def test_save_runtime_setting(self):
         self.client.force_login(self.super_admin)

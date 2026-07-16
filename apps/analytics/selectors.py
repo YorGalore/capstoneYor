@@ -105,8 +105,12 @@ def timeline_chart(timeline, width=760, height=230):
     }
 
 
-def recent_alerts(limit=5):
-    return list(Alert.objects.select_related("rule").order_by("-triggered_at")[:limit])
+def recent_alerts(project, limit=5):
+    return list(
+        Alert.objects.filter(project=project)
+        .select_related("rule")
+        .order_by("-triggered_at")[:limit]
+    )
 
 
 def war_room_summary(issue):

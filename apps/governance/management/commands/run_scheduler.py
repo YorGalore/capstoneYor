@@ -60,12 +60,20 @@ class Command(BaseCommand):
 
     def _tick(self):
         try:
+            manual_requests = scheduling.run_pending_manual_collections()
             ran = scheduling.run_due()
         except Exception:
             # The loop itself must survive anything — a scheduler that dies on an
             # unexpected error stops the entire platform's monitoring silently.
             logger.exception("Siklus penjadwal gagal")
             return
+
+        for request in manual_requests:
+            detail = request.detail or "-"
+            self.stdout.write(
+                f"manual:{request.collection_type} [{request.project.name}] "
+                f"{request.status}: {detail}"
+            )
 
         for job in ran:
             detail = job.last_error or job.last_detail

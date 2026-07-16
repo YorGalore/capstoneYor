@@ -16,7 +16,7 @@ import logging
 from django.db import transaction
 from django.utils import timezone
 
-from .models import ScheduledJob
+from .models import ManualCollectionRequest, ScheduledJob
 from .services import record_audit_entry
 
 logger = logging.getLogger(__name__)
@@ -63,10 +63,10 @@ def set_collection_enabled(enabled, actor):
 def _run_collect(project):
     from . import apify, orchestrator
 
-    token = apify.get_active_token()
-    if not token:
-        raise RuntimeError("Tidak ada token Apify aktif.")
-    runs = orchestrator.run_apify_collection(project, token)
+    token = apify.get_active_token(project)
+    runs = orchestrator.run_news_collection(project)
+    if token:
+        runs += orchestrator.run_apify_collection(project, token)
     items = sum(r.items_found for r in runs)
     return f"{len(runs)} sumber, {items} item"
 
@@ -119,6 +119,91 @@ HANDLERS = {
 # alerting and briefs run over data already held, and that is what people need most
 # during the incident that made someone hit the switch.
 COLLECTION_JOBS = {ScheduledJob.JOB_COLLECT}
+
+
+def _execute_manual_collection(request):
+    """Execute a claimed UI request in the scheduler process."""
+    from . import apify, orchestrator
+
+    if not collection_enabled():
+        request.status = ManualCollectionRequest.STATUS_SKIPPED
+        request.detail = "Koleksi sedang dihentikan oleh kill switch."
+        runs = []
+    elif request.collection_type == ManualCollectionRequest.TYPE_NEWS:
+        runs = orchestrator.run_news_collection(request.project)
+        if not runs:
+            request.status = ManualCollectionRequest.STATUS_FAILED
+            request.detail = "Tidak ada domain berita dan kata kunci aktif yang dapat diproses."
+    elif request.collection_type == ManualCollectionRequest.TYPE_SOCIAL:
+        token = apify.get_active_token(request.project)
+        if not token:
+            request.status = ManualCollectionRequest.STATUS_FAILED
+            request.detail = "Token Apify aktif belum tersedia untuk proyek ini."
+            runs = []
+        else:
+            runs = orchestrator.run_apify_collection(request.project, token)
+            if not runs:
+                request.status = ManualCollectionRequest.STATUS_FAILED
+                request.detail = "Tidak ada integrasi social media dan kata kunci aktif yang dapat diproses."
+    else:
+        runs = []
+        request.status = ManualCollectionRequest.STATUS_FAILED
+        request.detail = "Jenis koleksi tidak dikenal."
+
+    if runs:
+        request.items_found = sum(run.items_found for run in runs)
+        request.sources_processed = len(runs)
+        failures = [run for run in runs if run.status == run.STATUS_FAILED]
+        skipped = [run for run in runs if run.status == run.STATUS_SKIPPED]
+        if failures:
+            request.status = ManualCollectionRequest.STATUS_FAILED
+            request.detail = (
+                f"{len(failures)} dari {len(runs)} sumber gagal. "
+                + "; ".join(f"{run.source}: {run.error}" for run in failures)
+            )[:500]
+        elif len(skipped) == len(runs):
+            request.status = ManualCollectionRequest.STATUS_SKIPPED
+            request.detail = "Semua sumber dilewati karena koleksi lain masih berjalan."
+        else:
+            request.status = ManualCollectionRequest.STATUS_COMPLETED
+            request.detail = f"{len(runs)} sumber selesai, {request.items_found} item baru."
+
+    request.finished_at = timezone.now()
+    request.save(update_fields=[
+        "status", "items_found", "sources_processed", "detail", "finished_at",
+    ])
+    return request
+
+
+def run_pending_manual_collections(limit=1):
+    """Claim and execute queued UI requests without holding a DB lock while crawling."""
+    processed = []
+    for _ in range(limit):
+        with transaction.atomic():
+            request = (
+                ManualCollectionRequest.objects.select_for_update(skip_locked=True)
+                .filter(status=ManualCollectionRequest.STATUS_QUEUED)
+                .select_related("project")
+                .order_by("requested_at")
+                .first()
+            )
+            if request is None:
+                break
+            request.status = ManualCollectionRequest.STATUS_RUNNING
+            request.started_at = timezone.now()
+            request.detail = "Worker mulai memproses koleksi."
+            request.save(update_fields=["status", "started_at", "detail"])
+
+        try:
+            processed.append(_execute_manual_collection(request))
+        except Exception as exc:
+            logger.exception("Koleksi manual gagal: %s", request.pk)
+            request.status = ManualCollectionRequest.STATUS_FAILED
+            request.detail = str(exc)[:500]
+            request.finished_at = timezone.now()
+            request.save(update_fields=["status", "detail", "finished_at"])
+            processed.append(request)
+    return processed
 
 
 def due_jobs(now=None):

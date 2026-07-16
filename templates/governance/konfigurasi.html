@@ -19,9 +19,22 @@
   <div class="pantau-card">
     <div class="pantau-card-title">Kredensial Apify</div>
     <div class="mono-muted">TOKEN API (TINGKAT TENANT)</div>
-    <div class="pantau-credential-box">{{ credential.masked_token }}</div>
-    <div class="pantau-credential-status">✓ Terverifikasi {{ credential.last_verified_at|timesince }} lalu</div>
-    <div class="pantau-hint">Nilai penuh disimpan terenkripsi di secrets manager; tidak pernah dikirim utuh ke browser (FR-2A.3).</div>
+    {% if credential %}
+      <div class="pantau-credential-box">{{ credential.masked_token }}</div>
+      <div class="pantau-credential-status">Terverifikasi {{ credential.last_verified_at|timesince }} lalu</div>
+      <form method="post" action="{% url 'governance:revoke_project_apify_token' %}" class="pantau-inline-form">
+        {% csrf_token %}
+        <button type="submit" class="pantau-btn-outline pantau-btn-small">Cabut token</button>
+      </form>
+    {% else %}
+      <div class="pantau-credential-box">Belum ada token aktif untuk tenant ini</div>
+    {% endif %}
+    <form method="post" action="{% url 'governance:save_project_apify_token' %}" class="pantau-inline-form">
+      {% csrf_token %}
+      <input class="pantau-input" type="password" name="token" placeholder="Tempel token Apify tenant" autocomplete="off" required>
+      <button type="submit" class="pantau-btn-primary">Validasi &amp; simpan</button>
+    </form>
+    <div class="pantau-hint">Token hanya berlaku untuk proyek tenant ini, diuji langsung ke Apify, disimpan terenkripsi, dan tidak pernah dikirim utuh kembali ke browser.</div>
   </div>
   <div class="pantau-card">
     <div class="pantau-card-title">Pemilihan Aktor per Platform</div>
@@ -72,10 +85,17 @@
   </div>
   {% for domain in domains %}
     <div class="pantau-domain-row">
-      <span class="mono-strong">{{ domain.domain }}{% if not domain.feed_url %} <span class="mono-muted">(belum ada feed)</span>{% endif %}</span>
+      <span class="mono-strong">
+        {{ domain.domain }}
+        {% if domain.feed_url %}
+          <a href="{{ domain.feed_url }}" target="_blank" rel="noopener noreferrer" class="mono-muted">starter</a>
+        {% else %}
+          <span class="mono-muted">(belum ada starter)</span>
+        {% endif %}
+      </span>
       <span class="mono-muted">{{ domain.adapter }}</span>
       <span>{{ domain.get_status_display }}</span>
-      <span class="mono-muted">{% if domain.last_tested_at %}{{ domain.last_tested_at|timesince }} lalu{% else %}—{% endif %}</span>
+      <span class="mono-muted">{% if domain.last_tested_at %}{{ domain.last_tested_at|timesince }} lalu{% else %}&mdash;{% endif %}</span>
       <div class="pantau-domain-actions">
         <form method="post" action="{% url 'governance:test_domain_connection' domain.pk %}" class="pantau-inline-form">
           {% csrf_token %}
@@ -99,13 +119,45 @@
 
 <div class="pantau-card">
   <div class="pantau-card-header">
-    <div class="pantau-card-title">Jalankan Pemindaian Berita</div>
+    <div class="pantau-card-title">Trigger Koleksi Manual</div>
   </div>
-  <div class="pantau-hint">Memindai setiap domain yang memiliki URL feed RSS secara langsung melalui internet, mencocokkan artikel terhadap kata kunci aktif, lalu menyimpan hasil yang cocok sebagai mention baru di dasbor.</div>
-  <form method="post" action="{% url 'governance:run_scan' %}">
+  <div class="pantau-hint">Pilih sumber yang ingin dikoleksi. Request langsung masuk antrean worker dan berjalan asynchronous; halaman ini akan memperbarui status tanpa menunggu proses crawling selesai.</div>
+  <div class="pantau-collection-trigger-grid" data-status-template="{% url 'governance:collection_request_status' 0 %}">
+    <section class="pantau-collection-trigger" data-collection-card="social">
+      <div><div class="pantau-trigger-title">Social Media</div><div class="mono-muted">Platform Apify aktif · diproses worker</div></div>
+      <form method="post" action="{% url 'governance:run_social_collection' %}" class="js-collection-form">
+        {% csrf_token %}
+        <button type="submit" class="pantau-btn-dark">▶ Mulai Social Media</button>
+      </form>
+      <div class="pantau-collection-live" aria-live="polite"><span class="pantau-job-badge">Siap</span><span class="pantau-job-detail">Trigger akan masuk antrean.</span></div>
+    </section>
+    <section class="pantau-collection-trigger" data-collection-card="news">
+      <div><div class="pantau-trigger-title">Berita Daring</div><div class="mono-muted">RSS, sitemap, dan portal aktif · diproses worker</div></div>
+  <form method="post" action="{% url 'governance:run_scan' %}" class="js-collection-form">
     {% csrf_token %}
-    <button type="submit" class="pantau-btn-dark">▶ Jalankan Sekarang</button>
+    <button type="submit" class="pantau-btn-dark">▶ Mulai Berita</button>
   </form>
+      <div class="pantau-collection-live" aria-live="polite"><span class="pantau-job-badge">Siap</span><span class="pantau-job-detail">Trigger akan masuk antrean.</span></div>
+    </section>
+  </div>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header"><div class="pantau-card-title">Status Trigger Manual</div></div>
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead><tr><th>Jenis</th><th>Status</th><th>Diminta oleh</th><th>Sumber</th><th>Item</th><th>Keterangan</th></tr></thead>
+      <tbody>
+        {% for request_item in manual_requests %}
+        <tr class="js-manual-request-row" data-request-id="{{ request_item.pk }}" data-request-type="{{ request_item.collection_type }}" data-request-status="{{ request_item.status }}">
+          <td>{{ request_item.get_collection_type_display }}</td><td class="js-request-status">{{ request_item.get_status_display }}</td>
+          <td>{{ request_item.requested_by }}</td><td class="js-request-sources">{{ request_item.sources_processed }}</td>
+          <td class="js-request-items">{{ request_item.items_found }}</td><td class="js-request-detail">{{ request_item.detail|default:"Menunggu worker" }}</td>
+        </tr>
+        {% empty %}<tr><td colspan="6">Belum ada trigger manual.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <div class="pantau-card">
@@ -229,4 +281,95 @@
 </div>
 
 <div class="pantau-hint pantau-hint-highlight">Setiap perubahan pada konsol ini tercatat ke log audit — siapa, kapan, nilai sebelum/sesudah (FR-2A.7).</div>
+<script>
+(() => {
+  const grid = document.querySelector('.pantau-collection-trigger-grid');
+  if (!grid) return;
+  const statusTemplate = grid.dataset.statusTemplate;
+  const terminal = new Set(['completed', 'failed', 'skipped']);
+  const timers = new Map();
+  const statusUrl = id => statusTemplate.replace('/0/', `/${id}/`);
+
+  function render(job) {
+    const card = document.querySelector(`[data-collection-card="${job.type}"]`);
+    if (card) {
+      const badge = card.querySelector('.pantau-job-badge');
+      badge.textContent = job.status_label;
+      badge.dataset.status = job.status;
+      card.querySelector('.pantau-job-detail').textContent = job.detail ||
+        (job.status === 'queued' ? 'Menunggu worker mengambil antrean…' : 'Sedang diproses…');
+      card.querySelector('button[type="submit"]').disabled = !job.terminal;
+    }
+    const row = document.querySelector(`.js-manual-request-row[data-request-id="${job.id}"]`);
+    if (row) {
+      row.dataset.requestStatus = job.status;
+      row.querySelector('.js-request-status').textContent = job.status_label;
+      row.querySelector('.js-request-sources').textContent = job.sources_processed;
+      row.querySelector('.js-request-items').textContent = job.items_found;
+      row.querySelector('.js-request-detail').textContent = job.detail || 'Menunggu worker';
+    }
+  }
+
+  async function poll(id) {
+    try {
+      const response = await fetch(statusUrl(id), {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      if (!response.ok) throw new Error();
+      const {request: job} = await response.json();
+      render(job);
+      if (job.terminal) {
+        clearInterval(timers.get(id));
+        timers.delete(id);
+        window.setTimeout(() => window.location.reload(), 900);
+      }
+    } catch (_) {
+      clearInterval(timers.get(id));
+      timers.delete(id);
+    }
+  }
+
+  function startPolling(job) {
+    render(job);
+    if (job.terminal || timers.has(job.id)) return;
+    timers.set(job.id, setInterval(() => poll(job.id), 3000));
+    poll(job.id);
+  }
+
+  document.querySelectorAll('.js-collection-form').forEach(form => {
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const card = form.closest('.pantau-collection-trigger');
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      card.querySelector('.pantau-job-badge').textContent = 'Mengantrekan…';
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST', body: new FormData(form),
+          headers: {'X-Requested-With': 'XMLHttpRequest'},
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Trigger koleksi gagal.');
+        startPolling(data.request);
+      } catch (error) {
+        card.querySelector('.pantau-job-badge').textContent = 'Gagal';
+        card.querySelector('.pantau-job-detail').textContent = error.message;
+        button.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll('.js-manual-request-row').forEach(row => {
+    if (!terminal.has(row.dataset.requestStatus)) {
+      startPolling({
+        id: Number(row.dataset.requestId), type: row.dataset.requestType,
+        status: row.dataset.requestStatus,
+        status_label: row.querySelector('.js-request-status').textContent,
+        detail: row.querySelector('.js-request-detail').textContent,
+        items_found: Number(row.querySelector('.js-request-items').textContent),
+        sources_processed: Number(row.querySelector('.js-request-sources').textContent),
+        terminal: false,
+      });
+    }
+  });
+})();
+</script>
 {% endblock %}

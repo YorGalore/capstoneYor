@@ -38,11 +38,12 @@ def verify_token(token):
     return bool(payload.get("data", {}).get("id"))
 
 
-def store_token(token, updated_by):
+def store_token(token, updated_by, project):
     """Validate, encrypt, and store a token as the active credential (FR-2A.4)."""
     token = token.strip()
     if not verify_token(token):
         ApifyCredential.objects.create(
+            project=project,
             masked_token=crypto.mask(token),
             token_encrypted="",
             status=ApifyCredential.STATUS_INVALID,
@@ -51,10 +52,13 @@ def store_token(token, updated_by):
         raise ApifyTokenInvalid("Token Apify gagal divalidasi terhadap API langsung.")
 
     # Rotation: supersede any prior active credential.
-    ApifyCredential.objects.filter(status=ApifyCredential.STATUS_ACTIVE).update(
+    ApifyCredential.objects.filter(
+        project=project, status=ApifyCredential.STATUS_ACTIVE
+    ).update(
         status=ApifyCredential.STATUS_REVOKED
     )
     return ApifyCredential.objects.create(
+        project=project,
         masked_token=crypto.mask(token),
         token_encrypted=crypto.encrypt(token),
         status=ApifyCredential.STATUS_ACTIVE,
@@ -62,14 +66,18 @@ def store_token(token, updated_by):
     )
 
 
-def get_active_token():
-    cred = ApifyCredential.objects.filter(status=ApifyCredential.STATUS_ACTIVE).order_by("-id").first()
+def get_active_token(project):
+    cred = ApifyCredential.objects.filter(
+        project=project, status=ApifyCredential.STATUS_ACTIVE
+    ).order_by("-id").first()
     if cred is None or not cred.token_encrypted:
         return None
     return crypto.decrypt(cred.token_encrypted)
 
 
-def revoke(updated_by):
-    ApifyCredential.objects.filter(status=ApifyCredential.STATUS_ACTIVE).update(
+def revoke(updated_by, project):
+    ApifyCredential.objects.filter(
+        project=project, status=ApifyCredential.STATUS_ACTIVE
+    ).update(
         status=ApifyCredential.STATUS_REVOKED, token_encrypted=""
     )

@@ -21,11 +21,10 @@ class NavigationSmokeTest(TestCase):
         )
         self.assertIn("Kemenko PMK", topbar_html)
 
-    def test_root_redirects_to_ringkasan(self):
-        seed_core()
-        self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
+    def test_root_renders_public_landing_page(self):
         response = self.client.get("/")
-        self.assertRedirects(response, "/ringkasan/", fetch_redirect_response=False)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pahami apa yang publik")
 
     def test_all_screen_routes_resolve(self):
         from django.utils import timezone

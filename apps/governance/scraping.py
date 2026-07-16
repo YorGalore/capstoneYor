@@ -12,7 +12,11 @@ from email.utils import parsedate_to_datetime
 from django.db import models as django_models
 from django.utils import timezone
 
-from apps.analytics.models import Mention
+from apps.analytics import actors, taxonomy
+from apps.analytics.models import Author, Mention
+from apps.analytics.nlp import classify
+
+from . import portal_crawler
 
 USER_AGENT = "PantauNewsBot/1.0 (+https://pantau.local; monitoring console)"
 FETCH_TIMEOUT_SECONDS = 10
@@ -112,9 +116,7 @@ def _emotion_for_sentiment(sentiment):
 
 
 def run_scan(project, platform, domains, keywords):
-    """Fetch every domain's RSS feed and persist real, keyword-matching
-    articles as Mention rows. Returns a summary dict for the UI/audit log.
-    """
+    """Fetch every configured source and persist real keyword-matching articles."""
     active_keywords = [k for k in keywords if k.is_active]
     new_mentions = 0
     sources_scanned = 0
@@ -126,8 +128,13 @@ def run_scan(project, platform, domains, keywords):
             continue
         sources_scanned += 1
         try:
-            items = fetch_feed(domain.feed_url)
-        except ScrapeError as exc:
+            if domain.adapter.strip().lower() == "rss":
+                items = fetch_feed(domain.feed_url)
+            else:
+                items = portal_crawler.crawl(
+                    domain, [keyword.keyword for keyword in active_keywords]
+                )
+        except (ScrapeError, portal_crawler.PortalCrawlError) as exc:
             errors.append(f"{domain.domain}: {exc}")
             domain.status = domain.STATUS_NEEDS_REVIEW
             domain.last_tested_at = timezone.now()
@@ -141,23 +148,36 @@ def run_scan(project, platform, domains, keywords):
         for item in items:
             if not item["link"]:
                 continue
-            haystack = f"{item['title']} {item['description']}".lower()
+            body = item.get("body", "")
+            haystack = f"{item['title']} {item['description']} {body}".lower()
             matched_keyword = next(
                 (k for k in active_keywords if k.keyword.lower() in haystack), None
             )
             if matched_keyword is None:
                 continue
 
-            sentiment = score_sentiment(haystack)
-            _, created = Mention.objects.get_or_create(
+            classification = classify(haystack)
+            author, _ = Author.objects.get_or_create(
+                platform=platform,
+                handle=domain.domain,
+                defaults={"display_name": domain.domain},
+            )
+            mention, created = Mention.objects.get_or_create(
                 source_url=item["link"],
                 defaults={
                     "project": project,
                     "platform": platform,
+                    "author": author,
                     "author_handle": domain.domain,
-                    "content_snippet": item["title"][:500] or item["description"][:500],
-                    "sentiment": sentiment,
-                    "emotion": _emotion_for_sentiment(sentiment),
+                    "content_snippet": f"{item['title']}. {body or item['description']}"[:8000],
+                    "sentiment": classification.sentiment,
+                    "sentiment_confidence": classification.confidence,
+                    "sentiment_model": classification.model_version,
+                    "emotion": (
+                        classification.emotions[0]
+                        if classification.emotions else _emotion_for_sentiment(classification.sentiment)
+                    ),
+                    "emotion_labels": classification.emotions,
                     "posted_at": item["posted_at"],
                     "is_political": False,
                     "matched_keyword": matched_keyword.keyword,
@@ -165,6 +185,9 @@ def run_scan(project, platform, domains, keywords):
                 },
             )
             if created:
+                taxonomy.auto_label(mention)
+                actors.tag_mention(mention)
+                actors.tag_program(mention)
                 new_mentions += 1
                 gained_matches[matched_keyword.id] = gained_matches.get(matched_keyword.id, 0) + 1
 

@@ -7,7 +7,7 @@ this boundary.
 """
 from django.db import transaction
 
-from apps.analytics import taxonomy
+from apps.analytics import actors, taxonomy
 from apps.analytics.models import Author, Mention
 from apps.analytics.nlp import classify
 
@@ -56,6 +56,10 @@ def ingest_items(project, platform, items):
         # Auto-assign to the Issue Taxonomy where the content confidently matches;
         # anything unmatched surfaces in the manual review queue (FR-3A.2/3A.3).
         taxonomy.auto_label(mention)
+        # Apply only tenant-configured public/organizational actor rules, plus
+        # configured government-program rules, while the mention is ingested.
+        actors.tag_mention(mention)
+        actors.tag_program(mention)
         created += 1
     return {"created": created, "duplicates": duplicates}
 

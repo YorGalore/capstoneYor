@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import AnalystProfile, Platform, Province, Regency, Project, Tenant
+from .models import AnalystProfile, OnboardingRequest, Platform, Province, Regency, Project, Tenant
 from .rbac import AdminLockoutError, assert_can_deactivate_user, assert_can_delete_user
 
 User = get_user_model()
@@ -51,3 +51,10 @@ admin.site.register(Platform)
 admin.site.register(Province)
 admin.site.register(Regency)
 admin.site.register(AnalystProfile)
+
+
+@admin.register(OnboardingRequest)
+class OnboardingRequestAdmin(admin.ModelAdmin):
+    list_display = ("organization_name", "organization_type", "contact_name", "work_email", "status", "created_at")
+    list_filter = ("organization_type", "status", "created_at")
+    search_fields = ("organization_name", "contact_name", "work_email")

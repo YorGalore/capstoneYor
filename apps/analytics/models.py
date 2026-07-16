@@ -167,6 +167,7 @@ class AlertRule(models.Model):
         (CONDITION_VOLUME_SPIKE, "Lonjakan volume sebutan"),
     ]
 
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="alert_rules")
     name = models.CharField(max_length=150)
     condition_summary = models.CharField(max_length=255)
     channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES)
@@ -194,6 +195,7 @@ class Alert(models.Model):
     STATUS_RESOLVED = "resolved"
     STATUS_CHOICES = [(STATUS_ACTIVE, "Aktif"), (STATUS_RESOLVED, "Teratasi")]
 
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="alerts")
     rule = models.ForeignKey(AlertRule, on_delete=models.CASCADE, related_name="alerts")
     issue = models.ForeignKey(
         PoliticalIssue, on_delete=models.SET_NULL, null=True, blank=True, related_name="alerts"

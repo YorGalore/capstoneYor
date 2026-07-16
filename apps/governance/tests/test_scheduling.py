@@ -223,9 +223,10 @@ class KillSwitchTest(TestCase):
 
         platform = Platform.objects.get(slug="x")
         PlatformIntegration.objects.create(
-            platform=platform, method=PlatformIntegration.METHOD_APIFY, is_active=True
+            project=self.project, platform=platform,
+            method=PlatformIntegration.METHOD_APIFY, is_active=True
         )
-        MonitoringKeyword.objects.create(keyword="pangan", is_active=True)
+        MonitoringKeyword.objects.create(project=self.project, keyword="pangan", is_active=True)
         scheduling.set_collection_enabled(False, actor="Super Admin")
 
         with mock.patch.object(orchestrator.apify_crawler, "collect") as collect:

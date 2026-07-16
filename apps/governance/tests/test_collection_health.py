@@ -7,12 +7,17 @@ arrived for a week. Health has to be legible without reading the run ledger by h
 from django.test import TestCase
 from django.utils import timezone
 
+from apps.core.models import Project, Tenant
 from apps.governance import health
 from apps.governance.models import CollectionRun
 
 
 def run(source, status, minutes_ago=0, **kwargs):
-    entry = CollectionRun.objects.create(source=source, status=status, **kwargs)
+    tenant, _ = Tenant.objects.get_or_create(name="Health Tenant")
+    project, _ = Project.objects.get_or_create(tenant=tenant, name="Health Project")
+    entry = CollectionRun.objects.create(
+        project=project, source=source, status=status, **kwargs
+    )
     when = timezone.now() - timezone.timedelta(minutes=minutes_ago)
     CollectionRun.objects.filter(pk=entry.pk).update(started_at=when, finished_at=when)
     return CollectionRun.objects.get(pk=entry.pk)

@@ -6,12 +6,33 @@ from .models import (
     RuntimeSetting, ScheduledJob,
 )
 
-admin.site.register(PlatformIntegration)
-admin.site.register(ApifyCredential)
-admin.site.register(MonitoredDomain)
-admin.site.register(MonitoringKeyword)
+@admin.register(PlatformIntegration)
+class PlatformIntegrationAdmin(admin.ModelAdmin):
+    list_display = ("platform", "project", "method", "is_active")
+    list_filter = ("project", "method", "is_active")
+
+
+@admin.register(ApifyCredential)
+class ApifyCredentialAdmin(admin.ModelAdmin):
+    list_display = ("masked_token", "project", "status", "last_verified_at")
+    list_filter = ("project", "status")
+
+
+@admin.register(MonitoredDomain)
+class MonitoredDomainAdmin(admin.ModelAdmin):
+    list_display = ("domain", "project", "adapter", "status")
+    list_filter = ("project", "status")
+
+
+@admin.register(MonitoringKeyword)
+class MonitoringKeywordAdmin(admin.ModelAdmin):
+    list_display = ("keyword", "project", "is_active", "match_count")
+    list_filter = ("project", "is_active")
 admin.site.register(PoliticalMonitoringPermission)
-admin.site.register(CollectionRun)
+@admin.register(CollectionRun)
+class CollectionRunAdmin(admin.ModelAdmin):
+    list_display = ("source", "project", "status", "items_found", "cost_estimate", "started_at")
+    list_filter = ("project", "source", "status")
 
 
 @admin.register(AuditLogEntry)

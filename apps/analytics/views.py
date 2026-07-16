@@ -113,7 +113,7 @@ def correct_sentiment(request, mention_id):
 def ringkasan(request):
     project = get_active_project(request)
     summary = selectors.ringkasan_summary(project) if project else None
-    alerts = selectors.recent_alerts()
+    alerts = selectors.recent_alerts(project) if project else []
     return render(request, "analytics/ringkasan.html", {
         "active_nav": "ringkasan",
         "summary": summary,

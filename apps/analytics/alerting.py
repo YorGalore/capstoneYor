@@ -56,17 +56,23 @@ def _evaluate(project, rule):
 
 
 def evaluate_rules(project, issue=None):
-    """Evaluate every active rule; raise and return newly triggered Alerts."""
+    """Evaluate the project's active rules; raise and return newly triggered Alerts."""
+    if issue is not None and issue.project_id != project.pk:
+        raise ValueError("The alert issue must belong to the evaluated project.")
+
     triggered = []
-    for rule in AlertRule.objects.filter(is_active=True):
+    for rule in AlertRule.objects.filter(project=project, is_active=True):
         breached, detail, severity = _evaluate(project, rule)
         if not breached:
             continue
         # Don't re-raise a rule that is already firing and unresolved.
-        if Alert.objects.filter(rule=rule, status=Alert.STATUS_ACTIVE).exists():
+        if Alert.objects.filter(
+            project=project, rule=rule, status=Alert.STATUS_ACTIVE
+        ).exists():
             continue
 
         triggered.append(Alert.objects.create(
+            project=project,
             rule=rule,
             issue=issue,
             severity=severity,

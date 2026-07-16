@@ -58,6 +58,11 @@ services:
         condition: service_healthy
       web:
         condition: service_started
+    # The image healthcheck probes the web service on port 8000. This container
+    # deliberately runs only the scheduler loop, so inheriting that probe would
+    # mark a healthy scheduler as unhealthy even while jobs are running.
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
 volumes:

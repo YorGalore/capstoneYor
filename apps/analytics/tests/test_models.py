@@ -53,15 +53,16 @@ class AnalyticsModelsTest(TestCase):
 
     def test_alert_ordering_is_most_recent_first(self):
         rule = AlertRule.objects.create(
+            project=self.project,
             name="Rasio-Neg-3J", condition_summary="Negatif > 55% dalam 3 jam",
             channel=AlertRule.CHANNEL_WEBHOOK,
         )
         older = Alert.objects.create(
-            rule=rule, severity=Alert.SEVERITY_WARNING, title="Lama", detail="...",
+            project=self.project, rule=rule, severity=Alert.SEVERITY_WARNING, title="Lama", detail="...",
             triggered_at=timezone.now() - timezone.timedelta(hours=2),
         )
         newer = Alert.objects.create(
-            rule=rule, severity=Alert.SEVERITY_CRITICAL, title="Baru", detail="...",
+            project=self.project, rule=rule, severity=Alert.SEVERITY_CRITICAL, title="Baru", detail="...",
             triggered_at=timezone.now(),
         )
         self.assertEqual(list(Alert.objects.all()), [newer, older])
