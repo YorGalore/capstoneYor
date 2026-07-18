@@ -1,6 +1,8 @@
 from django.contrib.auth.decorators import login_not_required
+from django.http import Http404
 from django.shortcuts import redirect, render
 
+from .articles import ARTICLES, get_article
 from .forms import OnboardingRequestForm
 from .models import AnalystProfile
 
@@ -12,7 +14,7 @@ def landing(request):
     # a "Masuk" button and a demo booking form they have no use for.
     if request.user.is_authenticated:
         return redirect("analytics:ringkasan")
-    return render(request, "core/landing.html")
+    return render(request, "core/landing.html", {"articles": ARTICLES})
 
 
 @login_not_required
@@ -33,6 +35,15 @@ def onboarding(request):
 @login_not_required
 def onboarding_success(request):
     return render(request, "core/onboarding_success.html")
+
+
+@login_not_required
+def article_detail(request, slug):
+    article = get_article(slug)
+    if article is None:
+        raise Http404("Artikel tidak ditemukan")
+    related = [a for a in ARTICLES if a["slug"] != slug][:5]
+    return render(request, "core/artikel_detail.html", {"article": article, "related": related})
 
 
 def profile(request):

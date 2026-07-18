@@ -1,0 +1,16 @@
+{% load static %}
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ article.title }} — PANTAU</title><meta name="description" content="{{ article.excerpt }}">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="{% static 'core/css/landing.css' %}"></head>
+<body><div class="research-banner"><div class="wrap">PANTAU adalah proyek riset yang dikembangkan oleh <a href="https://senada-ugm.github.io/" target="_blank" rel="noopener">SENADA (Software Engineering and Data Lab)</a>, Departemen Ilmu Komputer dan Elektronika, Fakultas MIPA, Universitas Gadjah Mada.</div></div>
+<nav class="nav wrap"><a class="brand" href="/"><span class="logo">P</span><span>PANTAU<small>NARASI &amp; OPINI</small></span></a><div class="navlinks"><a href="/#fitur">Fitur</a><a href="/#solusi">Solusi</a><a href="/#artikel">Artikel</a></div><div class="navcta"><a class="text-link" href="{% url 'login' %}">Masuk</a><a class="button small" href="{% url 'core:onboarding' %}">Jadwalkan demo <span>↗</span></a></div></nav>
+
+<main><article class="article-detail wrap"><div class="article-meta"><span class="article-tag">{{ article.category }}</span><span>{{ article.read_minutes }} menit baca</span></div><h1>{{ article.title }}</h1>
+{% for kind, text in article.body %}{% if kind == "h" %}<h2>{{ text }}</h2>{% else %}<p>{{ text }}</p>{% endif %}{% endfor %}
+</article>
+
+<section class="article-related wrap"><h3>Artikel lainnya</h3><ul>{% for other in related %}<li><a href="{% url 'core:artikel_detail' other.slug %}">{{ other.title }}</a></li>{% endfor %}</ul></section>
+
+<section class="final-cta wrap"><small>KEPUTUSAN YANG LEBIH CEPAT DIMULAI DARI SINYAL YANG TEPAT</small><h2>Apa yang perlu Anda <em>pantau hari ini?</em></h2><p>Jadwalkan sesi singkat bersama tim kami. Kami akan membantu memetakan kebutuhan organisasi Anda.</p><a class="button" href="{% url 'core:onboarding' %}">Jadwalkan demo <span>→</span></a></section></main>
+<footer><div class="wrap footer"><a class="brand" href="/"><span class="logo">P</span><span>PANTAU<small>NARASI &amp; OPINI</small></span></a><p>Social intelligence untuk keputusan yang bertanggung jawab.</p><div><a href="/#fitur">Fitur</a><a href="{% url 'login' %}">Masuk</a><a href="{% url 'core:onboarding' %}">Hubungi kami</a></div></div>
+<div class="wrap research-credit"><p>PANTAU adalah proyek riset yang dikembangkan oleh <a href="https://senada-ugm.github.io/" target="_blank" rel="noopener">SENADA — Software Engineering and Data Lab</a>, Departemen Ilmu Komputer dan Elektronika, FMIPA, Universitas Gadjah Mada, dipimpin oleh Assoc. Prof. Lukman Heryawan, Ph.D. SENADA meneliti rekayasa perangkat lunak, ilmu data, dan teknologi mutakhir untuk kesehatan, pendidikan, dan masyarakat.</p></div></footer></body></html>
