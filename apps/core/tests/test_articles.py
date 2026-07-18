@@ -24,6 +24,11 @@ class ArticleContentTest(SimpleTestCase):
         self.assertEqual(get_article(first["slug"]), first)
         self.assertIsNone(get_article("tidak-ada-slug-seperti-ini"))
 
+    def test_every_article_body_has_at_least_2000_words(self):
+        for article in ARTICLES:
+            word_count = sum(len(text.split()) for _, text in article["body"])
+            self.assertGreaterEqual(word_count, 2000, article["slug"])
+
 
 class ArticleDetailViewTest(TestCase):
     def test_known_slug_returns_200_with_title_and_related_links(self):
