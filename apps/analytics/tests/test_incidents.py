@@ -31,3 +31,32 @@ class IncidentModelTest(TestCase):
         )
         self.assertEqual(list(incident.events.all()), [event])
         self.assertIsNotNone(event.occurred_at)
+
+    def test_board_order_puts_the_most_urgent_incident_first(self):
+        for severity in [
+            Incident.SEVERITY_LOW, Incident.SEVERITY_CRITICAL,
+            Incident.SEVERITY_MEDIUM, Incident.SEVERITY_HIGH,
+        ]:
+            Incident.objects.create(
+                project=self.project, title=severity, severity=severity,
+            )
+
+        ordered = [i.severity for i in Incident.objects.all()]
+
+        self.assertEqual(ordered, [
+            Incident.SEVERITY_CRITICAL, Incident.SEVERITY_HIGH,
+            Incident.SEVERITY_MEDIUM, Incident.SEVERITY_LOW,
+        ])
+
+    def test_partial_save_of_severity_still_reorders_the_board(self):
+        incident = Incident.objects.create(
+            project=self.project, title="Naik", severity=Incident.SEVERITY_LOW,
+        )
+        other = Incident.objects.create(
+            project=self.project, title="Tetap", severity=Incident.SEVERITY_MEDIUM,
+        )
+
+        incident.severity = Incident.SEVERITY_CRITICAL
+        incident.save(update_fields=["severity"])
+
+        self.assertEqual(list(Incident.objects.all()), [incident, other])

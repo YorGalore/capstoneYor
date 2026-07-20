@@ -565,6 +565,16 @@ class Incident(models.Model):
         (SEVERITY_LOW, "Rendah"),
     ]
 
+    # Ordering by the severity *string* would sort alphabetically — medium, low,
+    # high, critical — putting the most urgent incidents last on a board whose
+    # whole purpose is surfacing them first. Rank numerically instead.
+    SEVERITY_RANK = {
+        SEVERITY_CRITICAL: 0,
+        SEVERITY_HIGH: 1,
+        SEVERITY_MEDIUM: 2,
+        SEVERITY_LOW: 3,
+    }
+
     STATUS_OPEN = "open"
     STATUS_ASSIGNED = "assigned"
     STATUS_IN_PROGRESS = "in_progress"
@@ -587,6 +597,7 @@ class Incident(models.Model):
         Regency, on_delete=models.SET_NULL, null=True, blank=True, related_name="incidents"
     )
     severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default=SEVERITY_LOW)
+    severity_rank = models.PositiveSmallIntegerField(default=3, editable=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_OPEN)
     assigned_opd = models.ForeignKey(
         OPD, on_delete=models.SET_NULL, null=True, blank=True, related_name="incidents"
@@ -605,11 +616,20 @@ class Incident(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-severity", "-mention_count"]
+        ordering = ["severity_rank", "-mention_count"]
         indexes = [
             models.Index(fields=["project", "status"]),
-            models.Index(fields=["severity"]),
+            models.Index(fields=["severity_rank"]),
         ]
+
+    def save(self, *args, **kwargs):
+        self.severity_rank = self.SEVERITY_RANK[self.severity]
+        # A partial save that touches severity must persist the derived rank too,
+        # or the board silently keeps ordering by the previous severity.
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "severity" in update_fields:
+            kwargs["update_fields"] = list(update_fields) + ["severity_rank"]
+        super().save(*args, **kwargs)
 
     @property
     def is_open(self):
