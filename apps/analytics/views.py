@@ -506,4 +506,3 @@ def insiden_refresh(request):
         touched = incidents.refresh_candidates(project)
         messages.success(request, f"{len(touched)} kandidat insiden diperbarui.")
     return redirect("analytics:insiden")
-    return redirect(f"{reverse('analytics:brief')}?tanggal={brief.brief_date}")
