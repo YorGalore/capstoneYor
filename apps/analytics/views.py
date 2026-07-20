@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.http import HttpResponse, StreamingHttpResponse
+from django.http import Http404, HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -13,7 +13,7 @@ from apps.core.selectors import get_active_project, scope_to_tenant
 from apps.governance import regulatory
 from apps.governance.neutrality import NEUTRALITY_NOTICE, require_political_monitoring
 from apps.governance.services import record_audit_entry
-from . import briefs, exports, selectors, taxonomy
+from . import briefs, exports, incidents, selectors, taxonomy
 from .models import (
     DailyBrief, DailyBriefIssue, Issue, IssueMergeHistory, LabelCorrection, Mention,
     PoliticalIssue, ResponseAction,
@@ -390,4 +390,120 @@ def finalize_brief(request, brief_id):
         actor_label=actor, action="Memfinalisasi brief harian", target=str(brief.brief_date),
     )
     messages.success(request, "Brief difinalisasi dan dikunci.")
+    return redirect(f"{reverse('analytics:brief')}?tanggal={brief.brief_date}")
+
+
+def _actor(request):
+    """The human to record against an action — never 'sistem' for a user action."""
+    return request.user.get_full_name() or request.user.username
+
+
+def _get_incident(request, incident_id):
+    """Fetch a tenant-scoped incident or 404. Never trust the id alone (FR-1.2)."""
+    from .models import Incident
+
+    return get_object_or_404(
+        scope_to_tenant(Incident.objects.all(), request), pk=incident_id
+    )
+
+
+@require_page("insiden")
+def insiden(request):
+    """Incident board: candidates and confirmed incidents as cards."""
+    board = selectors.incident_board(
+        request,
+        window=request.GET.get("periode", "7"),
+        opd_slug=request.GET.get("opd", ""),
+        severity=request.GET.get("severity", ""),
+    )
+    from .models import Incident
+
+    return render(request, "analytics/insiden.html", {
+        "active_nav": "insiden",
+        "board": board,
+        "severity_choices": Incident.SEVERITY_CHOICES,
+        "filters": {
+            "periode": request.GET.get("periode", "7"),
+            "opd": request.GET.get("opd", ""),
+            "severity": request.GET.get("severity", ""),
+        },
+    })
+
+
+@require_page("insiden")
+def insiden_detail(request, incident_id):
+    incident = selectors.incident_detail(request, incident_id)
+    if incident is None:
+        raise Http404("Insiden tidak ditemukan.")
+
+    from .models import Incident, OPD
+
+    return render(request, "analytics/insiden_detail.html", {
+        "active_nav": "insiden",
+        "incident": incident,
+        "events": incident.events.all(),
+        "related_mentions": incident.mentions.all()[:20],
+        "opds": OPD.objects.filter(project=incident.project, is_active=True),
+        "status_choices": Incident.STATUS_CHOICES,
+    })
+
+
+@require_page("insiden")
+@require_POST
+def insiden_promote(request, incident_id):
+    incident = _get_incident(request, incident_id)
+    incidents.promote(incident, by=_actor(request))
+    messages.success(request, "Kandidat dikonfirmasi sebagai insiden.")
+    return redirect("analytics:insiden_detail", incident_id=incident.pk)
+
+
+@require_page("insiden")
+@require_POST
+def insiden_assign(request, incident_id):
+    from .models import OPD
+
+    incident = _get_incident(request, incident_id)
+    opd = get_object_or_404(
+        OPD.objects.filter(project=incident.project), pk=request.POST.get("opd")
+    )
+    incidents.assign(incident, opd, by=_actor(request))
+    messages.success(request, f"Insiden ditugaskan ke {opd}.")
+    return redirect("analytics:insiden_detail", incident_id=incident.pk)
+
+
+@require_page("insiden")
+@require_POST
+def insiden_status(request, incident_id):
+    incident = _get_incident(request, incident_id)
+    try:
+        incidents.set_status(incident, request.POST.get("status", ""), by=_actor(request))
+        messages.success(request, "Status insiden diperbarui.")
+    except incidents.InvalidTransition as exc:
+        messages.error(request, str(exc))
+    return redirect("analytics:insiden_detail", incident_id=incident.pk)
+
+
+@require_page("insiden")
+@require_POST
+def insiden_note(request, incident_id):
+    incident = _get_incident(request, incident_id)
+    description = (request.POST.get("description") or "").strip()
+    if not description:
+        messages.error(request, "Catatan tidak boleh kosong.")
+    else:
+        incidents.log_note(incident, description, by=_actor(request))
+        messages.success(request, "Catatan ditambahkan ke lini masa.")
+    return redirect("analytics:insiden_detail", incident_id=incident.pk)
+
+
+@require_page("insiden")
+@require_POST
+def insiden_refresh(request):
+    project = get_active_project(request)
+    if project is None:
+        messages.error(request, "Tidak ada proyek aktif.")
+    else:
+        touched = incidents.refresh_candidates(project)
+        messages.success(request, f"{len(touched)} kandidat insiden diperbarui.")
+    return redirect("analytics:insiden")
     return redirect(f"{reverse('analytics:brief')}?tanggal={brief.brief_date}")

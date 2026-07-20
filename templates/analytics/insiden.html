@@ -1,0 +1,31 @@
+{% extends "core/base_dashboard.html" %}
+{% block content %}
+<h1>Insiden</h1>
+<section>
+  <h2>Insiden Terkonfirmasi ({{ board.counts.confirmed }})</h2>
+  {% for incident in board.confirmed %}
+    <article class="incident-card severity-{{ incident.severity }}">
+      <a href="{% url 'analytics:insiden_detail' incident.pk %}">{{ incident.title }}</a>
+      <span class="severity-chip">{{ incident.get_severity_display }}</span>
+      <span>{{ incident.regency.name|default:"—" }}</span>
+      <span>{{ incident.mention_count }} sebutan</span>
+      <span>{{ incident.negative_pct }}% negatif</span>
+      <span>{{ incident.assigned_opd|default:"Belum ditugaskan" }}</span>
+    </article>
+  {% empty %}
+    <p>Belum ada insiden terkonfirmasi.</p>
+  {% endfor %}
+</section>
+<section>
+  <h2>Kandidat ({{ board.counts.candidates }})</h2>
+  {% for incident in board.candidates %}
+    <article class="incident-card candidate severity-{{ incident.severity }}">
+      <a href="{% url 'analytics:insiden_detail' incident.pk %}">{{ incident.title }}</a>
+      <span class="severity-chip">{{ incident.get_severity_display }}</span>
+      <span>{{ incident.mention_count }} sebutan</span>
+    </article>
+  {% empty %}
+    <p>Tidak ada kandidat baru.</p>
+  {% endfor %}
+</section>
+{% endblock %}

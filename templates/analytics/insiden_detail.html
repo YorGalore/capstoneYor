@@ -1,0 +1,58 @@
+{% extends "core/base_dashboard.html" %}
+{% block content %}
+<h1>{{ incident.title }}</h1>
+<p>{{ incident.get_severity_display }} · {{ incident.get_status_display }}
+   · {{ incident.regency.name|default:"—" }}</p>
+
+<section><h2>Ringkasan</h2><div>{{ incident.ai_summary|linebreaks }}</div></section>
+<section><h2>Dugaan Penyebab</h2><div>{{ incident.root_cause|linebreaks }}</div></section>
+<section><h2>Dampak</h2><div>{{ incident.impact|linebreaks }}</div></section>
+<section><h2>Rekomendasi</h2><div>{{ incident.recommendation|linebreaks }}</div></section>
+
+<section>
+  <h2>Lini Masa</h2>
+  <ol>
+    {% for event in events %}
+      <li>{{ event.occurred_at|date:"d M H:i" }} — {{ event.description }}
+          <em>{{ event.logged_by }}</em></li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section>
+  <h2>Tindakan</h2>
+  {% if not incident.is_confirmed %}
+  <form method="post" action="{% url 'analytics:insiden_promote' incident.pk %}">
+    {% csrf_token %}<button type="submit">Konfirmasi sebagai insiden</button>
+  </form>
+  {% endif %}
+  <form method="post" action="{% url 'analytics:insiden_assign' incident.pk %}">
+    {% csrf_token %}
+    <select name="opd">
+      {% for opd in opds %}<option value="{{ opd.pk }}">{{ opd.name }}</option>{% endfor %}
+    </select>
+    <button type="submit">Tugaskan</button>
+  </form>
+  <form method="post" action="{% url 'analytics:insiden_status' incident.pk %}">
+    {% csrf_token %}
+    <select name="status">
+      {% for value, label in status_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+    </select>
+    <button type="submit">Ubah status</button>
+  </form>
+  <form method="post" action="{% url 'analytics:insiden_note' incident.pk %}">
+    {% csrf_token %}
+    <input type="text" name="description" placeholder="Catatan">
+    <button type="submit">Catat</button>
+  </form>
+</section>
+
+<details>
+  <summary>Postingan terkait ({{ related_mentions|length }})</summary>
+  <ul>
+    {% for mention in related_mentions %}
+      <li>{{ mention.author_handle }} — {{ mention.content_snippet }}</li>
+    {% endfor %}
+  </ul>
+</details>
+{% endblock %}

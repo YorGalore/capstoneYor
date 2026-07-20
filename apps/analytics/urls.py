@@ -24,4 +24,11 @@ urlpatterns = [
     path("taksonomi/<int:mention_id>/label/", views.assign_issue, name="assign_issue"),
     path("taksonomi/gabung/", views.merge_issues, name="merge_issues"),
     path("taksonomi/gabung/<int:history_id>/batal/", views.unmerge_issues, name="unmerge_issues"),
+    path("insiden/", views.insiden, name="insiden"),
+    path("insiden/hitung-ulang/", views.insiden_refresh, name="insiden_refresh"),
+    path("insiden/<int:incident_id>/", views.insiden_detail, name="insiden_detail"),
+    path("insiden/<int:incident_id>/konfirmasi/", views.insiden_promote, name="insiden_promote"),
+    path("insiden/<int:incident_id>/tugaskan/", views.insiden_assign, name="insiden_assign"),
+    path("insiden/<int:incident_id>/status/", views.insiden_status, name="insiden_status"),
+    path("insiden/<int:incident_id>/catat/", views.insiden_note, name="insiden_note"),
 ]
