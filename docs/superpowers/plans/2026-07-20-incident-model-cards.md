@@ -1558,10 +1558,18 @@ class DemoSeedTest(TestCase):
     def test_demo_seed_creates_opds_for_assignment(self):
         from apps.core import demo_kulon_progo
 
-        demo_kulon_progo.seed()
+        demo_kulon_progo.seed_kulon_progo_demo()
 
         self.assertTrue(OPD.objects.filter(slug="pu").exists())
         self.assertTrue(OPD.objects.filter(slug="dlh").exists())
+
+    def test_demo_seed_is_idempotent(self):
+        from apps.core import demo_kulon_progo
+
+        demo_kulon_progo.seed_kulon_progo_demo()
+        demo_kulon_progo.seed_kulon_progo_demo()
+
+        self.assertEqual(OPD.objects.filter(slug="pu").count(), 1)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1571,11 +1579,14 @@ Expected: FAIL — `AssertionError: False is not true`
 
 - [ ] **Step 3: Seed OPDs in the demo module**
 
-Read `apps/core/demo_kulon_progo.py` first to match its existing `seed()` structure and project lookup. Then, inside the existing `seed()` function — after the project is created or fetched, using whatever local variable holds it — add:
+Add a `_seed_opds(project)` helper to `apps/core/demo_kulon_progo.py`, following the file's
+existing `_seed_*(project)` convention, and call it from `seed_kulon_progo_demo()` after
+`_seed_entities(project)`:
 
 ```python
-    # OPD the incident board can assign work to. Idempotent: the demo seed is
-    # re-run routinely and must not duplicate rows.
+def _seed_opds(project):
+    """OPD the incident board can assign work to. Idempotent: the demo seed is
+    re-run routinely and must not duplicate rows."""
     from apps.analytics.models import OPD
 
     for slug, name, abbr in [
@@ -1589,7 +1600,11 @@ Read `apps/core/demo_kulon_progo.py` first to match its existing `seed()` struct
         )
 ```
 
-If the local variable holding the project is not named `project`, use its actual name.
+Then add the call inside `seed_kulon_progo_demo()`, after the `_seed_entities` line:
+
+```python
+    _seed_opds(project)
+```
 
 - [ ] **Step 4: Add the nav entry**
 
