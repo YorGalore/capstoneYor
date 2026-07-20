@@ -174,6 +174,40 @@ class DetectionTest(TestCase):
             self._mention(Mention.SENTIMENT_NEGATIVE)
         self.assertEqual(incidents.shortlist_candidates(self.project), [])
 
+    def test_a_small_first_ever_cluster_is_not_treated_as_a_surge(self):
+        # Every cluster has an empty prior window on a first-ever run. If that
+        # counted as a surge, day one would mark the whole board Critical and the
+        # tier would stop meaning anything.
+        for _ in range(incidents.MIN_MENTIONS):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+
+        candidate = incidents.shortlist_candidates(self.project)[0]
+
+        self.assertEqual(candidate["volume_change_pct"], 0.0)
+        self.assertEqual(
+            incidents.severity_for(
+                negative_pct=candidate["negative_pct"],
+                volume_change_pct=candidate["volume_change_pct"],
+            ),
+            Incident.SEVERITY_HIGH,
+        )
+
+    def test_a_large_first_ever_cluster_is_a_genuine_spike(self):
+        # A flood that draws far more than the detection floor within hours has no
+        # yesterday to compare against, and is a crisis on arrival.
+        for _ in range(incidents.NEW_CLUSTER_SURGE_MENTIONS):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+
+        candidate = incidents.shortlist_candidates(self.project)[0]
+
+        self.assertEqual(
+            incidents.severity_for(
+                negative_pct=candidate["negative_pct"],
+                volume_change_pct=candidate["volume_change_pct"],
+            ),
+            Incident.SEVERITY_CRITICAL,
+        )
+
     def test_ignores_high_volume_clusters_that_are_not_negative(self):
         for _ in range(10):
             self._mention(Mention.SENTIMENT_POSITIVE)
@@ -304,10 +338,10 @@ class RefreshTest(DetectionTest):
         incident = created[0]
         self.assertFalse(incident.is_confirmed)
         self.assertEqual(incident.mention_count, 8)
-        # 100% negative with no prior-window baseline: shortlist_candidates treats
-        # a from-zero cluster as a surge (Fix 2), so a first detection this
-        # negative reaches Critical rather than being capped at High.
-        self.assertEqual(incident.severity, Incident.SEVERITY_CRITICAL)
+        # 100% negative, but only 8 mentions from an empty prior window — below
+        # NEW_CLUSTER_SURGE_MENTIONS, so it is a new grievance rather than a spike
+        # and enters at the tier its sentiment earns.
+        self.assertEqual(incident.severity, Incident.SEVERITY_HIGH)
         self.assertIn("DRAF", incident.ai_summary.upper())
         self.assertEqual(incident.events.filter(kind=IncidentEvent.KIND_DETECTED).count(), 1)
 

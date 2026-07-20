@@ -36,6 +36,11 @@ HIGH_NEGATIVE_PCT = 50
 MEDIUM_NEGATIVE_PCT = 30
 # A volume change this large is a surge rather than drift.
 SURGE_PCT = 200
+# A cluster with no prior activity has no measurable change, so it only counts as
+# a surge once it is substantially bigger than the detection floor. Without this,
+# every cluster on a first-ever run looks like a surge — which would mark the whole
+# board Critical on day one and drain the tier of meaning.
+NEW_CLUSTER_SURGE_MENTIONS = MIN_MENTIONS * 3
 
 
 def severity_for(negative_pct, volume_change_pct=0, coordinated=False):
@@ -194,12 +199,14 @@ def shortlist_candidates(project, since=None, window_days=DEFAULT_WINDOW_DAYS):
         ).count()
         if previous_total > 0:
             volume_change_pct = ((total - previous_total) / previous_total) * 100
-        elif total > 0:
-            # No prior activity at all plus a fresh cluster now is, by definition,
-            # a surge: use a large constant well above SURGE_PCT rather than a
-            # division by zero, so this deterministically escalates severity_for.
-            volume_change_pct = 100.0 * total
+        elif total >= NEW_CLUSTER_SURGE_MENTIONS:
+            # No prior window to divide by. A cluster this much larger than the
+            # detection floor appearing from nothing is a genuine spike — a flood
+            # that draws hundreds of posts within hours has no yesterday.
+            volume_change_pct = float(SURGE_PCT)
         else:
+            # A handful of posts from nothing is a new grievance, not a crisis. It
+            # enters at the tier its sentiment earns and escalates only if it grows.
             volume_change_pct = 0.0
 
         candidates.append({
