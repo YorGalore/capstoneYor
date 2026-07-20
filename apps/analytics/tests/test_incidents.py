@@ -1,8 +1,14 @@
+from datetime import timedelta
+
 from django.test import TestCase
+from django.utils import timezone
 
 from apps.analytics import incidents
-from apps.analytics.models import Incident, IncidentEvent, OPD
-from apps.core.models import Project, Province, Regency, Tenant
+from apps.analytics.models import (
+    Category, Incident, IncidentEvent, Issue, IssueLabel, Mention, OPD,
+    SubCategory,
+)
+from apps.core.models import Platform, Project, Province, Regency, Tenant
 
 
 class IncidentModelTest(TestCase):
@@ -129,3 +135,118 @@ class CompositionTest(TestCase):
         # Grounding discipline: with no evidence, say so rather than guess.
         result = incidents.compose_incident_narrative(self._candidate(snippets=[]))
         self.assertIn("belum", result["root_cause"].lower())
+
+
+class DetectionTest(TestCase):
+    def setUp(self):
+        self.platform = Platform.objects.create(slug="x", display_name="X")
+        self.tenant = Tenant.objects.create(name="Instansi A")
+        self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
+        self.province = Province.objects.create(name="DI Yogyakarta")
+        self.regency = Regency.objects.create(province=self.province, name="Depok")
+        cat = Category.objects.create(name="Infrastruktur")
+        sub = SubCategory.objects.create(category=cat, name="Jalan")
+        self.issue = Issue.objects.create(subcategory=sub, name="Jalan Rusak")
+
+    def _mention(self, sentiment, text="jalan berlubang", engagement=0):
+        mention = Mention.objects.create(
+            project=self.project, platform=self.platform, regency=self.regency,
+            author_handle="@warga", content_snippet=text, sentiment=sentiment,
+            emotion=Mention.EMOTION_ANGER, posted_at=timezone.now(),
+            engagement_count=engagement,
+        )
+        IssueLabel.objects.create(
+            mention=mention, issue=self.issue, source=IssueLabel.SOURCE_AUTO
+        )
+        return mention
+
+    def test_ignores_clusters_below_the_volume_threshold(self):
+        for _ in range(2):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+        self.assertEqual(incidents.shortlist_candidates(self.project), [])
+
+    def test_ignores_high_volume_clusters_that_are_not_negative(self):
+        for _ in range(10):
+            self._mention(Mention.SENTIMENT_POSITIVE)
+        self.assertEqual(incidents.shortlist_candidates(self.project), [])
+
+    def test_surfaces_a_negative_cluster_with_measured_counts(self):
+        for _ in range(8):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+        for _ in range(2):
+            self._mention(Mention.SENTIMENT_POSITIVE)
+
+        candidates = incidents.shortlist_candidates(self.project)
+
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertEqual(candidate["title"], "Jalan Rusak")
+        self.assertEqual(candidate["total"], 10)
+        self.assertEqual(candidate["negative_pct"], 80)
+        self.assertEqual(candidate["regency_name"], "Depok")
+
+    def test_quotes_the_highest_engagement_snippets_first(self):
+        for _ in range(7):
+            self._mention(Mention.SENTIMENT_NEGATIVE, text="biasa", engagement=1)
+        self._mention(Mention.SENTIMENT_NEGATIVE, text="viral parah", engagement=999)
+
+        candidate = incidents.shortlist_candidates(self.project)[0]
+
+        self.assertEqual(candidate["snippets"][0], "viral parah")
+
+    def test_ignores_mentions_outside_the_window(self):
+        old = timezone.now() - timedelta(days=30)
+        for _ in range(8):
+            mention = self._mention(Mention.SENTIMENT_NEGATIVE)
+            Mention.objects.filter(pk=mention.pk).update(posted_at=old)
+        self.assertEqual(incidents.shortlist_candidates(self.project), [])
+
+
+class RefreshTest(DetectionTest):
+    def test_creates_an_unconfirmed_incident_with_a_detection_event(self):
+        for _ in range(8):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+
+        created = incidents.refresh_candidates(self.project)
+
+        self.assertEqual(len(created), 1)
+        incident = created[0]
+        self.assertFalse(incident.is_confirmed)
+        self.assertEqual(incident.mention_count, 8)
+        self.assertEqual(incident.severity, Incident.SEVERITY_HIGH)
+        self.assertIn("DRAF", incident.ai_summary.upper())
+        self.assertEqual(incident.events.filter(kind=IncidentEvent.KIND_DETECTED).count(), 1)
+
+    def test_is_idempotent_rather_than_creating_duplicates(self):
+        for _ in range(8):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+
+        incidents.refresh_candidates(self.project)
+        incidents.refresh_candidates(self.project)
+
+        self.assertEqual(Incident.objects.filter(project=self.project).count(), 1)
+
+    def test_never_overwrites_an_operator_confirmed_incident(self):
+        for _ in range(8):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+        incident = incidents.refresh_candidates(self.project)[0]
+        incident.is_confirmed = True
+        incident.ai_summary = "Ditinjau dan disunting oleh operator."
+        incident.title = "Judul hasil suntingan"
+        incident.save()
+
+        incidents.refresh_candidates(self.project)
+
+        incident.refresh_from_db()
+        self.assertEqual(incident.ai_summary, "Ditinjau dan disunting oleh operator.")
+        self.assertEqual(incident.title, "Judul hasil suntingan")
+
+    def test_does_not_leak_incidents_across_tenants(self):
+        for _ in range(8):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+        other_tenant = Tenant.objects.create(name="Instansi B")
+        other_project = Project.objects.create(tenant=other_tenant, name="Proyek B")
+
+        incidents.refresh_candidates(self.project)
+
+        self.assertEqual(Incident.objects.filter(project=other_project).count(), 0)
