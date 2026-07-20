@@ -22,6 +22,7 @@ PAGES = [
     ("feed", "Umpan Sebutan"),
     ("narasi", "Narasi Politik"),
     ("war_room", "War Room"),
+    ("insiden", "Insiden"),
     ("koordinasi", "Deteksi Koordinasi"),
     ("regional", "Regional"),
     ("sosiograf", "Sosiograf"),
@@ -45,7 +46,7 @@ SUPER_ADMIN_ONLY_PAGES = {DEV_OPS_PAGE, "permission_matrix"}
 # "tool" pages, which stay denied by default (FR-1A.1).
 DASHBOARD_PAGES = {
     "ringkasan", "narasi", "war_room", "koordinasi", "regional", "brief",
-    "sosiograf", "laporan",
+    "sosiograf", "laporan", "insiden",
 }
 ROLES = [R.ROLE_SUPER_ADMIN, R.ROLE_TENANT_ADMIN, R.ROLE_ANALYST, R.ROLE_VIEWER]
 

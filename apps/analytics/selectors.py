@@ -541,3 +541,69 @@ def laporan_summary(project, days=30):
         "final_count": final_count,
         "draft_count": len(briefs) - final_count,
     }
+
+
+def incident_board(request, window="7", opd_slug="", severity=""):
+    """Incidents for the board, split into operator candidates and confirmed items.
+
+    Both halves come from the same tenant-scoped queryset: candidates are shown
+    alongside confirmed incidents rather than hidden in a separate queue, so the
+    operator's review work stays visible in context.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.core.selectors import scope_to_tenant
+
+    from .models import Incident, OPD
+
+    queryset = scope_to_tenant(
+        Incident.objects.select_related("assigned_opd", "regency"), request
+    )
+    # Same tenant gate as the incidents themselves, so the OPD filter can never
+    # offer another tenant's units.
+    opds = scope_to_tenant(OPD.objects.filter(is_active=True), request)
+
+    try:
+        days = int(window)
+    except (TypeError, ValueError):
+        days = 7
+    if days > 0:
+        queryset = queryset.filter(created_at__gte=timezone.now() - timedelta(days=days))
+
+    if opd_slug:
+        queryset = queryset.filter(assigned_opd__slug=opd_slug)
+    if severity:
+        queryset = queryset.filter(severity=severity)
+
+    confirmed = list(queryset.filter(is_confirmed=True))
+    candidates = list(queryset.filter(is_confirmed=False))
+
+    return {
+        "confirmed": confirmed,
+        "candidates": candidates,
+        "opds": opds,
+        "counts": {
+            "confirmed": len(confirmed),
+            "candidates": len(candidates),
+            "critical": sum(1 for i in confirmed if i.severity == Incident.SEVERITY_CRITICAL),
+            "open": sum(1 for i in confirmed if i.is_open),
+        },
+    }
+
+
+def incident_detail(request, incident_id):
+    """One incident with its timeline and related mentions, tenant-scoped."""
+    from apps.core.selectors import scope_to_tenant
+
+    from .models import Incident
+
+    return (
+        scope_to_tenant(
+            Incident.objects.select_related("assigned_opd", "regency", "issue"), request
+        )
+        .prefetch_related("events", "mentions__platform")
+        .filter(pk=incident_id)
+        .first()
+    )
