@@ -1,6 +1,47 @@
 {% extends "core/base_dashboard.html" %}
 {% block content %}
 <h1>Insiden</h1>
+<header class="incident-board-header">
+  <div class="incident-counts">
+    <span>Terkonfirmasi: {{ board.counts.confirmed }}</span>
+    <span>Kandidat: {{ board.counts.candidates }}</span>
+    <span>Kritis: {{ board.counts.critical }}</span>
+    <span>Terbuka: {{ board.counts.open }}</span>
+  </div>
+  <form method="get" class="incident-filter-form">
+    <label>
+      Periode
+      <select name="periode">
+        <option value="1" {% if filters.periode == "1" %}selected{% endif %}>Hari ini</option>
+        <option value="7" {% if filters.periode == "7" %}selected{% endif %}>7 hari</option>
+        <option value="30" {% if filters.periode == "30" %}selected{% endif %}>30 hari</option>
+      </select>
+    </label>
+    <label>
+      OPD
+      <select name="opd">
+        <option value="">Semua OPD</option>
+        {% for opd in board.opds %}
+          <option value="{{ opd.slug }}" {% if filters.opd == opd.slug %}selected{% endif %}>{{ opd.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Tingkat
+      <select name="severity">
+        <option value="">Semua tingkat</option>
+        {% for value, label in severity_choices %}
+          <option value="{{ value }}" {% if filters.severity == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Terapkan filter</button>
+  </form>
+  <form method="post" action="{% url 'analytics:insiden_refresh' %}">
+    {% csrf_token %}
+    <button type="submit">Hitung ulang kandidat</button>
+  </form>
+</header>
 <section>
   <h2>Insiden Terkonfirmasi ({{ board.counts.confirmed }})</h2>
   {% for incident in board.confirmed %}

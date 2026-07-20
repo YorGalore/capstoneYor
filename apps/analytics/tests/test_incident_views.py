@@ -1,9 +1,15 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
-from apps.analytics.models import Incident, IncidentEvent, OPD
-from apps.core.models import AnalystProfile, Project, Tenant
+from apps.analytics.models import (
+    Category, Incident, IncidentEvent, Issue, IssueLabel, Mention, OPD,
+    SubCategory,
+)
+from apps.core.models import AnalystProfile, Platform, Project, Province, Regency, Tenant
 
 
 class IncidentBoardAccessTest(TestCase):
@@ -51,6 +57,26 @@ class IncidentBoardAccessTest(TestCase):
         response = self.client.get(reverse("analytics:insiden"))
         self.assertEqual(len(response.context["board"]["confirmed"]), 1)
         self.assertEqual(len(response.context["board"]["candidates"]), 1)
+
+    def test_board_never_hides_a_still_open_incident_regardless_of_age(self):
+        # Fix 3: the window filter must not silently drop unresolved work — the
+        # worst failure mode for a board meant to surface it.
+        old = timezone.now() - timedelta(days=30)
+        still_open = Incident.objects.create(
+            project=self.project, title="Insiden Lama Masih Terbuka",
+            severity=Incident.SEVERITY_HIGH, status=Incident.STATUS_OPEN,
+        )
+        Incident.objects.filter(pk=still_open.pk).update(created_at=old)
+        old_closed = Incident.objects.create(
+            project=self.project, title="Insiden Lama Sudah Ditutup",
+            severity=Incident.SEVERITY_HIGH, status=Incident.STATUS_CLOSED,
+        )
+        Incident.objects.filter(pk=old_closed.pk).update(created_at=old)
+
+        response = self.client.get(reverse("analytics:insiden"))
+
+        self.assertContains(response, "Insiden Lama Masih Terbuka")
+        self.assertNotContains(response, "Insiden Lama Sudah Ditutup")
 
     def test_board_filters_by_severity(self):
         Incident.objects.create(
@@ -136,6 +162,17 @@ class IncidentActionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Ringkasan terukur.")
 
+    def test_detail_page_only_offers_legal_status_transitions(self):
+        # Fix 5: from `open`, only `assigned` and `closed` are legal; the picker
+        # must not offer `resolved` (or `in_progress`) at all.
+        response = self.client.get(
+            reverse("analytics:insiden_detail", args=[self.incident.pk])
+        )
+        self.assertEqual(self.incident.status, Incident.STATUS_OPEN)
+        allowed_values = [value for value, _label in response.context["allowed_status_choices"]]
+        self.assertEqual(set(allowed_values), {Incident.STATUS_ASSIGNED, Incident.STATUS_CLOSED})
+        self.assertNotContains(response, f'value="{Incident.STATUS_RESOLVED}"')
+
     def test_detail_rejects_another_tenants_incident(self):
         other = Tenant.objects.create(name="Instansi B")
         other_project = Project.objects.create(tenant=other, name="Proyek B")
@@ -170,3 +207,46 @@ class DemoSeedTest(TestCase):
         demo_kulon_progo.seed_kulon_progo_demo()
 
         self.assertEqual(OPD.objects.filter(slug="pu").count(), 1)
+
+
+class IncidentRefreshTriggerTest(TestCase):
+    """Fix 1: detection must be reachable from the UI, not just the URL."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="Instansi A")
+        self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
+        user = get_user_model().objects.create_user(username="analis", password="rahasia123")
+        AnalystProfile.objects.update_or_create(
+            user=user,
+            defaults={"tenant": self.tenant, "role": AnalystProfile.ROLE_ANALYST},
+        )
+        self.client.force_login(user)
+
+        self.platform = Platform.objects.create(slug="x", display_name="X")
+        self.province = Province.objects.create(name="DI Yogyakarta")
+        self.regency = Regency.objects.create(province=self.province, name="Depok")
+        cat = Category.objects.create(name="Infrastruktur")
+        sub = SubCategory.objects.create(category=cat, name="Jalan")
+        self.issue = Issue.objects.create(subcategory=sub, name="Jalan Rusak")
+        for _ in range(8):
+            mention = Mention.objects.create(
+                project=self.project, platform=self.platform, regency=self.regency,
+                author_handle="@warga", content_snippet="jalan berlubang",
+                sentiment=Mention.SENTIMENT_NEGATIVE, emotion=Mention.EMOTION_ANGER,
+                posted_at=timezone.now(),
+            )
+            IssueLabel.objects.create(
+                mention=mention, issue=self.issue, source=IssueLabel.SOURCE_AUTO
+            )
+
+    def test_board_has_a_reachable_refresh_trigger(self):
+        response = self.client.get(reverse("analytics:insiden"))
+        self.assertContains(response, reverse("analytics:insiden_refresh"))
+
+    def test_posting_to_refresh_creates_candidates_and_redirects(self):
+        self.assertEqual(Incident.objects.filter(project=self.project).count(), 0)
+
+        response = self.client.post(reverse("analytics:insiden_refresh"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Incident.objects.filter(project=self.project).count(), 1)

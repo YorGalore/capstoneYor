@@ -438,6 +438,14 @@ def insiden_detail(request, incident_id):
 
     from .models import Incident, OPD
 
+    # Only offer transitions the engine will actually accept (FR: no skipped
+    # lifecycle stages). This is a UI convenience — set_status() still enforces
+    # the same rule server-side as defence in depth.
+    allowed_statuses = incidents.ALLOWED_TRANSITIONS.get(incident.status, set())
+    allowed_status_choices = [
+        (value, label) for value, label in Incident.STATUS_CHOICES if value in allowed_statuses
+    ]
+
     return render(request, "analytics/insiden_detail.html", {
         "active_nav": "insiden",
         "incident": incident,
@@ -445,6 +453,7 @@ def insiden_detail(request, incident_id):
         "related_mentions": incident.mentions.all()[:20],
         "opds": OPD.objects.filter(project=incident.project, is_active=True),
         "status_choices": Incident.STATUS_CHOICES,
+        "allowed_status_choices": allowed_status_choices,
     })
 
 
