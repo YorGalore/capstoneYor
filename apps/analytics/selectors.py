@@ -549,6 +549,12 @@ def incident_board(request, window="7", opd_slug="", severity=""):
     Both halves come from the same tenant-scoped queryset: candidates are shown
     alongside confirmed incidents rather than hidden in a separate queue, so the
     operator's review work stays visible in context.
+
+    The time window only ever hides *terminal* incidents (resolved/closed) older
+    than the window: an incident that is still open or in progress must never
+    disappear from the board just because it is old, since that is precisely the
+    unresolved work the board exists to surface. Passing ``window="0"`` disables
+    the window filter entirely (no incident is hidden by age).
     """
     from datetime import timedelta
 
@@ -570,7 +576,12 @@ def incident_board(request, window="7", opd_slug="", severity=""):
     except (TypeError, ValueError):
         days = 7
     if days > 0:
-        queryset = queryset.filter(created_at__gte=timezone.now() - timedelta(days=days))
+        cutoff = timezone.now() - timedelta(days=days)
+        terminal_statuses = [Incident.STATUS_RESOLVED, Incident.STATUS_CLOSED]
+        queryset = queryset.filter(
+            Q(status__in=terminal_statuses, created_at__gte=cutoff)
+            | ~Q(status__in=terminal_statuses)
+        )
 
     if opd_slug:
         queryset = queryset.filter(assigned_opd__slug=opd_slug)

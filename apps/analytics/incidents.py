@@ -50,15 +50,23 @@ def severity_for(negative_pct, volume_change_pct=0, coordinated=False):
     escalates it. Coordinated inauthentic activity lifts an item above Low even
     when sentiment looks calm, matching the reasoning in ``classify_risk``: that
     combination is what a manufactured narrative looks like early on.
+
+    In the Medium band specifically, only a genuine volume ``surge`` escalates to
+    High. ``coordinated`` alone is *why* a calm cluster reaches this branch at all
+    (see above) — folding it into the escalation trigger too would double-count
+    it and push a merely-coordinated-but-calm cluster straight to High, which is
+    a bigger jump than the signal (coordination without volume or negativity)
+    warrants.
     """
-    escalating = volume_change_pct >= SURGE_PCT or coordinated
+    surge = volume_change_pct >= SURGE_PCT
+    escalating = surge or coordinated
 
     if negative_pct >= CRITICAL_NEGATIVE_PCT:
         return Incident.SEVERITY_CRITICAL if escalating else Incident.SEVERITY_HIGH
     if negative_pct >= HIGH_NEGATIVE_PCT:
         return Incident.SEVERITY_HIGH if escalating else Incident.SEVERITY_MEDIUM
     if negative_pct >= MEDIUM_NEGATIVE_PCT or coordinated:
-        return Incident.SEVERITY_MEDIUM
+        return Incident.SEVERITY_HIGH if surge else Incident.SEVERITY_MEDIUM
     return Incident.SEVERITY_LOW
 
 
@@ -138,6 +146,13 @@ def shortlist_candidates(project, since=None, window_days=DEFAULT_WINDOW_DAYS):
     if since is None:
         since = timezone.now() - timedelta(days=window_days)
 
+    now = timezone.now()
+    # The comparison window for volume_change_pct: the same length of time
+    # immediately preceding `since`, so "current" and "previous" are apples to
+    # apples regardless of what window_days the caller chose.
+    window_length = now - since
+    previous_since = since - window_length
+
     rows = (
         IssueLabel.objects.filter(
             mention__project=project, mention__posted_at__gte=since
@@ -169,6 +184,24 @@ def shortlist_candidates(project, since=None, window_days=DEFAULT_WINDOW_DAYS):
             .order_by("-engagement_count")
             .values_list("id", "content_snippet")
         )
+
+        previous_total = IssueLabel.objects.filter(
+            mention__project=project,
+            mention__posted_at__gte=previous_since,
+            mention__posted_at__lt=since,
+            issue__id=row["issue__id"],
+            mention__regency_id=row["mention__regency__id"],
+        ).count()
+        if previous_total > 0:
+            volume_change_pct = ((total - previous_total) / previous_total) * 100
+        elif total > 0:
+            # No prior activity at all plus a fresh cluster now is, by definition,
+            # a surge: use a large constant well above SURGE_PCT rather than a
+            # division by zero, so this deterministically escalates severity_for.
+            volume_change_pct = 100.0 * total
+        else:
+            volume_change_pct = 0.0
+
         candidates.append({
             "title": row["issue__name"],
             "issue_id": row["issue__id"],
@@ -176,6 +209,7 @@ def shortlist_candidates(project, since=None, window_days=DEFAULT_WINDOW_DAYS):
             "regency_name": row["mention__regency__name"] or "",
             "total": total,
             "negative_pct": negative_pct,
+            "volume_change_pct": volume_change_pct,
             "snippets": [snippet for _id, snippet in mentions[:MAX_SNIPPETS]],
             "mention_ids": [mention_id for mention_id, _snippet in mentions],
         })
@@ -188,7 +222,14 @@ def refresh_candidates(project, since=None, window_days=DEFAULT_WINDOW_DAYS):
 
     A confirmed incident is left alone entirely: once an operator has promoted and
     edited it, re-running detection must not clobber their judgement with a fresh
-    machine composition.
+    machine composition. The same protection extends to any incident an operator
+    has already acted on even before confirming it: `assign()` advances a
+    still-unconfirmed incident to `assigned`, and the detail view lets an operator
+    work a candidate (assign/status/note) ahead of confirmation. Skipping only
+    `is_confirmed` would let a later refresh overwrite that work — title,
+    severity, mention_count, negative_pct, narrative, and the mentions M2M — with
+    a silent downgrade and no timeline event. So the guard is: skip when
+    confirmed OR when the incident has moved out of `open`.
     """
     touched = []
     for candidate in shortlist_candidates(project, since=since, window_days=window_days):
@@ -198,11 +239,16 @@ def refresh_candidates(project, since=None, window_days=DEFAULT_WINDOW_DAYS):
             regency_id=candidate["regency_id"],
         ).first()
 
-        if incident is not None and incident.is_confirmed:
+        if incident is not None and (
+            incident.is_confirmed or incident.status != Incident.STATUS_OPEN
+        ):
             continue
 
         narrative = compose_incident_narrative(candidate)
-        severity = severity_for(negative_pct=candidate["negative_pct"])
+        severity = severity_for(
+            negative_pct=candidate["negative_pct"],
+            volume_change_pct=candidate["volume_change_pct"],
+        )
 
         if incident is None:
             incident = Incident.objects.create(

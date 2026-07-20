@@ -92,6 +92,15 @@ class SeverityTest(TestCase):
             Incident.SEVERITY_HIGH,
         )
 
+    def test_a_surge_escalates_a_medium_band_issue_to_high(self):
+        # 30-50% negative is the Medium band; a surge must escalate it too, not
+        # only the >=50% High band (the docstring promises escalation applies
+        # generally, but the branch had no escalation arm).
+        self.assertEqual(
+            incidents.severity_for(negative_pct=35, volume_change_pct=300),
+            Incident.SEVERITY_HIGH,
+        )
+
     def test_coordinated_activity_lifts_a_calm_issue_above_low(self):
         # Calm sentiment plus coordination is what a manufactured narrative looks
         # like early on, so it must not sit at Low.
@@ -201,6 +210,88 @@ class DetectionTest(TestCase):
             Mention.objects.filter(pk=mention.pk).update(posted_at=old)
         self.assertEqual(incidents.shortlist_candidates(self.project), [])
 
+    def test_same_issue_in_two_regencies_yields_two_candidates(self):
+        # Clustering is (issue x regency): the same complaint in two different
+        # kecamatan must surface as two separate items, not one merged cluster.
+        other_regency = Regency.objects.create(province=self.province, name="Sleman")
+        for _ in range(8):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+        for _ in range(8):
+            mention = Mention.objects.create(
+                project=self.project, platform=self.platform, regency=other_regency,
+                author_handle="@warga", content_snippet="jalan berlubang parah",
+                sentiment=Mention.SENTIMENT_NEGATIVE, emotion=Mention.EMOTION_ANGER,
+                posted_at=timezone.now(),
+            )
+            IssueLabel.objects.create(
+                mention=mention, issue=self.issue, source=IssueLabel.SOURCE_AUTO
+            )
+
+        candidates = incidents.shortlist_candidates(self.project)
+
+        self.assertEqual(len(candidates), 2)
+        regency_names = {c["regency_name"] for c in candidates}
+        self.assertEqual(regency_names, {"Depok", "Sleman"})
+
+
+class VolumeChangeTest(DetectionTest):
+    """Fix 2: shortlist_candidates must compute volume_change_pct against the
+    immediately preceding window of equal length, so the critical severity tier
+    (which requires an escalation signal) is reachable."""
+
+    def _mention_at(self, sentiment, posted_at, text="jalan berlubang"):
+        mention = Mention.objects.create(
+            project=self.project, platform=self.platform, regency=self.regency,
+            author_handle="@warga", content_snippet=text, sentiment=sentiment,
+            emotion=Mention.EMOTION_ANGER, posted_at=posted_at,
+        )
+        IssueLabel.objects.create(
+            mention=mention, issue=self.issue, source=IssueLabel.SOURCE_AUTO
+        )
+        return mention
+
+    def test_volume_tripled_against_prior_window_is_critical(self):
+        now = timezone.now()
+        since = now - timedelta(days=7)
+        previous_start = since - timedelta(days=7)
+        # Previous window: 3 negative mentions.
+        for _ in range(3):
+            self._mention_at(Mention.SENTIMENT_NEGATIVE, previous_start + timedelta(hours=1))
+        # Current window: 9 negative mentions (tripled), highly negative.
+        for _ in range(9):
+            self._mention_at(Mention.SENTIMENT_NEGATIVE, since + timedelta(hours=1))
+
+        candidates = incidents.shortlist_candidates(self.project, since=since, window_days=7)
+
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertGreaterEqual(candidate["volume_change_pct"], 200)
+        severity = incidents.severity_for(
+            negative_pct=candidate["negative_pct"],
+            volume_change_pct=candidate["volume_change_pct"],
+        )
+        self.assertEqual(severity, Incident.SEVERITY_CRITICAL)
+
+    def test_steady_volume_negative_cluster_stays_high(self):
+        now = timezone.now()
+        since = now - timedelta(days=7)
+        previous_start = since - timedelta(days=7)
+        for _ in range(8):
+            self._mention_at(Mention.SENTIMENT_NEGATIVE, previous_start + timedelta(hours=1))
+        for _ in range(8):
+            self._mention_at(Mention.SENTIMENT_NEGATIVE, since + timedelta(hours=1))
+
+        candidates = incidents.shortlist_candidates(self.project, since=since, window_days=7)
+
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertLess(candidate["volume_change_pct"], 200)
+        severity = incidents.severity_for(
+            negative_pct=candidate["negative_pct"],
+            volume_change_pct=candidate["volume_change_pct"],
+        )
+        self.assertEqual(severity, Incident.SEVERITY_HIGH)
+
 
 class RefreshTest(DetectionTest):
     def test_creates_an_unconfirmed_incident_with_a_detection_event(self):
@@ -213,7 +304,10 @@ class RefreshTest(DetectionTest):
         incident = created[0]
         self.assertFalse(incident.is_confirmed)
         self.assertEqual(incident.mention_count, 8)
-        self.assertEqual(incident.severity, Incident.SEVERITY_HIGH)
+        # 100% negative with no prior-window baseline: shortlist_candidates treats
+        # a from-zero cluster as a surge (Fix 2), so a first detection this
+        # negative reaches Critical rather than being capped at High.
+        self.assertEqual(incident.severity, Incident.SEVERITY_CRITICAL)
         self.assertIn("DRAF", incident.ai_summary.upper())
         self.assertEqual(incident.events.filter(kind=IncidentEvent.KIND_DETECTED).count(), 1)
 
@@ -233,13 +327,49 @@ class RefreshTest(DetectionTest):
         incident.is_confirmed = True
         incident.ai_summary = "Ditinjau dan disunting oleh operator."
         incident.title = "Judul hasil suntingan"
+        incident.severity = Incident.SEVERITY_LOW
+        incident.mention_count = 1
         incident.save()
+        original_mention_ids = set(incident.mentions.values_list("id", flat=True))
 
         incidents.refresh_candidates(self.project)
 
         incident.refresh_from_db()
         self.assertEqual(incident.ai_summary, "Ditinjau dan disunting oleh operator.")
         self.assertEqual(incident.title, "Judul hasil suntingan")
+        self.assertEqual(incident.severity, Incident.SEVERITY_LOW)
+        self.assertEqual(incident.mention_count, 1)
+        self.assertEqual(set(incident.mentions.values_list("id", flat=True)), original_mention_ids)
+
+    def test_never_overwrites_an_unconfirmed_incident_that_has_been_assigned(self):
+        # Fix 6: assign() advances an unconfirmed incident to `assigned` without
+        # confirming it. A later refresh must not clobber that operator work.
+        for _ in range(8):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+        incident = incidents.refresh_candidates(self.project)[0]
+        self.assertFalse(incident.is_confirmed)
+        opd = OPD.objects.create(project=self.project, name="Dinas PU", slug="pu", abbr="PU")
+        incidents.assign(incident, opd, by="Sekda")
+        incident.refresh_from_db()
+        self.assertEqual(incident.status, Incident.STATUS_ASSIGNED)
+        incident.title = "Judul hasil suntingan"
+        incident.severity = Incident.SEVERITY_LOW
+        incident.mention_count = 1
+        incident.save()
+        original_mention_ids = set(incident.mentions.values_list("id", flat=True))
+
+        # Add more matching mentions so a naive refresh would have something new
+        # to overwrite with.
+        for _ in range(8):
+            self._mention(Mention.SENTIMENT_NEGATIVE)
+
+        incidents.refresh_candidates(self.project)
+
+        incident.refresh_from_db()
+        self.assertEqual(incident.title, "Judul hasil suntingan")
+        self.assertEqual(incident.severity, Incident.SEVERITY_LOW)
+        self.assertEqual(incident.mention_count, 1)
+        self.assertEqual(set(incident.mentions.values_list("id", flat=True)), original_mention_ids)
 
     def test_does_not_leak_incidents_across_tenants(self):
         for _ in range(8):
@@ -314,6 +444,16 @@ class LifecycleTest(TestCase):
 
         with self.assertRaises(incidents.InvalidTransition):
             incidents.set_status(self.incident, Incident.STATUS_IN_PROGRESS, by="PU")
+
+    def test_open_can_be_dismissed_directly_to_closed(self):
+        # The open->closed lifecycle path (dismissal without ever assigning) was
+        # uncovered: ALLOWED_TRANSITIONS permits it explicitly.
+        incidents.set_status(self.incident, Incident.STATUS_CLOSED, by="Operator A")
+
+        self.incident.refresh_from_db()
+        self.assertEqual(self.incident.status, Incident.STATUS_CLOSED)
+        self.assertIsNotNone(self.incident.closed_at)
+        self.assertFalse(self.incident.is_open)
 
     def test_note_is_appended_without_changing_status(self):
         incidents.log_note(self.incident, "Sudah dicek lapangan.", by="Operator A")
