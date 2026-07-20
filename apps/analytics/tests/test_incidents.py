@@ -250,3 +250,74 @@ class RefreshTest(DetectionTest):
         incidents.refresh_candidates(self.project)
 
         self.assertEqual(Incident.objects.filter(project=other_project).count(), 0)
+
+
+class LifecycleTest(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="Instansi A")
+        self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
+        self.opd = OPD.objects.create(
+            project=self.project, name="Dinas Pekerjaan Umum", slug="pu", abbr="PU"
+        )
+        self.incident = Incident.objects.create(
+            project=self.project, title="Jalan Rusak", severity=Incident.SEVERITY_HIGH,
+        )
+
+    def test_promoting_marks_confirmed_and_records_who_did_it(self):
+        incidents.promote(self.incident, by="Operator A")
+
+        self.incident.refresh_from_db()
+        self.assertTrue(self.incident.is_confirmed)
+        event = self.incident.events.last()
+        self.assertEqual(event.logged_by, "Operator A")
+
+    def test_assigning_sets_the_opd_and_advances_status(self):
+        incidents.assign(self.incident, self.opd, by="Sekda")
+
+        self.incident.refresh_from_db()
+        self.assertEqual(self.incident.assigned_opd, self.opd)
+        self.assertEqual(self.incident.status, Incident.STATUS_ASSIGNED)
+        event = self.incident.events.filter(kind=IncidentEvent.KIND_ASSIGNED).last()
+        self.assertIn("PU", event.description)
+
+    def test_status_change_is_recorded_on_the_timeline(self):
+        incidents.assign(self.incident, self.opd, by="Sekda")
+        incidents.set_status(self.incident, Incident.STATUS_IN_PROGRESS, by="Dinas PU")
+
+        self.incident.refresh_from_db()
+        self.assertEqual(self.incident.status, Incident.STATUS_IN_PROGRESS)
+        self.assertEqual(
+            self.incident.events.filter(kind=IncidentEvent.KIND_STATUS_CHANGE).count(), 1
+        )
+
+    def test_closing_stamps_the_closing_time(self):
+        incidents.assign(self.incident, self.opd, by="Sekda")
+        incidents.set_status(self.incident, Incident.STATUS_IN_PROGRESS, by="PU")
+        incidents.set_status(self.incident, Incident.STATUS_RESOLVED, by="PU")
+        incidents.set_status(self.incident, Incident.STATUS_CLOSED, by="Sekda")
+
+        self.incident.refresh_from_db()
+        self.assertIsNotNone(self.incident.closed_at)
+        self.assertFalse(self.incident.is_open)
+
+    def test_rejects_skipping_the_lifecycle(self):
+        # An incident cannot go straight from open to resolved: something must have
+        # been assigned and worked, or the KPI record is fiction.
+        with self.assertRaises(incidents.InvalidTransition):
+            incidents.set_status(self.incident, Incident.STATUS_RESOLVED, by="X")
+
+    def test_rejects_reopening_a_closed_incident(self):
+        incidents.assign(self.incident, self.opd, by="Sekda")
+        incidents.set_status(self.incident, Incident.STATUS_IN_PROGRESS, by="PU")
+        incidents.set_status(self.incident, Incident.STATUS_RESOLVED, by="PU")
+        incidents.set_status(self.incident, Incident.STATUS_CLOSED, by="Sekda")
+
+        with self.assertRaises(incidents.InvalidTransition):
+            incidents.set_status(self.incident, Incident.STATUS_IN_PROGRESS, by="PU")
+
+    def test_note_is_appended_without_changing_status(self):
+        incidents.log_note(self.incident, "Sudah dicek lapangan.", by="Operator A")
+
+        self.incident.refresh_from_db()
+        self.assertEqual(self.incident.status, Incident.STATUS_OPEN)
+        self.assertEqual(self.incident.events.filter(kind=IncidentEvent.KIND_NOTE).count(), 1)

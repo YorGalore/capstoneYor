@@ -245,3 +245,84 @@ def refresh_candidates(project, since=None, window_days=DEFAULT_WINDOW_DAYS):
         incident.mentions.set(candidate["mention_ids"])
         touched.append(incident)
     return touched
+
+
+class InvalidTransition(Exception):
+    """The requested status change is not permitted from the current status."""
+
+
+# An incident may not skip stages: a resolution that was never assigned or worked
+# leaves a KPI record that does not describe what actually happened. Closed is
+# terminal — a recurrence is a new incident, not a reopened one.
+ALLOWED_TRANSITIONS = {
+    Incident.STATUS_OPEN: {Incident.STATUS_ASSIGNED, Incident.STATUS_CLOSED},
+    Incident.STATUS_ASSIGNED: {Incident.STATUS_IN_PROGRESS, Incident.STATUS_CLOSED},
+    Incident.STATUS_IN_PROGRESS: {Incident.STATUS_RESOLVED, Incident.STATUS_CLOSED},
+    Incident.STATUS_RESOLVED: {Incident.STATUS_CLOSED},
+    Incident.STATUS_CLOSED: set(),
+}
+
+
+def promote(incident, by):
+    """Confirm a detected candidate as a real incident (FR: human gate)."""
+    incident.is_confirmed = True
+    incident.save(update_fields=["is_confirmed", "updated_at"])
+    IncidentEvent.objects.create(
+        incident=incident,
+        kind=IncidentEvent.KIND_ACTION_LOGGED,
+        description="Kandidat dikonfirmasi sebagai insiden.",
+        logged_by=by,
+    )
+    return incident
+
+
+def assign(incident, opd, by):
+    """Assign an incident to an OPD, advancing it out of `open`."""
+    incident.assigned_opd = opd
+    fields = ["assigned_opd", "updated_at"]
+    if incident.status == Incident.STATUS_OPEN:
+        incident.status = Incident.STATUS_ASSIGNED
+        fields.append("status")
+    incident.save(update_fields=fields)
+    IncidentEvent.objects.create(
+        incident=incident,
+        kind=IncidentEvent.KIND_ASSIGNED,
+        description=f"Ditugaskan ke {opd}.",
+        logged_by=by,
+    )
+    return incident
+
+
+def set_status(incident, status, by):
+    """Move an incident to ``status``, refusing transitions that skip the lifecycle."""
+    if status not in ALLOWED_TRANSITIONS.get(incident.status, set()):
+        raise InvalidTransition(
+            f"Tidak dapat mengubah status dari "
+            f"{incident.get_status_display()} ke {dict(Incident.STATUS_CHOICES).get(status, status)}."
+        )
+
+    previous_display = incident.get_status_display()
+    incident.status = status
+    fields = ["status", "updated_at"]
+    if status == Incident.STATUS_CLOSED:
+        incident.closed_at = timezone.now()
+        fields.append("closed_at")
+    incident.save(update_fields=fields)
+
+    IncidentEvent.objects.create(
+        incident=incident,
+        kind=IncidentEvent.KIND_STATUS_CHANGE,
+        description=f"Status berubah dari {previous_display} menjadi {incident.get_status_display()}.",
+        logged_by=by,
+    )
+    return incident
+
+
+def log_note(incident, description, by):
+    """Append a free-text note to the timeline without changing status."""
+    return IncidentEvent.objects.create(
+        incident=incident,
+        kind=IncidentEvent.KIND_NOTE,
+        description=description,
+        logged_by=by,
+    )
