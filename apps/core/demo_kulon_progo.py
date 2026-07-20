@@ -323,6 +323,22 @@ def _seed_entities(project):
     return actors, programs
 
 
+def _seed_opds(project):
+    """OPD the incident board can assign work to. Idempotent: the demo seed is
+    re-run routinely and must not duplicate rows."""
+    from apps.analytics.models import OPD
+
+    for slug, name, abbr in [
+        ("pu", "Dinas Pekerjaan Umum dan Perumahan Rakyat", "PU"),
+        ("dlh", "Dinas Lingkungan Hidup", "DLH"),
+        ("dishub", "Dinas Perhubungan", "Dishub"),
+        ("dinkes", "Dinas Kesehatan", "Dinkes"),
+    ]:
+        OPD.objects.get_or_create(
+            project=project, slug=slug, defaults={"name": name, "abbr": abbr}
+        )
+
+
 def _posted_at(days_ago, index):
     if days_ago == 0:
         return timezone.now() - timezone.timedelta(minutes=25)
@@ -535,6 +551,7 @@ def seed_kulon_progo_demo():
     _seed_governance(tenant, project, user)
     issues = _seed_taxonomy()
     actors, programs = _seed_entities(project)
+    _seed_opds(project)
     mentions = _seed_mentions(project, province, regency, issues, programs, actors)
     _seed_issue_and_alerts(project, mentions)
     _seed_social_buzz(project, province, regency, issues, programs)

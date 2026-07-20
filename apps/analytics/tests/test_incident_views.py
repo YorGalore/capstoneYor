@@ -144,3 +144,29 @@ class IncidentActionTest(TestCase):
         )
         response = self.client.get(reverse("analytics:insiden_detail", args=[foreign.pk]))
         self.assertEqual(response.status_code, 404)
+
+
+class DemoSeedTest(TestCase):
+    def setUp(self):
+        # seed_kulon_progo_demo() reuses the shared platform/reference rows created
+        # by seed_core(); apps/core/tests/test_kulon_progo_demo.py follows the same
+        # pattern.
+        from apps.core.seed import seed_core
+
+        seed_core()
+
+    def test_demo_seed_creates_opds_for_assignment(self):
+        from apps.core import demo_kulon_progo
+
+        demo_kulon_progo.seed_kulon_progo_demo()
+
+        self.assertTrue(OPD.objects.filter(slug="pu").exists())
+        self.assertTrue(OPD.objects.filter(slug="dlh").exists())
+
+    def test_demo_seed_is_idempotent(self):
+        from apps.core import demo_kulon_progo
+
+        demo_kulon_progo.seed_kulon_progo_demo()
+        demo_kulon_progo.seed_kulon_progo_demo()
+
+        self.assertEqual(OPD.objects.filter(slug="pu").count(), 1)

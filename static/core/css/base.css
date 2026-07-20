@@ -422,3 +422,36 @@ a:hover { color: #0A5C64; text-decoration: underline; }
   .pantau-shell, .pantau-main, .pantau-content { display: block; padding: 0; margin: 0; }
   .pantau-card { box-shadow: none; border: 1px solid #CBD5E1; break-inside: avoid; }
 }
+
+/* Incident cards — severity is carried by a left border and chip colour so the
+   board is scannable in a few seconds without reading any number. */
+.incident-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  background: #fff;
+  border: 1px solid #E3E8EE;
+  border-left: 4px solid #7C8A99;
+  border-radius: 8px;
+}
+.incident-card.candidate { background: #FAFBFC; border-style: dashed; }
+.incident-card.severity-critical { border-left-color: #C0392B; }
+.incident-card.severity-high { border-left-color: #E67E22; }
+.incident-card.severity-medium { border-left-color: #F1C40F; }
+.incident-card.severity-low { border-left-color: #27AE60; }
+
+.severity-chip {
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: #EEF2F6;
+  color: #33475B;
+}
+.severity-critical .severity-chip { background: #FDEDEC; color: #C0392B; }
+.severity-high .severity-chip { background: #FDF2E9; color: #B9770E; }
+.severity-medium .severity-chip { background: #FEF9E7; color: #9A7D0A; }
+.severity-low .severity-chip { background: #EAFAF1; color: #1E8449; }
