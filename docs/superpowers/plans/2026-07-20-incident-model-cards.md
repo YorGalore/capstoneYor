@@ -1054,8 +1054,12 @@ class IncidentBoardAccessTest(TestCase):
         self.tenant = Tenant.objects.create(name="Instansi A")
         self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
         user = get_user_model().objects.create_user(username="analis", password="rahasia123")
-        AnalystProfile.objects.create(
-            user=user, tenant=self.tenant, role=AnalystProfile.ROLE_ANALYST
+        # A post_save signal already auto-creates a profile for a new user when a
+        # Tenant exists, so create() would violate the OneToOne constraint. Every
+        # other test module in this codebase uses update_or_create here.
+        AnalystProfile.objects.update_or_create(
+            user=user,
+            defaults={"tenant": self.tenant, "role": AnalystProfile.ROLE_ANALYST},
         )
         self.client.force_login(user)
 
@@ -1240,8 +1244,12 @@ class IncidentActionTest(TestCase):
         user = get_user_model().objects.create_user(
             username="operator", password="rahasia123", first_name="Operator", last_name="Satu"
         )
-        AnalystProfile.objects.create(
-            user=user, tenant=self.tenant, role=AnalystProfile.ROLE_ANALYST
+        # A post_save signal already auto-creates a profile for a new user when a
+        # Tenant exists, so create() would violate the OneToOne constraint. Every
+        # other test module in this codebase uses update_or_create here.
+        AnalystProfile.objects.update_or_create(
+            user=user,
+            defaults={"tenant": self.tenant, "role": AnalystProfile.ROLE_ANALYST},
         )
         self.client.force_login(user)
         self.opd = OPD.objects.create(
