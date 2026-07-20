@@ -188,11 +188,31 @@ class Incident(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Ordering by the severity *string* would sort alphabetically — medium, low,
+    # high, critical — putting the most urgent incidents last on a board whose
+    # whole purpose is surfacing them first. Rank numerically instead.
+    SEVERITY_RANK = {
+        SEVERITY_CRITICAL: 0,
+        SEVERITY_HIGH: 1,
+        SEVERITY_MEDIUM: 2,
+        SEVERITY_LOW: 3,
+    }
+    severity_rank = models.PositiveSmallIntegerField(default=3, editable=False)
+
+    def save(self, *args, **kwargs):
+        self.severity_rank = self.SEVERITY_RANK[self.severity]
+        # A partial save that touches severity must persist the derived rank too,
+        # or the board silently keeps ordering by the previous severity.
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "severity" in update_fields:
+            kwargs["update_fields"] = list(update_fields) + ["severity_rank"]
+        super().save(*args, **kwargs)
+
     class Meta:
-        ordering = ["-severity", "-mention_count"]
+        ordering = ["severity_rank", "-mention_count"]
         indexes = [
             models.Index(fields=["project", "status"]),
-            models.Index(fields=["severity"]),
+            models.Index(fields=["severity_rank"]),
         ]
 
     @property
