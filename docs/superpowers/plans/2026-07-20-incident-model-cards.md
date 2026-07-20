@@ -312,10 +312,24 @@ class SeverityTest(TestCase):
         self.assertEqual(incidents.severity_for(negative_pct=75), Incident.SEVERITY_HIGH)
 
     def test_negative_plus_coordinated_surge_is_critical(self):
-        # High risk AND a volume surge is the shape of a crisis, not a grumble.
+        # High negativity AND a volume surge is the shape of a crisis, not a grumble.
         self.assertEqual(
             incidents.severity_for(negative_pct=85, volume_change_pct=250, coordinated=True),
             Incident.SEVERITY_CRITICAL,
+        )
+
+    def test_a_surge_escalates_a_merely_negative_issue(self):
+        self.assertEqual(
+            incidents.severity_for(negative_pct=55, volume_change_pct=250),
+            Incident.SEVERITY_HIGH,
+        )
+
+    def test_coordinated_activity_lifts_a_calm_issue_above_low(self):
+        # Calm sentiment plus coordination is what a manufactured narrative looks
+        # like early on, so it must not sit at Low.
+        self.assertEqual(
+            incidents.severity_for(negative_pct=5, coordinated=True),
+            Incident.SEVERITY_MEDIUM,
         )
 
 
@@ -393,29 +407,36 @@ MIN_NEGATIVE_PCT = 40
 # How many source snippets to quote in the summary.
 MAX_SNIPPETS = 3
 
-_RISK_TO_SEVERITY = {
-    regulatory.RISK_HIGH: Incident.SEVERITY_HIGH,
-    regulatory.RISK_MEDIUM: Incident.SEVERITY_MEDIUM,
-    regulatory.RISK_LOW: Incident.SEVERITY_LOW,
-}
+# Sentiment thresholds for each severity tier.
+CRITICAL_NEGATIVE_PCT = 70
+HIGH_NEGATIVE_PCT = 50
+MEDIUM_NEGATIVE_PCT = 30
+# A volume change this large is a surge rather than drift.
+SURGE_PCT = 200
 
 
 def severity_for(negative_pct, volume_change_pct=0, coordinated=False):
     """Map measured signal onto an incident severity.
 
-    Delegates to the existing regulatory risk classifier so incidents and briefs
-    triage consistently, then adds the ``critical`` tier the classifier has no
-    concept of: high risk *plus* a volume surge is the shape of a crisis rather
-    than a steady grievance.
+    Deliberately *not* delegated to ``regulatory.classify_risk``. That classifier
+    needs a combined score of 4 to reach High, and sentiment alone contributes at
+    most 2 — so an incident detected from negativity could never exceed Medium and
+    the board would be unable to distinguish a grumble from a crisis.
+
+    Negativity therefore sets the tier, and a volume surge or coordinated activity
+    escalates it. Coordinated inauthentic activity lifts an item above Low even
+    when sentiment looks calm, matching the reasoning in ``classify_risk``: that
+    combination is what a manufactured narrative looks like early on.
     """
-    risk = regulatory.classify_risk(
-        negative_ratio=negative_pct / 100,
-        volume_change_pct=volume_change_pct,
-        coordinated=coordinated,
-    )
-    if risk == regulatory.RISK_HIGH and volume_change_pct >= 200:
-        return Incident.SEVERITY_CRITICAL
-    return _RISK_TO_SEVERITY[risk]
+    escalating = volume_change_pct >= SURGE_PCT or coordinated
+
+    if negative_pct >= CRITICAL_NEGATIVE_PCT:
+        return Incident.SEVERITY_CRITICAL if escalating else Incident.SEVERITY_HIGH
+    if negative_pct >= HIGH_NEGATIVE_PCT:
+        return Incident.SEVERITY_HIGH if escalating else Incident.SEVERITY_MEDIUM
+    if negative_pct >= MEDIUM_NEGATIVE_PCT or coordinated:
+        return Incident.SEVERITY_MEDIUM
+    return Incident.SEVERITY_LOW
 
 
 def _location(candidate):
