@@ -516,3 +516,138 @@ class DailyBriefRun(models.Model):
 
     def __str__(self):
         return f"run {self.brief.brief_date} oleh {self.triggered_by}"
+
+
+class OPD(models.Model):
+    """An organizational unit (Dinas) an incident can be assigned to.
+
+    Scoped per project so each tenant defines its own structure. Introduced with
+    the Incident board; also the grouping key for the later per-OPD KPI view.
+    """
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="opds")
+    name = models.CharField(max_length=200)
+    slug = models.SlugField()
+    abbr = models.CharField(max_length=20, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("project", "slug")
+        ordering = ["name"]
+        verbose_name = "OPD"
+        verbose_name_plural = "OPD"
+
+    def __str__(self):
+        return self.abbr or self.name
+
+
+class Incident(models.Model):
+    """A citizen-service problem surfaced by social conversation, tracked as a
+    decision object for leadership.
+
+    Distinct from PoliticalIssue (a political-narrative war-room event, gated by
+    neutrality controls) and from the taxonomy Issue (a classification leaf applied
+    to individual mentions). An Incident *aggregates* mentions — clustered on
+    taxonomy Issue x Regency — into something a Kepala Dinas can act on.
+
+    Narrative fields are composed deterministically and always carry the draft
+    banner: nothing here is published to leadership without human review.
+    """
+
+    SEVERITY_CRITICAL = "critical"
+    SEVERITY_HIGH = "high"
+    SEVERITY_MEDIUM = "medium"
+    SEVERITY_LOW = "low"
+    SEVERITY_CHOICES = [
+        (SEVERITY_CRITICAL, "Kritis"),
+        (SEVERITY_HIGH, "Tinggi"),
+        (SEVERITY_MEDIUM, "Sedang"),
+        (SEVERITY_LOW, "Rendah"),
+    ]
+
+    STATUS_OPEN = "open"
+    STATUS_ASSIGNED = "assigned"
+    STATUS_IN_PROGRESS = "in_progress"
+    STATUS_RESOLVED = "resolved"
+    STATUS_CLOSED = "closed"
+    STATUS_CHOICES = [
+        (STATUS_OPEN, "Terbuka"),
+        (STATUS_ASSIGNED, "Ditugaskan"),
+        (STATUS_IN_PROGRESS, "Ditangani"),
+        (STATUS_RESOLVED, "Selesai"),
+        (STATUS_CLOSED, "Ditutup"),
+    ]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="incidents")
+    title = models.CharField(max_length=250)
+    issue = models.ForeignKey(
+        Issue, on_delete=models.SET_NULL, null=True, blank=True, related_name="incidents"
+    )
+    regency = models.ForeignKey(
+        Regency, on_delete=models.SET_NULL, null=True, blank=True, related_name="incidents"
+    )
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default=SEVERITY_LOW)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    assigned_opd = models.ForeignKey(
+        OPD, on_delete=models.SET_NULL, null=True, blank=True, related_name="incidents"
+    )
+    mentions = models.ManyToManyField(Mention, blank=True, related_name="incidents")
+    mention_count = models.PositiveIntegerField(default=0)
+    negative_pct = models.PositiveIntegerField(default=0)
+    ai_summary = models.TextField(blank=True)
+    root_cause = models.TextField(blank=True)
+    impact = models.TextField(blank=True)
+    recommendation = models.TextField(blank=True)
+    is_confirmed = models.BooleanField(default=False)
+    first_seen_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-severity", "-mention_count"]
+        indexes = [
+            models.Index(fields=["project", "status"]),
+            models.Index(fields=["severity"]),
+        ]
+
+    @property
+    def is_open(self):
+        return self.status not in (self.STATUS_RESOLVED, self.STATUS_CLOSED)
+
+    def __str__(self):
+        return self.title
+
+
+class IncidentEvent(models.Model):
+    """One entry on an incident's timeline (detection, assignment, status change,
+    logged action). Together these form the auditable record of how the institution
+    responded — the same role ResponseAction plays for a political narrative event.
+    """
+
+    KIND_DETECTED = "detected"
+    KIND_VOLUME_UPDATE = "volume_update"
+    KIND_ASSIGNED = "assigned"
+    KIND_STATUS_CHANGE = "status_change"
+    KIND_ACTION_LOGGED = "action_logged"
+    KIND_NOTE = "note"
+    KIND_CHOICES = [
+        (KIND_DETECTED, "Terdeteksi"),
+        (KIND_VOLUME_UPDATE, "Perubahan volume"),
+        (KIND_ASSIGNED, "Penugasan"),
+        (KIND_STATUS_CHANGE, "Perubahan status"),
+        (KIND_ACTION_LOGGED, "Tindakan dicatat"),
+        (KIND_NOTE, "Catatan"),
+    ]
+
+    incident = models.ForeignKey(Incident, on_delete=models.CASCADE, related_name="events")
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    description = models.CharField(max_length=500)
+    logged_by = models.CharField(max_length=150, blank=True)
+    occurred_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["occurred_at", "id"]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} — {self.description[:40]}"
