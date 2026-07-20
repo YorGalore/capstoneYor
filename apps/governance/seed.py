@@ -24,6 +24,9 @@ DEFAULT_SCHEDULES = [
     # A no-op until someone sets a retention policy, which is the point: the platform must
     # not start deleting a ministry's archive on its own.
     (ScheduledJob.JOB_PURGE_RETENTION, 1440, True),
+    (ScheduledJob.JOB_ENRICH_AUTHORS, 360, True),
+    # Cheap no-op until a human finalizes a brief; then it distributes exactly once.
+    (ScheduledJob.JOB_SEND_BRIEF, 60, True),
 ]
 
 # feed_url is left blank for sources with no known public RSS feed — the

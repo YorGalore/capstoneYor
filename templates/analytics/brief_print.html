@@ -1,0 +1,67 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brief {{ brief.brief_date|date:"j F Y" }} — PANTAU</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font: 13px/1.6 'Georgia', 'Times New Roman', serif; color: #1a2332; max-width: 820px; margin: 0 auto; padding: 40px 32px; position: relative; }
+    header { border-bottom: 3px double #1a2332; padding-bottom: 14px; margin-bottom: 22px; }
+    .kop { font: 700 20px 'Arial', sans-serif; letter-spacing: 1px; }
+    .kop-sub { font: 12px 'Arial', sans-serif; color: #475569; margin-top: 2px; }
+    .meta { display: flex; justify-content: space-between; font: 11px 'Arial', sans-serif; color: #475569; margin-top: 10px; }
+    h2 { font: 700 15px 'Arial', sans-serif; margin: 22px 0 6px; }
+    .stats { font: 11px 'Arial', sans-serif; color: #64748B; margin-bottom: 8px; }
+    .content { white-space: pre-wrap; margin-bottom: 6px; }
+    .risk { display: inline-block; font: 700 10px 'Arial', sans-serif; padding: 2px 8px; border: 1px solid #1a2332; border-radius: 3px; margin-left: 8px; vertical-align: 2px; text-transform: uppercase; }
+    .regulasi { margin: 8px 0 0 16px; padding-left: 12px; border-left: 3px solid #CBD5E1; font-size: 12px; color: #334155; }
+    .regulasi-src { font: 700 10px 'Arial', sans-serif; color: #64748B; }
+    footer { margin-top: 32px; border-top: 1px solid #CBD5E1; padding-top: 10px; font: 10.5px 'Arial', sans-serif; color: #64748B; }
+    .draft-watermark { position: fixed; top: 40%; left: 0; right: 0; text-align: center; font: 700 90px 'Arial', sans-serif; color: rgba(198, 72, 63, .13); transform: rotate(-24deg); pointer-events: none; z-index: 10; }
+    .print-bar { position: sticky; top: 0; background: #0E7C86; color: #fff; padding: 10px 16px; margin: -40px -32px 28px; display: flex; justify-content: space-between; align-items: center; font: 600 13px 'Arial', sans-serif; }
+    .print-bar button { background: #fff; color: #0E7C86; border: none; border-radius: 6px; padding: 7px 16px; font: 700 12px 'Arial', sans-serif; cursor: pointer; }
+    @media print {
+      .print-bar { display: none; }
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-bar">
+    <span>Pratinjau cetak — gunakan dialog cetak browser untuk menyimpan sebagai PDF.</span>
+    <button onclick="window.print()">🖨 Cetak / Simpan PDF</button>
+  </div>
+  {% if not brief.is_locked %}<div class="draft-watermark">DRAF</div>{% endif %}
+  <header>
+    <div class="kop">{{ instansi|upper }}</div>
+    <div class="kop-sub">{{ proyek }} — Brief Eksekutif Harian</div>
+    <div class="meta">
+      <span>Periode: {{ brief.brief_date|date:"l, j F Y" }}</span>
+      <span>Status: {{ brief.get_status_display }}{% if brief.finalized_by %} · difinalisasi oleh {{ brief.finalized_by }} ({{ brief.finalized_at|date:"j M Y H:i" }}){% endif %}</span>
+    </div>
+  </header>
+
+  {% for item in brief.issues.all %}
+    <section>
+      <h2>{{ forloop.counter }}. {{ item.title }}<span class="risk">Risiko: {{ item.risk_level }}</span></h2>
+      <div class="stats">{{ item.mention_count }} sebutan · {{ item.negative_pct }}% negatif{% if not item.approved %} · BELUM DITINJAU{% endif %}</div>
+      <div class="content">{{ item.content }}</div>
+      {% for ref in item.regulatory_context %}
+        <div class="regulasi">
+          <div class="regulasi-src">{{ ref.source_ref }}</div>
+          “{{ ref.passage }}”
+        </div>
+      {% endfor %}
+    </section>
+  {% empty %}
+    <p>Tidak ada isu yang memenuhi ambang prioritas pada tanggal ini.</p>
+  {% endfor %}
+
+  <footer>
+    Dihasilkan oleh PANTAU — pemantauan opini publik &amp; pelaporan netral berbasis bukti.
+    Konten dihasilkan dengan bantuan AI dan {% if brief.is_locked %}telah ditinjau serta difinalisasi oleh manusia (FR-30.3){% else %}masih berupa DRAF yang belum ditinjau — bukan pernyataan resmi institusi{% endif %}.
+  </footer>
+</body>
+</html>

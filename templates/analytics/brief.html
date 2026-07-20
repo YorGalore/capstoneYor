@@ -16,6 +16,9 @@
     {% elif brief %}
       <span class="pantau-chip pantau-chip-deny">{{ brief.get_status_display }}</span>
     {% endif %}
+    {% if brief %}
+      <a class="pantau-btn-outline pantau-btn-small" href="{% url 'analytics:brief_print' brief.pk %}" target="_blank" rel="noopener">🖨 Versi cetak / PDF</a>
+    {% endif %}
   </form>
 </div>
 

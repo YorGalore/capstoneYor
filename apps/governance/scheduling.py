@@ -107,12 +107,39 @@ def _run_purge_retention(project):
     return f"{result['deleted']} dihapus, {result['protected']} dilindungi"
 
 
+def _run_enrich_authors(project):
+    from apps.analytics import authors
+
+    result = authors.enrich(project)
+    return f"{result['linked']} sebutan ditautkan, {result['scored']} penulis dinilai"
+
+
+def _run_send_brief(project):
+    from apps.analytics import notifications
+    from apps.analytics.models import DailyBrief
+
+    brief_date = (timezone.now() - timezone.timedelta(days=1)).date()
+    brief = DailyBrief.objects.filter(
+        project=project, brief_date=brief_date, status=DailyBrief.STATUS_FINAL
+    ).first()
+    if brief is None:
+        return f"Belum ada brief final untuk {brief_date} — menunggu tinjauan manusia"
+    # A finalized brief is distributed exactly once; the cadence just keeps
+    # checking until a human finalizes it.
+    if notifications.brief_already_sent(brief):
+        return f"Brief {brief_date} sudah terdistribusi"
+    delivery = notifications.send_brief(brief)
+    return f"Brief {brief_date}: {delivery.get_status_display().lower()} — {delivery.detail}"
+
+
 HANDLERS = {
     ScheduledJob.JOB_COLLECT: _run_collect,
     ScheduledJob.JOB_EVALUATE_ALERTS: _run_evaluate_alerts,
     ScheduledJob.JOB_DETECT_COORDINATION: _run_detect_coordination,
     ScheduledJob.JOB_GENERATE_BRIEF: _run_generate_brief,
     ScheduledJob.JOB_PURGE_RETENTION: _run_purge_retention,
+    ScheduledJob.JOB_ENRICH_AUTHORS: _run_enrich_authors,
+    ScheduledJob.JOB_SEND_BRIEF: _run_send_brief,
 }
 
 # Jobs the kill switch stops. Halting collection must not also blind the analysts:

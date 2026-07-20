@@ -24,6 +24,8 @@ PAGES = [
     ("war_room", "War Room"),
     ("koordinasi", "Deteksi Koordinasi"),
     ("regional", "Regional"),
+    ("sosiograf", "Sosiograf"),
+    ("laporan", "Laporan"),
     ("konfigurasi", "Konfigurasi"),
     ("pengawasan", "Pengawasan"),
     ("brief", "Brief Harian"),
@@ -41,7 +43,10 @@ SUPER_ADMIN_ONLY_PAGES = {DEV_OPS_PAGE, "permission_matrix"}
 # The Daily Brief is written for the Spokesperson/Pimpinan persona and reviewed by
 # Analysts (FR-30.3), so both roles reach it by default — unlike the operational
 # "tool" pages, which stay denied by default (FR-1A.1).
-DASHBOARD_PAGES = {"ringkasan", "narasi", "war_room", "koordinasi", "regional", "brief"}
+DASHBOARD_PAGES = {
+    "ringkasan", "narasi", "war_room", "koordinasi", "regional", "brief",
+    "sosiograf", "laporan",
+}
 ROLES = [R.ROLE_SUPER_ADMIN, R.ROLE_TENANT_ADMIN, R.ROLE_ANALYST, R.ROLE_VIEWER]
 
 

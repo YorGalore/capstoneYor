@@ -162,6 +162,153 @@
 
 <div class="pantau-card">
   <div class="pantau-card-header">
+    <div class="pantau-card-title">Aturan Peringatan</div>
+  </div>
+  <div class="pantau-hint">Aturan dievaluasi tiap siklus penjadwal (FR-12.1). Saat terpicu, notifikasi dikirim lewat kanal aturan (FR-12.2) — email ke analis tenant, atau webhook ke URL pada Runtime Setting <span class="mono">alerts.webhook_url</span>.</div>
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead><tr><th>Nama</th><th>Kondisi</th><th>Kanal</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for rule in alert_rules %}
+        <tr>
+          <td>{{ rule.name }}</td>
+          <td>{{ rule.condition_summary }}</td>
+          <td>{{ rule.get_channel_display }}</td>
+          <td>
+            <form method="post" action="{% url 'governance:toggle_alert_rule' rule.pk %}" class="pantau-inline-form">
+              {% csrf_token %}
+              <button type="submit" class="pantau-toggle-btn {% if rule.is_active %}pantau-status-active{% else %}pantau-status-inactive{% endif %}">
+                {% if rule.is_active %}● Aktif{% else %}● Nonaktif{% endif %}
+              </button>
+            </form>
+          </td>
+          <td>
+            <form method="post" action="{% url 'governance:delete_alert_rule' rule.pk %}" class="pantau-inline-form">
+              {% csrf_token %}
+              <button type="submit" class="pantau-btn-outline pantau-btn-small">Hapus</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5">Belum ada aturan peringatan.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="{% url 'governance:add_alert_rule' %}" class="pantau-add-form pantau-rule-form">
+    {% csrf_token %}
+    {{ alert_rule_form.name }}
+    {{ alert_rule_form.condition_type }}
+    {{ alert_rule_form.threshold }}
+    {{ alert_rule_form.window_minutes }}
+    {{ alert_rule_form.channel }}
+    <button type="submit" class="pantau-btn-primary">+ Tambah aturan</button>
+  </form>
+  <div class="pantau-hint">Ambang: untuk rasio negatif isi pecahan 0–1 (mis. 0.5 = 50%); untuk lonjakan volume isi jumlah sebutan. Jendela dalam menit.</div>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Entitas Politik &amp; Program Terlacak</div>
+  </div>
+  {% if election_mode %}
+  <div class="pantau-neutrality-notice">⚠ Mode periode pemilu aktif — konfigurasi aktor politik dan kubu dibekukan (§8.5).</div>
+  {% endif %}
+  <div class="pantau-hint">Hanya partai, koalisi, pejabat/kandidat publik, dan organisasi yang boleh didaftarkan — individu privat tidak pernah diprofilkan (FR-29.3). Kubu sepenuhnya ditentukan tenant; tidak ada kubu bawaan (FR-24.3).</div>
+
+  <div class="pantau-card-title">Kubu</div>
+  <div class="pantau-keyword-tags">
+    {% for camp in camps %}
+      <div class="pantau-keyword-tag">
+        <span style="color: {{ camp.color }}">●</span>
+        <span>{{ camp.name }}</span>
+        <form method="post" action="{% url 'governance:delete_camp' camp.pk %}" class="pantau-inline-form">
+          {% csrf_token %}
+          <button type="submit" title="Hapus" {% if election_mode %}disabled{% endif %}>✕</button>
+        </form>
+      </div>
+    {% empty %}
+      <div class="mono-muted">Belum ada kubu. Kubu dibuat oleh tenant, bukan bawaan platform.</div>
+    {% endfor %}
+  </div>
+  <form method="post" action="{% url 'governance:add_camp' %}" class="pantau-add-form">
+    {% csrf_token %}
+    {{ camp_form.name }}
+    {{ camp_form.color }}
+    <button type="submit" class="pantau-btn-primary" {% if election_mode %}disabled{% endif %}>+ Tambah kubu</button>
+  </form>
+
+  <div class="pantau-card-title">Aktor Politik Publik</div>
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead><tr><th>Nama</th><th>Jenis</th><th>Kubu</th><th>Kata kunci</th><th>Akun resmi</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for actor in actors %}
+        <tr>
+          <td>{{ actor.name }}</td>
+          <td>{{ actor.get_actor_type_display }}</td>
+          <td>{% if actor.camp %}<span style="color: {{ actor.camp.color }}">●</span> {{ actor.camp.name }}{% else %}—{% endif %}</td>
+          <td class="mono-muted">{{ actor.keywords|join:", "|default:"—" }}</td>
+          <td class="mono-muted">{{ actor.handles|join:", "|default:"—" }}</td>
+          <td>
+            <form method="post" action="{% url 'governance:toggle_actor' actor.pk %}" class="pantau-inline-form">
+              {% csrf_token %}
+              <button type="submit" class="pantau-toggle-btn {% if actor.is_active %}pantau-status-active{% else %}pantau-status-inactive{% endif %}" {% if election_mode %}disabled{% endif %}>
+                {% if actor.is_active %}● Aktif{% else %}● Nonaktif{% endif %}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">Belum ada aktor politik terdaftar.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="{% url 'governance:add_actor' %}" class="pantau-add-form pantau-rule-form">
+    {% csrf_token %}
+    {{ actor_form.name }}
+    {{ actor_form.actor_type }}
+    {{ actor_form.camp }}
+    {{ actor_form.keywords }}
+    {{ actor_form.handles }}
+    <button type="submit" class="pantau-btn-primary" {% if election_mode %}disabled{% endif %}>+ Daftarkan aktor</button>
+  </form>
+
+  <div class="pantau-card-title">Program Pemerintah Terlacak</div>
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead><tr><th>Program</th><th>Instansi</th><th>Kata kunci</th><th></th></tr></thead>
+      <tbody>
+        {% for program in programs %}
+        <tr>
+          <td>{{ program.name }}</td>
+          <td>{{ program.agency|default:"—" }}</td>
+          <td class="mono-muted">{{ program.keywords|join:", "|default:"—" }}</td>
+          <td>
+            <form method="post" action="{% url 'governance:delete_program' program.pk %}" class="pantau-inline-form">
+              {% csrf_token %}
+              <button type="submit" class="pantau-btn-outline pantau-btn-small">Hapus</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">Belum ada program terlacak.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="{% url 'governance:add_program' %}" class="pantau-add-form pantau-rule-form">
+    {% csrf_token %}
+    {{ program_form.name }}
+    {{ program_form.agency }}
+    {{ program_form.keywords }}
+    <button type="submit" class="pantau-btn-primary">+ Tambah program</button>
+  </form>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
     <div class="pantau-card-title">Koleksi Data</div>
   </div>
   {% if collection_enabled %}

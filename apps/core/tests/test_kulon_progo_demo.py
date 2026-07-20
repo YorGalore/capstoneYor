@@ -47,18 +47,36 @@ class KulonProgoDemoSeedTest(TestCase):
     def test_report_aligned_news_distribution_and_local_entities(self):
         _tenant, project = seed_kulon_progo_demo()
         mentions = Mention.objects.filter(project=project)
+        curated = mentions.filter(sentiment_model="demo-curated-v1")
 
-        self.assertEqual(mentions.count(), 14)
-        self.assertEqual(mentions.filter(sentiment=Mention.SENTIMENT_POSITIVE).count(), 7)
-        self.assertEqual(mentions.filter(sentiment=Mention.SENTIMENT_NEUTRAL).count(), 4)
-        self.assertEqual(mentions.filter(sentiment=Mention.SENTIMENT_NEGATIVE).count(), 3)
-        self.assertEqual(mentions.filter(sentiment_model="demo-curated-v1").count(), 14)
+        self.assertEqual(curated.count(), 26)
+        self.assertEqual(curated.filter(sentiment=Mention.SENTIMENT_POSITIVE).count(), 13)
+        self.assertEqual(curated.filter(sentiment=Mention.SENTIMENT_NEUTRAL).count(), 7)
+        self.assertEqual(curated.filter(sentiment=Mention.SENTIMENT_NEGATIVE).count(), 6)
         self.assertTrue(mentions.filter(author_handle="Kominfo Kulon Progo").exists())
         self.assertTrue(mentions.filter(content_snippet__icontains="Garongan").exists())
 
         self.assertEqual(PoliticalActor.objects.filter(project=project).count(), 3)
         self.assertEqual(GovernmentProgram.objects.filter(project=project).count(), 5)
         self.assertTrue(Alert.objects.filter(project=project, status=Alert.STATUS_ACTIVE).exists())
+
+    def test_social_buzz_and_coordination_cluster_enrich_the_demo(self):
+        from apps.coordination.models import CoordinationCluster
+
+        _tenant, project = seed_kulon_progo_demo()
+        mentions = Mention.objects.filter(project=project)
+        social = mentions.filter(sentiment_model="demo-social-v1")
+
+        self.assertEqual(social.count(), 220)
+        self.assertEqual(mentions.count(), 246)
+        self.assertTrue(social.exclude(platform__slug="berita").exists())
+        self.assertFalse(social.filter(platform__slug="berita").exists())
+
+        cluster = CoordinationCluster.objects.get(issue__project=project)
+        self.assertEqual(cluster.cluster_code, "Klaster-KP-01")
+        self.assertTrue(cluster.accounts.exists())
+        self.assertTrue(cluster.signals.exists())
+        self.assertTrue(cluster.duplicate_samples.exists())
 
     def test_local_monitoring_configuration_and_reviewable_brief(self):
         _tenant, project = seed_kulon_progo_demo()
@@ -74,7 +92,11 @@ class KulonProgoDemoSeedTest(TestCase):
         configured_domains = MonitoredDomain.objects.filter(project=project)
         self.assertFalse(configured_domains.filter(feed_url="").exists())
         self.assertFalse(configured_domains.exclude(adapter__startswith="portal-").exists())
-        self.assertEqual(ScheduledJob.objects.filter(project=project).count(), 5)
+        from apps.governance.seed import DEFAULT_SCHEDULES
+
+        self.assertEqual(
+            ScheduledJob.objects.filter(project=project).count(), len(DEFAULT_SCHEDULES)
+        )
         brief = DailyBrief.objects.get(project=project)
         self.assertEqual(brief.status, DailyBrief.STATUS_DRAFT)
         self.assertGreaterEqual(brief.issues.count(), 1)

@@ -12,7 +12,7 @@ class SeedDemoDataCommandTest(TestCase):
     def test_command_populates_all_apps(self):
         call_command("seed_demo_data")
         self.assertGreater(Mention.objects.count(), 1000)
-        self.assertEqual(CoordinationCluster.objects.count(), 4)
+        self.assertEqual(CoordinationCluster.objects.count(), 5)
         self.assertGreater(AuditLogEntry.objects.count(), 0)
         local_tenant = Tenant.objects.get(name=TENANT_NAME)
         self.assertTrue(Project.objects.filter(tenant=local_tenant, name=PROJECT_NAME).exists())

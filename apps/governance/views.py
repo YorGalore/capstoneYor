@@ -17,8 +17,13 @@ from apps.core.permissions import (
     require_page,
 )
 
-from . import apify, health, portal_crawler, runtime, scheduling, scraping
-from .forms import MonitoredDomainForm, MonitoringKeywordForm
+from apps.analytics.models import AlertRule, Camp, GovernmentProgram, PoliticalActor
+
+from . import apify, health, neutrality, portal_crawler, runtime, scheduling, scraping
+from .forms import (
+    AlertRuleForm, CampForm, GovernmentProgramForm, MonitoredDomainForm,
+    MonitoringKeywordForm, PoliticalActorForm,
+)
 from .models import (
     ApifyCredential, AuditLogEntry, CollectionRun, ManualCollectionRequest, MonitoredDomain, MonitoringKeyword,
     PlatformIntegration, PoliticalMonitoringPermission, PolicyAcknowledgment, RuntimeSetting,
@@ -60,7 +65,182 @@ def konfigurasi(request):
         "collector_health": health.collection_health(project=project),
         "health_labels": health.STATUS_LABELS,
         "collection_enabled": scheduling.collection_enabled(),
+        "alert_rules": AlertRule.objects.filter(project=project).order_by("name"),
+        "alert_rule_form": AlertRuleForm(project=project),
+        "camps": Camp.objects.filter(project=project),
+        "camp_form": CampForm(project=project),
+        "actors": PoliticalActor.objects.filter(project=project).select_related("camp"),
+        "actor_form": PoliticalActorForm(project=project),
+        "programs": GovernmentProgram.objects.filter(project=project),
+        "program_form": GovernmentProgramForm(project=project),
+        "election_mode": neutrality.election_mode_active(),
     })
+
+
+def _form_errors(form):
+    return "; ".join(f"{field}: {', '.join(errors)}" for field, errors in form.errors.items())
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def add_alert_rule(request):
+    form = AlertRuleForm(request.POST, project=_current_project(request))
+    if form.is_valid():
+        rule = form.save()
+        record_audit_entry(
+            actor_label=_actor_label(request), action="Menambahkan aturan peringatan",
+            target=rule.name,
+        )
+        messages.success(request, f'Aturan peringatan "{rule.name}" ditambahkan.')
+    else:
+        messages.error(request, f"Gagal menambahkan aturan peringatan. {_form_errors(form)}")
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def toggle_alert_rule(request, pk):
+    rule = get_object_or_404(AlertRule, pk=pk, project=_current_project(request))
+    rule.is_active = not rule.is_active
+    rule.save(update_fields=["is_active"])
+    record_audit_entry(
+        actor_label=_actor_label(request),
+        action="Mengaktifkan aturan peringatan" if rule.is_active else "Menonaktifkan aturan peringatan",
+        target=rule.name,
+    )
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def delete_alert_rule(request, pk):
+    rule = get_object_or_404(AlertRule, pk=pk, project=_current_project(request))
+    label = rule.name
+    rule.delete()
+    record_audit_entry(
+        actor_label=_actor_label(request), action="Menghapus aturan peringatan", target=label,
+    )
+    messages.success(request, f'Aturan peringatan "{label}" dihapus.')
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def add_camp(request):
+    if neutrality.election_mode_active():
+        messages.error(request, "Konfigurasi politik dibekukan selama periode pemilu (§8.5).")
+        return redirect("governance:konfigurasi")
+    form = CampForm(request.POST, project=_current_project(request))
+    if form.is_valid():
+        camp = form.save()
+        record_audit_entry(
+            actor_label=_actor_label(request), action="Menambahkan kubu politik", target=camp.name,
+        )
+        messages.success(request, f'Kubu "{camp.name}" ditambahkan.')
+    else:
+        messages.error(request, f"Gagal menambahkan kubu. {_form_errors(form)}")
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def delete_camp(request, pk):
+    if neutrality.election_mode_active():
+        messages.error(request, "Konfigurasi politik dibekukan selama periode pemilu (§8.5).")
+        return redirect("governance:konfigurasi")
+    camp = get_object_or_404(Camp, pk=pk, project=_current_project(request))
+    label = camp.name
+    camp.delete()
+    record_audit_entry(
+        actor_label=_actor_label(request), action="Menghapus kubu politik", target=label,
+    )
+    messages.success(request, f'Kubu "{label}" dihapus.')
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def add_actor(request):
+    project = _current_project(request)
+    form = PoliticalActorForm(request.POST, project=project)
+    if not form.is_valid():
+        messages.error(request, f"Gagal menambahkan aktor politik. {_form_errors(form)}")
+        return redirect("governance:konfigurasi")
+    try:
+        # Routed through the neutrality service so the FR-29.3 public-actor
+        # allowlist and the §8.5 election-period freeze cannot be bypassed.
+        actor = neutrality.create_political_actor(
+            project,
+            name=form.cleaned_data["name"],
+            actor_type=form.cleaned_data["actor_type"],
+            camp=form.cleaned_data.get("camp"),
+            keywords=form.cleaned_data["keywords"],
+            handles=form.cleaned_data["handles"],
+        )
+    except neutrality.ElectionPeriodFrozen as exc:
+        messages.error(request, str(exc))
+        return redirect("governance:konfigurasi")
+    record_audit_entry(
+        actor_label=_actor_label(request), action="Mendaftarkan aktor politik publik",
+        target=actor.name,
+    )
+    messages.success(request, f'Aktor politik "{actor.name}" didaftarkan.')
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def toggle_actor(request, pk):
+    if neutrality.election_mode_active():
+        messages.error(request, "Konfigurasi politik dibekukan selama periode pemilu (§8.5).")
+        return redirect("governance:konfigurasi")
+    actor = get_object_or_404(PoliticalActor, pk=pk, project=_current_project(request))
+    actor.is_active = not actor.is_active
+    actor.save(update_fields=["is_active"])
+    record_audit_entry(
+        actor_label=_actor_label(request),
+        action="Mengaktifkan aktor politik" if actor.is_active else "Menonaktifkan aktor politik",
+        target=actor.name,
+    )
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def add_program(request):
+    form = GovernmentProgramForm(request.POST, project=_current_project(request))
+    if form.is_valid():
+        program = form.save()
+        record_audit_entry(
+            actor_label=_actor_label(request), action="Menambahkan program pemerintah terlacak",
+            target=program.name,
+        )
+        messages.success(request, f'Program "{program.name}" ditambahkan.')
+    else:
+        messages.error(request, f"Gagal menambahkan program. {_form_errors(form)}")
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def delete_program(request, pk):
+    program = get_object_or_404(GovernmentProgram, pk=pk, project=_current_project(request))
+    label = program.name
+    program.delete()
+    record_audit_entry(
+        actor_label=_actor_label(request), action="Menghapus program pemerintah terlacak", target=label,
+    )
+    messages.success(request, f'Program "{label}" dihapus.')
+    return redirect("governance:konfigurasi")
 
 
 @require_page("konfigurasi")

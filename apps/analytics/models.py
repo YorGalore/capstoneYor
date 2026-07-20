@@ -459,6 +459,46 @@ class DailyBriefIssue(models.Model):
         return self.title
 
 
+class NotificationDelivery(models.Model):
+    """A delivery attempt for an outbound notification (FR-12.2): a triggered
+    alert or a finalized daily brief, over a concrete channel. Recorded whether
+    it succeeded or not, so operators can audit what left the platform."""
+
+    KIND_ALERT = "alert"
+    KIND_BRIEF = "brief"
+    KIND_CHOICES = [(KIND_ALERT, "Peringatan"), (KIND_BRIEF, "Brief harian")]
+
+    STATUS_SENT = "sent"
+    STATUS_FAILED = "failed"
+    STATUS_SKIPPED = "skipped"
+    STATUS_CHOICES = [
+        (STATUS_SENT, "Terkirim"),
+        (STATUS_FAILED, "Gagal"),
+        (STATUS_SKIPPED, "Dilewati"),
+    ]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="notification_deliveries")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES)
+    channel = models.CharField(max_length=20)
+    subject = models.CharField(max_length=255)
+    recipients = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    detail = models.CharField(max_length=500, blank=True)
+    alert = models.ForeignKey(
+        Alert, on_delete=models.CASCADE, null=True, blank=True, related_name="deliveries"
+    )
+    brief = models.ForeignKey(
+        DailyBrief, on_delete=models.CASCADE, null=True, blank=True, related_name="deliveries"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} via {self.channel} ({self.get_status_display()})"
+
+
 class DailyBriefRun(models.Model):
     """One generation attempt for a brief. The DB-level status claim on DailyBrief
     is what prevents a scheduled run and a manual run arriving together from

@@ -22,9 +22,9 @@
     <a class="pantau-nav-item{% if active_nav == 'war_room' %} active{% endif %}" href="{% url 'analytics:war_room' %}">War Room</a>
     <a class="pantau-nav-item{% if active_nav == 'koordinasi' %} active{% endif %}" href="{% url 'coordination:koordinasi' %}">Deteksi Koordinasi</a>
     <a class="pantau-nav-item{% if active_nav == 'regional' %} active{% endif %}" href="{% url 'analytics:regional' %}">Regional</a>
-    <span class="pantau-nav-item disabled" title="Segera hadir">Sosiograf</span>
+    <a class="pantau-nav-item{% if active_nav == 'sosiograf' %} active{% endif %}" href="{% url 'analytics:sosiograf' %}">Sosiograf</a>
     <a class="pantau-nav-item{% if active_nav == 'brief' %} active{% endif %}" href="{% url 'analytics:brief' %}">Brief Harian</a>
-    <span class="pantau-nav-item disabled" title="Segera hadir">Laporan</span>
+    <a class="pantau-nav-item{% if active_nav == 'laporan' %} active{% endif %}" href="{% url 'analytics:laporan' %}">Laporan</a>
   </nav>
   <div class="pantau-nav-footer">
     <a class="pantau-nav-item{% if active_nav == 'konfigurasi' %} active{% endif %}" href="{% url 'governance:konfigurasi' %}">Konfigurasi</a>

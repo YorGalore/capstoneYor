@@ -1,3 +1,4 @@
+import math
 from collections import OrderedDict
 
 from django.db.models import Count, Q, Sum
@@ -5,7 +6,7 @@ from django.utils import timezone
 
 from apps.core.models import Province
 
-from .models import Alert, Coalition, Mention
+from .models import Alert, Author, Coalition, DailyBrief, Mention
 
 SENTIMENT_LABELS = OrderedDict([
     (Mention.SENTIMENT_POSITIVE, "Positif"),
@@ -362,3 +363,181 @@ def regional_summary(project, selected_province=None):
         }
 
     return {"province_rows": province_rows[:10], "heat_tiles": heat_tiles, "selected": selected}
+
+
+def sosiograf_summary(project, days=30, max_nodes=20, width=760, height=560):
+    """Interaction sociograph (Sosiograf): the most influential authors of the
+    last ``days`` days as graph nodes, linked when they push the same theme.
+    Accounts that belong to a flagged coordination cluster are marked so the
+    analyst can see amplification structure at a glance.
+
+    The layout is computed server-side (deterministic circular layout grouped
+    by theme) so the page needs no JS graph library.
+    """
+    since = timezone.now() - timezone.timedelta(days=days)
+    qs = Mention.objects.filter(project=project, posted_at__gte=since)
+
+    author_rows = list(
+        qs.exclude(author_handle="")
+        .values("author_handle", "platform__slug", "platform__display_name")
+        .annotate(
+            n=Count("id"),
+            reach=Sum("reach_estimate"),
+            engagement=Sum("engagement_count"),
+            negative=Count("id", filter=Q(sentiment=Mention.SENTIMENT_NEGATIVE)),
+            positive=Count("id", filter=Q(sentiment=Mention.SENTIMENT_POSITIVE)),
+        )
+        .order_by("-reach", "-n")[:max_nodes]
+    )
+    if not author_rows:
+        return None
+
+    handles = [row["author_handle"] for row in author_rows]
+
+    # Dominant theme per author — the edge criterion.
+    theme_by_author = {}
+    theme_rows = (
+        qs.filter(author_handle__in=handles)
+        .exclude(theme="")
+        .values("author_handle", "theme")
+        .annotate(n=Count("id"))
+        .order_by("author_handle", "-n")
+    )
+    for row in theme_rows:
+        theme_by_author.setdefault(row["author_handle"], row["theme"])
+
+    # Accounts sitting inside a flagged coordination cluster.
+    from apps.coordination.models import ClusterAccount, CoordinationCluster
+
+    coordinated = set(
+        ClusterAccount.objects.filter(
+            cluster__issue__project=project,
+            cluster__status=CoordinationCluster.STATUS_FLAGGED,
+            handle__in=handles,
+        ).values_list("handle", flat=True)
+    )
+
+    # Normalized influence scores where the enrichment job has produced them
+    # (FR-3.3); reach is the fallback for handles not yet linked to an Author.
+    influence_by_handle = {
+        (handle, slug): float(score)
+        for handle, slug, score in Author.objects.filter(
+            handle__in=handles, influence_score__gt=0
+        ).values_list("handle", "platform__slug", "influence_score")
+    }
+
+    def _weight(row):
+        return influence_by_handle.get(
+            (row["author_handle"], row["platform__slug"])
+        ) or float(row["reach"] or 0)
+
+    # Group nodes by theme so linked nodes sit next to each other on the circle.
+    author_rows.sort(key=lambda r: (theme_by_author.get(r["author_handle"], "~"), -_weight(r)))
+
+    max_weight = max(_weight(row) for row in author_rows) or 1
+    cx, cy = width / 2, height / 2
+    ring = min(width, height) / 2 - 70
+    nodes = []
+    for index, row in enumerate(author_rows):
+        angle = (2 * math.pi * index) / len(author_rows) - math.pi / 2
+        total = row["n"] or 1
+        negative_pct = round((row["negative"] / total) * 100)
+        if negative_pct >= 50:
+            sentiment = "negative"
+        elif round((row["positive"] / total) * 100) >= 50:
+            sentiment = "positive"
+        else:
+            sentiment = "neutral"
+        nodes.append({
+            "handle": row["author_handle"],
+            "platform": row["platform__display_name"],
+            "influence": influence_by_handle.get((row["author_handle"], row["platform__slug"]), 0),
+            "x": round(cx + ring * math.cos(angle), 1),
+            "y": round(cy + ring * math.sin(angle), 1),
+            "radius": round(9 + (_weight(row) / max_weight) * 21, 1),
+            "mentions": row["n"],
+            "reach": row["reach"] or 0,
+            "engagement": row["engagement"] or 0,
+            "negative_pct": negative_pct,
+            "sentiment": sentiment,
+            "theme": theme_by_author.get(row["author_handle"], ""),
+            "coordinated": row["author_handle"] in coordinated,
+        })
+
+    edges = []
+    for i, a in enumerate(nodes):
+        for b in nodes[i + 1:]:
+            if a["theme"] and a["theme"] == b["theme"]:
+                edges.append({
+                    "x1": a["x"], "y1": a["y"], "x2": b["x"], "y2": b["y"],
+                    "coordinated": a["coordinated"] and b["coordinated"],
+                })
+
+    theme_counts = {}
+    for node in nodes:
+        if node["theme"]:
+            theme_counts[node["theme"]] = theme_counts.get(node["theme"], 0) + 1
+    theme_groups = sorted(theme_counts.items(), key=lambda kv: -kv[1])
+
+    influencers = sorted(nodes, key=lambda n: -(n["influence"] or n["reach"]))[:8]
+    return {
+        "width": width,
+        "height": height,
+        "nodes": nodes,
+        "edges": edges,
+        "influencers": influencers,
+        "coordinated_count": sum(1 for n in nodes if n["coordinated"]),
+        "theme_groups": [
+            {"theme": theme, "count": count} for theme, count in theme_groups[:6]
+        ],
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+        "days": days,
+    }
+
+
+def laporan_summary(project, days=30):
+    """Report center (Laporan): finalized daily briefs as the archive of record,
+    plus a rolling recap of the reporting period for the periodic report."""
+    since = timezone.now() - timezone.timedelta(days=days)
+    qs = Mention.objects.filter(project=project, posted_at__gte=since)
+
+    total_mentions = qs.count()
+    sentiment_counts = {
+        row["sentiment"]: row["n"] for row in qs.values("sentiment").annotate(n=Count("id"))
+    }
+    sentiment_breakdown = []
+    for key, label in SENTIMENT_LABELS.items():
+        count = sentiment_counts.get(key, 0)
+        pct = round((count / total_mentions) * 100) if total_mentions else 0
+        sentiment_breakdown.append({"key": key, "label": label, "count": count, "pct": pct})
+
+    platform_rows = []
+    for row in qs.values("platform__display_name").annotate(n=Count("id")).order_by("-n"):
+        platform_rows.append({
+            "name": row["platform__display_name"],
+            "count": row["n"],
+            "pct": round((row["n"] / total_mentions) * 100) if total_mentions else 0,
+        })
+
+    top_themes = _dominant_themes(qs, limit=6)
+    timeline = _daily_timeline(qs, since, days)
+
+    briefs = list(DailyBrief.objects.filter(project=project).order_by("-brief_date")[:30])
+    final_count = sum(1 for b in briefs if b.status == DailyBrief.STATUS_FINAL)
+
+    return {
+        "days": days,
+        "period_start": since.date(),
+        "period_end": timezone.now().date(),
+        "total_mentions": total_mentions,
+        "total_reach": qs.aggregate(total=Sum("reach_estimate"))["total"] or 0,
+        "unique_authors": qs.values("author_handle").distinct().count(),
+        "sentiment_breakdown": sentiment_breakdown,
+        "platform_rows": platform_rows,
+        "top_themes": top_themes,
+        "timeline_chart": timeline_chart(timeline, width=1160, height=180),
+        "briefs": briefs,
+        "final_count": final_count,
+        "draft_count": len(briefs) - final_count,
+    }

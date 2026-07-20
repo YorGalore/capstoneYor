@@ -1,0 +1,88 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Laporan{% endblock %}
+{% block content %}
+<div class="pantau-page-title">Pusat Laporan</div>
+{% if summary %}
+<div class="pantau-laporan-toolbar">
+  <form method="get" class="pantau-laporan-period">
+    <label class="mono-muted" for="periode">Periode rekap</label>
+    <select class="pantau-input" id="periode" name="periode" onchange="this.form.submit()">
+      <option value="7" {% if summary.days == 7 %}selected{% endif %}>7 hari terakhir</option>
+      <option value="30" {% if summary.days == 30 %}selected{% endif %}>30 hari terakhir</option>
+      <option value="90" {% if summary.days == 90 %}selected{% endif %}>90 hari terakhir</option>
+    </select>
+  </form>
+  <div class="pantau-laporan-exports">
+    {% if can_export %}
+    <a class="pantau-btn" href="{% url 'analytics:export_mentions' %}?format=csv">Unduh Data (CSV)</a>
+    <a class="pantau-btn" href="{% url 'analytics:export_mentions' %}?format=xlsx">Unduh Data (XLSX)</a>
+    {% endif %}
+    <button type="button" class="pantau-btn-outline" onclick="window.print()">🖨 Cetak laporan</button>
+  </div>
+</div>
+<div class="pantau-grid-laporan">
+  <div class="pantau-card pantau-card-dark pantau-laporan-recap">
+    <div class="pantau-kpi-label light">Rekap periode {{ summary.period_start|date:"j M Y" }} – {{ summary.period_end|date:"j M Y" }}</div>
+    <div class="pantau-region-kpis">
+      <div><div class="pantau-kpi-value light">{{ summary.total_mentions }}</div><div class="pantau-kpi-label light">sebutan</div></div>
+      <div><div class="pantau-kpi-value light">{{ summary.total_reach }}</div><div class="pantau-kpi-label light">estimasi jangkauan</div></div>
+      <div><div class="pantau-kpi-value light">{{ summary.unique_authors }}</div><div class="pantau-kpi-label light">akun unik</div></div>
+    </div>
+  </div>
+  <div class="pantau-card pantau-laporan-trend">
+    <div class="pantau-card-title">Tren volume &amp; sentimen — {{ summary.days }} hari</div>
+    <svg width="100%" height="{{ summary.timeline_chart.height }}" viewBox="0 0 {{ summary.timeline_chart.width }} {{ summary.timeline_chart.height }}" preserveAspectRatio="none">
+      <polyline points="{{ summary.timeline_chart.positive_points }}" fill="none" stroke="#2E7D5B" stroke-width="2"></polyline>
+      <polyline points="{{ summary.timeline_chart.neutral_points }}" fill="none" stroke="#7C8A99" stroke-width="2"></polyline>
+      <polyline points="{{ summary.timeline_chart.negative_points }}" fill="none" stroke="#C6483F" stroke-width="2"></polyline>
+    </svg>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Komposisi sentimen</div>
+    {% for row in summary.sentiment_breakdown %}
+      <div class="pantau-source-row">
+        <span>{{ row.label }}</span>
+        <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ row.pct }}%"></div></div>
+        <span class="mono">{{ row.count }} · {{ row.pct }}%</span>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Sebaran platform</div>
+    {% for row in summary.platform_rows %}
+      <div class="pantau-source-row">
+        <span>{{ row.name }}</span>
+        <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ row.pct }}%"></div></div>
+        <span class="mono">{{ row.count }}</span>
+      </div>
+    {% empty %}
+      <span class="mono-muted">Belum ada data pada periode ini.</span>
+    {% endfor %}
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Tema dominan</div>
+    <div class="narasi-theme-tags">
+      {% for theme in summary.top_themes %}
+        <span class="pantau-subissue-tag{% if forloop.counter <= 2 %} pantau-subissue-tag-primary{% endif %}">{{ theme.theme }} · {{ theme.pct }}%</span>
+      {% empty %}
+        <span class="mono-muted">Belum ada tema teridentifikasi.</span>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="pantau-card pantau-laporan-arsip">
+    <div class="pantau-card-title">Arsip Brief Harian <span class="mono-muted">— {{ summary.final_count }} final · {{ summary.draft_count }} belum final</span></div>
+    {% for brief in summary.briefs %}
+      <div class="pantau-region-row">
+        <a href="{% url 'analytics:brief' %}?tanggal={{ brief.brief_date|date:'Y-m-d' }}">Brief {{ brief.brief_date|date:"l, j F Y" }}</a>
+        <span class="pantau-badge{% if brief.is_locked %} pantau-badge-positive{% endif %}">{{ brief.get_status_display }}</span>
+        <a class="pantau-btn-outline pantau-btn-small" href="{% url 'analytics:brief_print' brief.pk %}" target="_blank" rel="noopener">🖨 Cetak</a>
+      </div>
+    {% empty %}
+      <span class="mono-muted">Belum ada brief harian. Buat dari halaman Brief Harian.</span>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="pantau-card"><span class="mono-muted">Belum ada proyek aktif untuk disusun laporannya.</span></div>
+{% endif %}
+{% endblock %}

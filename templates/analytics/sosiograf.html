@@ -1,0 +1,66 @@
+{% extends "core/base_dashboard.html" %}
+{% load l10n %}
+{% block title %}Sosiograf{% endblock %}
+{% block content %}
+<div class="pantau-page-title">Sosiograf Interaksi</div>
+{% if summary %}
+<div class="pantau-grid-sosiograf">
+  <div class="pantau-card pantau-sosiograf-card">
+    <div class="pantau-card-title">Jaringan Akun Berpengaruh <span class="mono-muted">— {{ summary.days }} hari terakhir · ukuran = jangkauan · garis = tema yang sama</span></div>
+    {% localize off %}
+    <svg class="pantau-sosiograf-svg" width="100%" viewBox="0 0 {{ summary.width }} {{ summary.height }}">
+      {% for edge in summary.edges %}
+        <line x1="{{ edge.x1 }}" y1="{{ edge.y1 }}" x2="{{ edge.x2 }}" y2="{{ edge.y2 }}"
+              class="pantau-sosiograf-edge{% if edge.coordinated %} coordinated{% endif %}"></line>
+      {% endfor %}
+      {% for node in summary.nodes %}
+        <g class="pantau-sosiograf-node">
+          <circle cx="{{ node.x }}" cy="{{ node.y }}" r="{{ node.radius }}"
+                  class="pantau-sosiograf-dot {{ node.sentiment }}{% if node.coordinated %} coordinated{% endif %}">
+            <title>@{{ node.handle }} · {{ node.platform }} · {{ node.mentions }} sebutan · jangkauan {{ node.reach }}{% if node.theme %} · tema: {{ node.theme }}{% endif %}{% if node.coordinated %} · TERINDIKASI KOORDINASI{% endif %}</title>
+          </circle>
+          <text x="{{ node.x }}" y="{{ node.y }}" dy="-{{ node.radius }}" class="pantau-sosiograf-label">@{{ node.handle }}</text>
+        </g>
+      {% endfor %}
+    </svg>
+    {% endlocalize %}
+    <div class="pantau-sosiograf-legend">
+      <span><span class="swatch positive"></span>Dominan positif</span>
+      <span><span class="swatch neutral"></span>Dominan netral</span>
+      <span><span class="swatch negative"></span>Dominan negatif</span>
+      <span><span class="swatch coordinated"></span>Terindikasi koordinasi</span>
+    </div>
+  </div>
+  <div class="pantau-card pantau-card-dark">
+    <div class="pantau-kpi-label light">Jaringan</div>
+    <div class="pantau-region-kpis">
+      <div><div class="pantau-kpi-value light">{{ summary.node_count }}</div><div class="pantau-kpi-label light">akun</div></div>
+      <div><div class="pantau-kpi-value light">{{ summary.edge_count }}</div><div class="pantau-kpi-label light">keterhubungan</div></div>
+      <div><div class="pantau-kpi-value light">{{ summary.coordinated_count }}</div><div class="pantau-kpi-label light">akun terkoordinasi</div></div>
+    </div>
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Akun Paling Berpengaruh</div>
+    {% for node in summary.influencers %}
+      <div class="pantau-source-row">
+        <span>@{{ node.handle }}{% if node.coordinated %} ⚠{% endif %} <span class="mono-muted">{{ node.platform }}</span></span>
+        <span class="pantau-badge pantau-badge-{{ node.sentiment }}">{{ node.negative_pct }}% neg</span>
+        <span class="mono">{{ node.reach }}</span>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Kelompok Tema</div>
+    <div class="narasi-theme-tags">
+      {% for group in summary.theme_groups %}
+        <span class="pantau-subissue-tag{% if forloop.counter <= 2 %} pantau-subissue-tag-primary{% endif %}">{{ group.theme }} · {{ group.count }} akun</span>
+      {% empty %}
+        <span class="mono-muted">Belum ada tema teridentifikasi pada periode ini.</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="pantau-card"><span class="mono-muted">Belum ada data sebutan pada 30 hari terakhir untuk membangun sosiograf.</span></div>
+{% endif %}
+{% endblock %}

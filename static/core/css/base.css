@@ -381,3 +381,44 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-risk-low { background: #EAF5F0; color: var(--positive); }
 .pantau-risk-medium { background: #FFF4E0; color: var(--warning); }
 .pantau-risk-high { background: #FBEDEC; color: var(--negative); }
+
+/* ── Sosiograf ─────────────────────────────────────────────── */
+.pantau-grid-sosiograf { display: grid; grid-template-columns: 1fr 420px; gap: 16px; }
+.pantau-sosiograf-card { grid-row: span 3; }
+.pantau-sosiograf-svg { display: block; margin-top: 8px; }
+.pantau-sosiograf-edge { stroke: #CBD5E1; stroke-width: 1; opacity: .7; }
+.pantau-sosiograf-edge.coordinated { stroke: var(--negative); stroke-width: 1.6; stroke-dasharray: 4 3; }
+.pantau-sosiograf-dot { stroke: #fff; stroke-width: 1.5; }
+.pantau-sosiograf-dot.positive { fill: var(--positive); }
+.pantau-sosiograf-dot.neutral { fill: #7C8A99; }
+.pantau-sosiograf-dot.negative { fill: var(--negative); }
+.pantau-sosiograf-dot.coordinated { stroke: var(--negative); stroke-width: 3; stroke-dasharray: 3 2; }
+.pantau-sosiograf-label { font: 500 10px 'IBM Plex Mono', monospace; fill: #475569; text-anchor: middle; }
+.pantau-sosiograf-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font: 500 11px 'IBM Plex Sans', sans-serif; color: #64748B; }
+.pantau-sosiograf-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.pantau-sosiograf-legend .swatch.positive { background: var(--positive); }
+.pantau-sosiograf-legend .swatch.neutral { background: #7C8A99; }
+.pantau-sosiograf-legend .swatch.negative { background: var(--negative); }
+.pantau-sosiograf-legend .swatch.coordinated { background: #fff; border: 2px dashed var(--negative); }
+
+/* ── Laporan ───────────────────────────────────────────────── */
+.pantau-laporan-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.pantau-laporan-period { display: flex; align-items: center; gap: 8px; }
+.pantau-laporan-period .pantau-input { width: auto; }
+.pantau-laporan-exports { display: flex; gap: 8px; }
+.pantau-grid-laporan { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pantau-laporan-recap, .pantau-laporan-trend { grid-column: span 2; }
+.pantau-laporan-arsip { grid-column: span 2; }
+
+/* ── Konfigurasi: aturan & entitas ─────────────────────────── */
+.pantau-rule-form { flex-wrap: wrap; }
+.pantau-rule-form .pantau-input { flex: 1 1 160px; min-width: 130px; }
+.pantau-input-color { flex: 0 0 52px !important; min-width: 52px !important; padding: 2px; height: 34px; }
+
+/* ── Cetak: sembunyikan kerangka dasbor ────────────────────── */
+@media print {
+  .pantau-sidebar, .pantau-topbar, .pantau-messages, .pantau-laporan-exports,
+  .pantau-laporan-period { display: none !important; }
+  .pantau-shell, .pantau-main, .pantau-content { display: block; padding: 0; margin: 0; }
+  .pantau-card { box-shadow: none; border: 1px solid #CBD5E1; break-inside: avoid; }
+}

@@ -71,7 +71,7 @@ def evaluate_rules(project, issue=None):
         ).exists():
             continue
 
-        triggered.append(Alert.objects.create(
+        alert = Alert.objects.create(
             project=project,
             rule=rule,
             issue=issue,
@@ -80,5 +80,11 @@ def evaluate_rules(project, issue=None):
             detail=detail,
             triggered_at=timezone.now(),
             status=Alert.STATUS_ACTIVE,
-        ))
+        )
+        # Deliver over the rule's channel (FR-12.2). Lazy import: notifications
+        # pulls in mail/webhook machinery this module otherwise never needs.
+        from . import notifications
+
+        notifications.deliver_alert(alert)
+        triggered.append(alert)
     return triggered

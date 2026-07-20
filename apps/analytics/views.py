@@ -159,6 +159,35 @@ def narasi(request):
     })
 
 
+@require_page("sosiograf")
+def sosiograf(request):
+    """Interaction sociograph: influential accounts as a server-rendered graph,
+    with coordination-flagged accounts highlighted."""
+    project = get_active_project(request)
+    summary = selectors.sosiograf_summary(project) if project else None
+    return render(request, "analytics/sosiograf.html", {
+        "active_nav": "sosiograf",
+        "summary": summary,
+    })
+
+
+@require_page("laporan")
+def laporan(request):
+    """Report center: archive of finalized daily briefs plus a periodic recap of
+    the reporting window, with links to the raw-data exports."""
+    project = get_active_project(request)
+    try:
+        days = min(max(int(request.GET.get("periode", 30)), 7), 90)
+    except (TypeError, ValueError):
+        days = 30
+    summary = selectors.laporan_summary(project, days=days) if project else None
+    return render(request, "analytics/laporan.html", {
+        "active_nav": "laporan",
+        "summary": summary,
+        "can_export": user_can_access(request.user, "export"),
+    })
+
+
 def regional(request):
     project = get_active_project(request)
     selected_province = request.GET.get("provinsi") or None
@@ -276,6 +305,25 @@ def brief_view(request):
         "brief_date": parsed,
         "risk_labels": regulatory.RISK_LABELS,
         "recent": DailyBrief.objects.filter(project=project)[:7] if project else [],
+    })
+
+
+@require_page("brief")
+def brief_print(request, brief_id):
+    """Standalone print-ready rendering of a brief (save as PDF via the browser's
+    print dialog). Drafts carry a watermark — only a final brief speaks for the
+    institution (FR-30.2)."""
+    project = get_active_project(request)
+    brief = get_object_or_404(DailyBrief, pk=brief_id, project=project)
+    record_audit_entry(
+        actor_label=request.user.get_full_name() or request.user.username,
+        action="Membuka brief versi cetak",
+        target=str(brief.brief_date),
+    )
+    return render(request, "analytics/brief_print.html", {
+        "brief": brief,
+        "instansi": project.tenant.name,
+        "proyek": project.name,
     })
 
 

@@ -284,12 +284,16 @@ class ScheduledJob(models.Model):
     JOB_DETECT_COORDINATION = "detect_coordination"
     JOB_GENERATE_BRIEF = "generate_brief"
     JOB_PURGE_RETENTION = "purge_retention"
+    JOB_ENRICH_AUTHORS = "enrich_authors"
+    JOB_SEND_BRIEF = "send_brief"
     JOB_CHOICES = [
         (JOB_COLLECT, "Koleksi data"),
         (JOB_EVALUATE_ALERTS, "Evaluasi peringatan"),
         (JOB_DETECT_COORDINATION, "Deteksi koordinasi"),
         (JOB_GENERATE_BRIEF, "Brief harian"),
         (JOB_PURGE_RETENTION, "Purge retensi"),
+        (JOB_ENRICH_AUTHORS, "Normalisasi penulis"),
+        (JOB_SEND_BRIEF, "Distribusi brief final"),
     ]
 
     STATUS_OK = "ok"
