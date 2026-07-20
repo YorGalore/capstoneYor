@@ -124,6 +124,73 @@ NEWS_ITEMS = [
 SOCIAL_BUZZ_SEED = 20260717
 SOCIAL_BUZZ_COUNT = 220
 
+# Citizen-service complaints sized to exercise the Incident board.
+#
+# The social-buzz layer above sets only a free-text ``theme`` and creates no
+# IssueLabel, so incident detection — which clusters on (taxonomy Issue x Regency)
+# — cannot see any of it. Without this layer the demo board is empty, which
+# demonstrates nothing.
+#
+# Volumes and sentiment splits are chosen to land on three different severity
+# tiers, so the board shows real triage rather than a single flat list:
+#   * jalan  — 22 mentions, 86% negative → above the from-zero surge floor → Kritis
+#   * air    —  9 mentions, 78% negative → below the surge floor        → Tinggi
+#   * sampah —  7 mentions, 57% negative → below the surge floor        → Sedang
+INCIDENT_CLUSTER_SEED = 20260720
+INCIDENT_CLUSTERS = [
+    {
+        "key": "jalan",
+        "subcategory": "Infrastruktur Jalan",
+        "issue": "Jalan Rusak Wates–Sentolo",
+        "keywords": ["jalan rusak", "berlubang", "wates", "sentolo"],
+        "total": 22,
+        "negative": 19,
+        "negative_snippets": [
+            "jalan wates-sentolo makin parah, lubangnya dalam sekali",
+            "sudah tiga motor jatuh di lubang depan pasar sentolo",
+            "tolong pak bupati jalan ini diperbaiki, tiap hari macet",
+            "lubang di jalan wates bikin bahaya kalau malam, tidak ada lampu",
+            "drainase mampet jadi jalan cepat rusak lagi setelah ditambal",
+        ],
+        "other_snippets": [
+            "katanya minggu depan mulai ditambal, semoga benar",
+            "ada alat berat masuk di ruas sentolo pagi ini",
+        ],
+    },
+    {
+        "key": "air",
+        "subcategory": "Air Bersih",
+        "issue": "Air PDAM Mati Berhari-hari",
+        "keywords": ["pdam", "air mati", "air bersih"],
+        "total": 9,
+        "negative": 7,
+        "negative_snippets": [
+            "air pdam mati sudah tiga hari, tidak ada pemberitahuan",
+            "beli air galon terus jadi boros, tolong segera diperbaiki",
+            "giliran air tidak jelas jadwalnya di daerah kami",
+        ],
+        "other_snippets": [
+            "info dari pdam katanya ada perbaikan pipa induk",
+        ],
+    },
+    {
+        "key": "sampah",
+        "subcategory": "Persampahan",
+        "issue": "Sampah Menumpuk di Pasar",
+        "keywords": ["sampah", "tps", "bau"],
+        "total": 7,
+        "negative": 4,
+        "negative_snippets": [
+            "sampah di tps pasar sudah seminggu tidak diangkut, bau sekali",
+            "tumpukan sampah meluber sampai bahu jalan",
+        ],
+        "other_snippets": [
+            "truk sampah tadi pagi sudah datang, semoga rutin",
+            "warga swadaya bersih-bersih tps kemarin sore",
+        ],
+    },
+]
+
 SOCIAL_PLATFORM_WEIGHTS = {
     "x": 0.30, "instagram": 0.24, "tiktok": 0.22, "facebook": 0.14, "youtube": 0.06, "forum": 0.04,
 }
@@ -453,6 +520,78 @@ def _seed_social_buzz(project, province, regency, issues, programs):
     Mention.objects.bulk_create(mentions)
 
 
+def _seed_incident_clusters(project, province, regency):
+    """Seed labeled citizen-service complaints so the Incident board has something
+    to detect.
+
+    Unlike ``_seed_social_buzz``, every mention here carries an ``IssueLabel``:
+    incident detection clusters on (taxonomy Issue x Regency) and is blind to the
+    free-text ``theme`` field the buzz layer uses.
+    """
+    # Guard on the model marker, matching the idempotency contract of the layers
+    # above: re-seeding must add nothing once this layer exists.
+    if Mention.objects.filter(project=project, sentiment_model="demo-incident-v1").exists():
+        return
+
+    category, _ = Category.objects.get_or_create(name="Layanan Publik")
+    platforms = list(Platform.objects.exclude(slug="berita"))
+    rng = random.Random(INCIDENT_CLUSTER_SEED)
+    now = timezone.now()
+
+    for cluster in INCIDENT_CLUSTERS:
+        subcategory, _ = SubCategory.objects.get_or_create(
+            category=category, name=cluster["subcategory"]
+        )
+        issue, _ = Issue.objects.get_or_create(
+            subcategory=subcategory,
+            name=cluster["issue"],
+            defaults={"keywords": cluster["keywords"]},
+        )
+
+        for index in range(cluster["total"]):
+            is_negative = index < cluster["negative"]
+            if is_negative:
+                sentiment = Mention.SENTIMENT_NEGATIVE
+                emotion = Mention.EMOTION_ANGER
+                snippet = cluster["negative_snippets"][index % len(cluster["negative_snippets"])]
+            else:
+                sentiment = Mention.SENTIMENT_NEUTRAL
+                emotion = Mention.EMOTION_TRUST
+                offset = index - cluster["negative"]
+                snippet = cluster["other_snippets"][offset % len(cluster["other_snippets"])]
+
+            mention = Mention.objects.create(
+                project=project,
+                platform=rng.choice(platforms),
+                province=province,
+                regency=regency,
+                author_handle=rng.choice(SOCIAL_HANDLES),
+                content_snippet=snippet,
+                theme=issue.name,
+                sentiment=sentiment,
+                sentiment_confidence=round(rng.uniform(0.72, 0.96), 2),
+                sentiment_model="demo-incident-v1",
+                emotion=emotion,
+                emotion_labels=[emotion],
+                # Inside the board's default 7-day window, so the demo shows
+                # candidates without the operator changing the filter first.
+                posted_at=now - timedelta(days=rng.uniform(0, 5), hours=rng.uniform(0, 24)),
+                engagement_count=rng.randint(5, 900),
+                reach_estimate=rng.randint(200, 45_000),
+                source_url=(
+                    f"https://demo.pantau.local/kulon-progo/insiden/"
+                    f"{cluster['key']}-{index + 1:03d}"
+                ),
+                matched_keyword=cluster["keywords"][0],
+                is_scraped=False,
+            )
+            IssueLabel.objects.create(
+                mention=mention,
+                issue=issue,
+                source=IssueLabel.SOURCE_AUTO,
+            )
+
+
 def _seed_coordination_cluster(project):
     # A local CIB-detection example tied to the Garongan issue, so the coordination
     # screen has something concrete to show in a Kulon Progo-specific demo rather
@@ -555,6 +694,7 @@ def seed_kulon_progo_demo():
     mentions = _seed_mentions(project, province, regency, issues, programs, actors)
     _seed_issue_and_alerts(project, mentions)
     _seed_social_buzz(project, province, regency, issues, programs)
+    _seed_incident_clusters(project, province, regency)
     _seed_coordination_cluster(project)
     _seed_reviewable_brief(project)
     return tenant, project

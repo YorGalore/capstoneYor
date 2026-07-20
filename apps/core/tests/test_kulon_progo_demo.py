@@ -12,7 +12,9 @@ from apps.core.demo_kulon_progo import (
     DEMO_PASSWORD,
     DEMO_USERNAME,
     DOMAINS,
+    INCIDENT_CLUSTERS,
     KEYWORDS,
+    NEWS_ITEMS,
     PROJECT_NAME,
     TENANT_NAME,
     seed_kulon_progo_demo,
@@ -68,7 +70,15 @@ class KulonProgoDemoSeedTest(TestCase):
         social = mentions.filter(sentiment_model="demo-social-v1")
 
         self.assertEqual(social.count(), 220)
-        self.assertEqual(mentions.count(), 246)
+        # Derived rather than hardcoded: a bare total silently breaks whenever a
+        # fixture layer is added, which says nothing about whether the addition
+        # was correct. Assert each layer instead.
+        incident_total = sum(cluster["total"] for cluster in INCIDENT_CLUSTERS)
+        incident = mentions.filter(sentiment_model="demo-incident-v1")
+        self.assertEqual(incident.count(), incident_total)
+        self.assertEqual(
+            mentions.count(), len(NEWS_ITEMS) + social.count() + incident_total
+        )
         self.assertTrue(social.exclude(platform__slug="berita").exists())
         self.assertFalse(social.filter(platform__slug="berita").exists())
 

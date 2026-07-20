@@ -18,3 +18,10 @@ staticfiles/
 *.pdf
 *.jpeg
 *.jpg
+
+# Server access notes. These carry live hostnames, credentials, and private-key
+# paths, and must never enter history — a leaked deploy key is a rotation, not a
+# revert.
+*vps*.txt
+docs/*credentials*
+docs/*secrets*

@@ -200,6 +200,25 @@ class DemoSeedTest(TestCase):
         self.assertTrue(OPD.objects.filter(slug="pu").exists())
         self.assertTrue(OPD.objects.filter(slug="dlh").exists())
 
+    def test_demo_seed_produces_a_board_an_operator_can_actually_triage(self):
+        # The demo is how this feature gets evaluated. A seed that leaves the board
+        # empty demonstrates nothing, so pin both that detection finds something and
+        # that the results span severity tiers rather than landing all on one.
+        from apps.analytics import incidents
+        from apps.analytics.models import Incident
+        from apps.core import demo_kulon_progo
+
+        _tenant, project = demo_kulon_progo.seed_kulon_progo_demo()
+
+        found = incidents.refresh_candidates(project)
+
+        self.assertGreaterEqual(len(found), 3, "demo seed detects no incidents")
+        severities = {incident.severity for incident in found}
+        self.assertIn(Incident.SEVERITY_CRITICAL, severities)
+        self.assertGreater(
+            len(severities), 1, "every demo incident landed on the same severity"
+        )
+
     def test_demo_seed_is_idempotent(self):
         from apps.core import demo_kulon_progo
 
