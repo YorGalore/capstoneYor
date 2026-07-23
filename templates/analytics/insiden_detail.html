@@ -1,62 +1,133 @@
 {% extends "core/base_dashboard.html" %}
+{% load analytics_extras %}
+{% block title %}{{ incident.title }}{% endblock %}
 {% block content %}
-<h1>{{ incident.title }}</h1>
-<p>{{ incident.get_severity_display }} · {{ incident.get_status_display }}
-   · {{ incident.regency.name|default:"—" }}</p>
+<div class="incident-detail-head severity-{{ incident.severity }}">
+  <div class="incident-detail-tags">
+    <span class="incident-card-icon">{{ incident.title|incident_icon }}</span>
+    <span class="severity-chip severity-{{ incident.severity }}">{{ incident.get_severity_display }}</span>
+    <span class="incident-status status-{{ incident.status }}">{{ incident.get_status_display }}</span>
+    <span class="incident-card-meta"><span>📍 {{ incident.regency.name|default:"—" }}</span></span>
+    {% if incident.assigned_opd %}
+      <span class="incident-opd-chip">{{ incident.assigned_opd }}</span>
+    {% endif %}
+  </div>
+  <h1 class="incident-detail-title">{{ incident.title }}</h1>
+  <div class="incident-detail-stats">
+    <div class="incident-stat">
+      <span class="incident-stat-value">{{ incident.mention_count }}</span>
+      <span class="incident-stat-label">Sebutan</span>
+    </div>
+    <div class="incident-stat">
+      <span class="incident-stat-value neg">{{ incident.negative_pct }}%</span>
+      <span class="incident-stat-label">Negatif</span>
+    </div>
+    {% if incident.first_seen_at %}
+    <div class="incident-stat">
+      <span class="incident-stat-value">{{ incident.first_seen_at|date:"d M" }}</span>
+      <span class="incident-stat-label">Pertama Terlihat</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
 
-<section><h2>Ringkasan</h2><div>{{ incident.ai_summary|linebreaks }}</div></section>
-<section><h2>Dugaan Penyebab</h2><div>{{ incident.root_cause|linebreaks }}</div></section>
-<section><h2>Dampak</h2><div>{{ incident.impact|linebreaks }}</div></section>
-<section><h2>Rekomendasi</h2><div>{{ incident.recommendation|linebreaks }}</div></section>
+<div class="incident-detail-grid">
+  <div class="pantau-card incident-narrative">
+    {% if incident.ai_summary|has_draft_banner %}
+    <div class="incident-draft-banner">
+      <span class="icon">⚠️</span>
+      <span class="incident-draft-banner-text"><strong>Draf — dihasilkan AI, menunggu tinjauan manusia.</strong> Teks di bawah belum diverifikasi; angka dan kutipan harus diperiksa terhadap sumber aslinya sebelum dikutip publik.</span>
+    </div>
+    {% endif %}
 
-<section>
-  <h2>Lini Masa</h2>
-  <ol>
-    {% for event in events %}
-      <li>{{ event.occurred_at|date:"d M H:i" }} — {{ event.description }}
-          <em>{{ event.logged_by }}</em></li>
-    {% endfor %}
-  </ol>
-</section>
+    <div class="incident-narrative-block">
+      <div class="incident-narrative-head"><h3>Ringkasan</h3><span class="incident-draft-tag">Draf</span></div>
+      <div class="incident-narrative-body">{{ incident.ai_summary|incident_body }}</div>
+    </div>
+    <div class="incident-narrative-block">
+      <div class="incident-narrative-head"><h3>Dugaan Penyebab</h3><span class="incident-draft-tag">Draf</span></div>
+      <div class="incident-narrative-body">{{ incident.root_cause|incident_body }}</div>
+    </div>
+    <div class="incident-narrative-block">
+      <div class="incident-narrative-head"><h3>Dampak</h3><span class="incident-draft-tag">Draf</span></div>
+      <div class="incident-narrative-body">{{ incident.impact|incident_body }}</div>
+    </div>
+    <div class="incident-narrative-block">
+      <div class="incident-narrative-head"><h3>Rekomendasi</h3><span class="incident-draft-tag">Draf</span></div>
+      <div class="incident-narrative-body">{{ incident.recommendation|incident_body }}</div>
+    </div>
 
-<section>
-  <h2>Tindakan</h2>
-  {% if not incident.is_confirmed %}
-  <form method="post" action="{% url 'analytics:insiden_promote' incident.pk %}">
-    {% csrf_token %}<button type="submit">Konfirmasi sebagai insiden</button>
-  </form>
-  {% endif %}
-  <form method="post" action="{% url 'analytics:insiden_assign' incident.pk %}">
-    {% csrf_token %}
-    <select name="opd">
-      {% for opd in opds %}<option value="{{ opd.pk }}">{{ opd.name }}</option>{% endfor %}
-    </select>
-    <button type="submit">Tugaskan</button>
-  </form>
-  {% if allowed_status_choices %}
-  <form method="post" action="{% url 'analytics:insiden_status' incident.pk %}">
-    {% csrf_token %}
-    <select name="status">
-      {% for value, label in allowed_status_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
-    </select>
-    <button type="submit">Ubah status</button>
-  </form>
-  {% else %}
-  <p>Insiden ini sudah ditutup dan tidak dapat diubah statusnya lagi.</p>
-  {% endif %}
-  <form method="post" action="{% url 'analytics:insiden_note' incident.pk %}">
-    {% csrf_token %}
-    <input type="text" name="description" placeholder="Catatan">
-    <button type="submit">Catat</button>
-  </form>
-</section>
+    <div class="incident-narrative-block">
+      <div class="incident-narrative-head"><h3>Lini Masa</h3></div>
+      <ol class="incident-timeline">
+        {% for event in events %}
+          <li class="incident-timeline-item kind-{{ event.kind }}">
+            <div class="incident-timeline-time">{{ event.occurred_at|date:"d M Y · H:i" }} WIB</div>
+            <div class="incident-timeline-desc">{{ event.description }}</div>
+            {% if event.logged_by %}<div class="incident-timeline-by">{{ event.logged_by }}</div>{% endif %}
+          </li>
+        {% empty %}
+          <li class="incident-timeline-item">Belum ada peristiwa tercatat.</li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
 
-<details>
-  <summary>Postingan terkait ({{ related_mentions|length }})</summary>
-  <ul>
-    {% for mention in related_mentions %}
-      <li>{{ mention.author_handle }} — {{ mention.content_snippet }}</li>
-    {% endfor %}
-  </ul>
-</details>
+  <aside class="pantau-card incident-action-panel">
+    {% if not incident.is_confirmed %}
+    <div class="incident-action-group">
+      <span class="incident-action-label">Tindakan</span>
+      <form method="post" action="{% url 'analytics:insiden_promote' incident.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="pantau-btn-dark" style="width:100%">Konfirmasi sebagai insiden</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="incident-action-group">
+      <span class="incident-action-label">Tugaskan ke OPD</span>
+      <form method="post" action="{% url 'analytics:insiden_assign' incident.pk %}" class="incident-action-row">
+        {% csrf_token %}
+        <select name="opd">
+          {% for opd in opds %}<option value="{{ opd.pk }}" {% if incident.assigned_opd_id == opd.pk %}selected{% endif %}>{{ opd.name }}</option>{% endfor %}
+        </select>
+        <button type="submit" class="pantau-btn-outline">Tugaskan</button>
+      </form>
+    </div>
+
+    <div class="incident-action-group">
+      <span class="incident-action-label">Ubah status</span>
+      {% if allowed_status_choices %}
+      <form method="post" action="{% url 'analytics:insiden_status' incident.pk %}" class="incident-action-row">
+        {% csrf_token %}
+        <select name="status">
+          {% for value, label in allowed_status_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+        <button type="submit" class="pantau-btn-outline">Ubah</button>
+      </form>
+      {% else %}
+      <p class="incident-action-note">Insiden ini sudah ditutup dan tidak dapat diubah statusnya lagi.</p>
+      {% endif %}
+    </div>
+
+    <div class="incident-action-group">
+      <span class="incident-action-label">Catat ke lini masa</span>
+      <form method="post" action="{% url 'analytics:insiden_note' incident.pk %}" class="incident-action-row">
+        {% csrf_token %}
+        <input type="text" name="description" placeholder="mis. survei lapangan dijadwalkan">
+        <button type="submit" class="pantau-btn-outline">Catat</button>
+      </form>
+    </div>
+
+    <details class="incident-related">
+      <summary>Postingan terkait ({{ related_mentions|length }})</summary>
+      <ul>
+        {% for mention in related_mentions %}
+          <li><span class="handle">{{ mention.author_handle }}</span>{{ mention.content_snippet }}</li>
+        {% endfor %}
+      </ul>
+    </details>
+    <p class="incident-action-note">Sistem menyarankan; penugasan dan perubahan status dilakukan oleh pejabat berwenang. Setiap tindakan tercatat pada lini masa audit.</p>
+  </aside>
+</div>
 {% endblock %}
