@@ -1,4 +1,5 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -49,6 +50,19 @@ class BriefViewTest(TestCase):
     def test_analyst_can_open_brief_page(self):
         response = self.client.get(reverse("analytics:brief"))
         self.assertEqual(response.status_code, 200)
+
+    def test_default_date_uses_local_calendar_after_midnight_wib(self):
+        # 23 Jul 20:30 UTC is already 24 Jul 03:30 in Asia/Jakarta. H-1 must
+        # therefore be 23 Jul, not 22 Jul as timezone.now().date() would yield.
+        utc_after_local_midnight = datetime(
+            2026, 7, 23, 20, 30, tzinfo=dt_timezone.utc
+        )
+        with mock.patch(
+            "django.utils.timezone.now", return_value=utc_after_local_midnight
+        ):
+            response = self.client.get(reverse("analytics:brief"))
+
+        self.assertEqual(str(response.context["brief_date"]), "2026-07-23")
 
     def test_generate_creates_draft_and_shows_draft_label(self):
         self.client.post(reverse("analytics:generate_brief"), {"tanggal": str(self.yesterday)})
