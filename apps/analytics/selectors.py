@@ -598,7 +598,12 @@ def incident_board(request, window="7", opd_slug="", severity=""):
         "counts": {
             "confirmed": len(confirmed),
             "candidates": len(candidates),
-            "critical": sum(1 for i in confirmed if i.severity == Incident.SEVERITY_CRITICAL),
+            # Severity is situational, not a workflow state: a critical candidate
+            # is the most urgent thing on the board (nobody has even confirmed it),
+            # so "Kritis" counts across candidates and confirmed alike.
+            "critical": sum(
+                1 for i in confirmed + candidates if i.severity == Incident.SEVERITY_CRITICAL
+            ),
             "open": sum(1 for i in confirmed if i.is_open),
         },
     }
