@@ -20,6 +20,7 @@ urlpatterns = [
     path("brief/<int:brief_id>/cetak/", views.brief_print, name="brief_print"),
     path("brief/isu/<int:issue_id>/tinjau/", views.review_brief_issue, name="review_brief_issue"),
     path("brief/<int:brief_id>/finalisasi/", views.finalize_brief, name="finalize_brief"),
+    path("brief/<int:brief_id>/buka-kembali/", views.reopen_brief, name="reopen_brief"),
     path("taksonomi/", views.taxonomy_view, name="taxonomy"),
     path("taksonomi/<int:mention_id>/label/", views.assign_issue, name="assign_issue"),
     path("taksonomi/gabung/", views.merge_issues, name="merge_issues"),

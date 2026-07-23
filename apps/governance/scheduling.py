@@ -93,7 +93,7 @@ def _run_detect_coordination(project):
 def _run_generate_brief(project):
     from apps.analytics import briefs
 
-    brief_date = (timezone.now() - timezone.timedelta(days=1)).date()
+    brief_date = timezone.localdate() - timezone.timedelta(days=1)
     brief = briefs.generate(project, brief_date, triggered_by="Penjadwal")
     # Never auto-finalized: a scheduled brief is still a draft awaiting human review
     # (FR-30.2). The scheduler produces the draft; it does not speak for the institution.
@@ -118,7 +118,7 @@ def _run_send_brief(project):
     from apps.analytics import notifications
     from apps.analytics.models import DailyBrief
 
-    brief_date = (timezone.now() - timezone.timedelta(days=1)).date()
+    brief_date = timezone.localdate() - timezone.timedelta(days=1)
     brief = DailyBrief.objects.filter(
         project=project, brief_date=brief_date, status=DailyBrief.STATUS_FINAL
     ).first()

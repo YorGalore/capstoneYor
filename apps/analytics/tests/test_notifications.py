@@ -74,7 +74,7 @@ class BriefDistributionTests(TestCase):
     def _final_brief(self, project):
         brief = DailyBrief.objects.create(
             project=project,
-            brief_date=(timezone.now() - timezone.timedelta(days=1)).date(),
+            brief_date=timezone.localdate() - timezone.timedelta(days=1),
             status=DailyBrief.STATUS_FINAL, finalized_by="Uji",
             finalized_at=timezone.now(),
         )

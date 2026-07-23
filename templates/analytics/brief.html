@@ -1,8 +1,9 @@
 {% extends "core/base_dashboard.html" %}
-{% block title %}Brief Harian{% endblock %}
+{% load analytics_extras %}
+{% block title %}Sorotan{% endblock %}
 {% block content %}
 <div class="pantau-page-head">
-  <h1 class="pantau-page-title">Brief Eksekutif Harian</h1>
+  <h1 class="pantau-page-title">Sorotan Eksekutif</h1>
   <p class="pantau-page-sub">Ringkasan H-1 untuk pimpinan. Konten dihasilkan AI sebagai <strong>draf</strong> dan wajib ditinjau manusia sebelum difinalisasi (FR-30.2/30.3).</p>
 </div>
 
@@ -20,6 +21,12 @@
       <a class="pantau-btn-outline pantau-btn-small" href="{% url 'analytics:brief_print' brief.pk %}" target="_blank" rel="noopener">🖨 Versi cetak / PDF</a>
     {% endif %}
   </form>
+  {% if brief and brief.is_locked and can_reopen_brief %}
+  <form method="post" action="{% url 'analytics:reopen_brief' brief.pk %}" class="pantau-inline-form" style="margin-top: 8px;" onsubmit="return confirm('Buka kembali brief ini untuk direvisi? Status Final akan dicabut sampai difinalisasi ulang.');">
+    {% csrf_token %}
+    <button type="submit" class="pantau-btn-outline pantau-btn-small">Buka kembali untuk revisi</button>
+  </form>
+  {% endif %}
 </div>
 
 {% if brief and brief.issues.exists %}
@@ -28,7 +35,7 @@
     <div class="pantau-card-header">
       <div class="pantau-card-title">{{ forloop.counter }}. {{ item.title }}</div>
       <div>
-        <span class="pantau-chip pantau-risk-{{ item.risk_level }}">Risiko: {{ risk_labels|default_if_none:'' }}{{ item.get_risk_display|default:item.risk_level }}</span>
+        <span class="pantau-chip pantau-risk-{{ item.risk_level }}">Risiko: {{ risk_labels|get_item:item.risk_level }}</span>
         {% if item.approved %}<span class="pantau-chip pantau-chip-allow">Disetujui</span>
         {% else %}<span class="pantau-chip pantau-chip-deny">Belum ditinjau</span>{% endif %}
       </div>
@@ -36,7 +43,7 @@
     <div class="pantau-hint">{{ item.mention_count }} sebutan · {{ item.negative_pct }}% negatif</div>
 
     {% if brief.is_locked %}
-      <pre class="pantau-brief-content">{{ item.content }}</pre>
+      <div class="pantau-brief-content incident-narrative-body">{{ item.content|brief_body }}</div>
     {% else %}
       <form method="post" action="{% url 'analytics:review_brief_issue' item.pk %}">
         {% csrf_token %}

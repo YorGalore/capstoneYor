@@ -1,0 +1,51 @@
+@startuml 01_deployment
+!theme plain
+title PANTAU - Diagram Deployment (Docker Compose)
+
+node "Host / VPS" {
+  node "Container: web" as web {
+    component "gunicorn\n(sync workers, preload_app)" as gunicorn
+    component "Django (pantau.wsgi)" as django
+    component "WhiteNoise\n(static files terkompres)" as whitenoise
+    gunicorn --> django
+    django --> whitenoise
+  }
+
+  node "Container: scheduler" as scheduler {
+    component "manage.py run_scheduler" as runsched
+    component "scheduling.run_due()" as rundue
+    runsched --> rundue
+  }
+
+  node "Container: db" as db_container {
+    database "PostgreSQL 17\n(pgdata volume)" as pg
+  }
+}
+
+cloud "Apify Platform\n(actor eksternal)" as apify
+cloud "Situs Berita\n(target crawler)" as news
+actor "Analis / Admin" as user
+node "Reverse Proxy / TLS Terminator\n(di luar compose)" as proxy
+
+user --> proxy : HTTPS
+proxy --> web : HTTP (X-Forwarded-Proto)
+web --> db_container : psycopg (DATABASE_URL)
+scheduler --> db_container : "SELECT ... FOR UPDATE SKIP LOCKED"
+scheduler --> apify : "koleksi sosial media"
+scheduler --> news : "respectful news crawler"
+web ..> web : "/healthz/ (readiness probe)"
+
+note right of scheduler
+  Proses terpisah dari web:
+  koleksi 4 menit tidak boleh
+  memblokir worker gunicorn.
+  Migrasi hanya dijalankan oleh
+  container web (RUN_MIGRATIONS).
+end note
+
+note bottom of db_container
+  Single named volume "pgdata".
+  Healthcheck: pg_isready
+end note
+
+@enduml

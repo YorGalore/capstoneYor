@@ -1,0 +1,46 @@
+@startuml 09_sequence_collection_scheduling
+!theme plain
+title Alur Sequence - Scheduler, Kill Switch, dan Koleksi Data
+
+participant "Container scheduler\n(run_scheduler loop)" as Loop
+participant "governance.scheduling\n.run_due()" as RunDue
+participant "ScheduledJob" as Job
+participant "RuntimeSetting\n(collection.enabled)" as KillSwitch
+participant "governance.orchestrator\n.run_apify_collection()" as Orch
+participant "MonitoringKeyword /\nPlatformIntegration" as Config
+participant "apify_crawler /\nportal_crawler" as Crawler
+participant "governance.ingestion" as Ingest
+participant "analytics.Mention" as Mention
+participant "CollectionRun" as Run
+participant "AuditLogEntry" as Audit
+
+Loop -> RunDue : run_due(now)
+activate RunDue
+RunDue -> Job : due_jobs(now)\n(enabled=True, next_run_at<=now)
+loop untuk setiap job (atomic, select_for_update skip_locked)
+  RunDue -> RunDue : run_job(job) via HANDLERS[job_type]
+  alt job_type == collect
+    RunDue -> KillSwitch : collection_enabled()?
+    alt kill switch OFF
+      RunDue -> Audit : record_audit_entry("collection skipped")
+      RunDue -> Job : last_status = skipped
+    else kill switch ON
+      RunDue -> Orch : run_apify_collection(project, token)
+      activate Orch
+      Orch -> Config : ambil keyword & integrasi aktif per platform
+      Orch -> Run : create(status=RUNNING)
+      Orch -> Crawler : collect(keywords, platform)
+      Crawler --> Orch : items mentah
+      Orch -> Ingest : ingest_items(project, platform, items)
+      Ingest -> Mention : create/update mentions
+      Orch -> Run : status = COMPLETED/FAILED,\ncost_estimate, items_found
+      deactivate Orch
+    end
+  else job_type lain (evaluate_alerts, generate_brief, ...)
+    RunDue -> RunDue : delegasikan ke modul terkait\n(lihat diagram sequence lain)
+  end
+  RunDue -> Job : _reschedule()\nnext_run_at = now + cadence\n(exponential backoff jika gagal)
+end
+deactivate RunDue
+
+@enduml

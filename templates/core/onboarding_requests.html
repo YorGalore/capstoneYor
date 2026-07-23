@@ -1,0 +1,36 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Permintaan Demo{% endblock %}
+{% block content %}
+<div class="pantau-page-title">Permintaan Demo (Onboarding)</div>
+<div class="pantau-hint">Daftar permintaan demo publik yang masuk lewat formulir "Mulai" (/mulai/), untuk diverifikasi dan ditindaklanjuti tanpa perlu akses Django admin.</div>
+<div class="pantau-card">
+  <div class="pantau-table-scroll">
+    <table class="pantau-table">
+      <thead>
+        <tr>
+          <th>Organisasi</th>
+          <th>Jenis</th>
+          <th>Kontak</th>
+          <th>Email Kerja</th>
+          <th>Status</th>
+          <th>Diajukan</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in requests %}
+        <tr>
+          <td>{{ item.organization_name }}</td>
+          <td>{{ item.get_organization_type_display }}</td>
+          <td>{{ item.contact_name }}</td>
+          <td>{{ item.work_email }}</td>
+          <td>{{ item.status }}</td>
+          <td>{{ item.created_at|date:"j M Y H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">Belum ada permintaan demo.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

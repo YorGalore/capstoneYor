@@ -466,7 +466,7 @@ class NotificationDelivery(models.Model):
 
     KIND_ALERT = "alert"
     KIND_BRIEF = "brief"
-    KIND_CHOICES = [(KIND_ALERT, "Peringatan"), (KIND_BRIEF, "Brief harian")]
+    KIND_CHOICES = [(KIND_ALERT, "Peringatan"), (KIND_BRIEF, "Sorotan")]
 
     STATUS_SENT = "sent"
     STATUS_FAILED = "failed"

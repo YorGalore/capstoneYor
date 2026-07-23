@@ -7,8 +7,10 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
-from apps.core.models import Platform
-from apps.core.permissions import require_page, user_can_access
+from apps.core.models import AnalystProfile, Platform
+from apps.core.permissions import (
+    require_page, require_role_at_least, require_writer_role, user_can_access,
+)
 from apps.core.selectors import get_active_project, scope_to_tenant
 from apps.governance import regulatory
 from apps.governance.neutrality import NEUTRALITY_NOTICE, require_political_monitoring
@@ -85,6 +87,7 @@ def feed(request):
 
 
 @require_page("feed")
+@require_writer_role
 @require_POST
 def correct_sentiment(request, mention_id):
     """Manually override a mention's sentiment (FR-5.3), recording the change as
@@ -110,6 +113,7 @@ def correct_sentiment(request, mention_id):
     return redirect("analytics:feed")
 
 
+@require_page("ringkasan")
 def ringkasan(request):
     project = get_active_project(request)
     summary = selectors.ringkasan_summary(project) if project else None
@@ -122,6 +126,7 @@ def ringkasan(request):
     })
 
 
+@require_page("war_room")
 def war_room(request):
     project = get_active_project(request)
     issue = (
@@ -142,6 +147,7 @@ def war_room(request):
     })
 
 
+@require_page("narasi")
 @require_political_monitoring("Narasi & perbandingan kubu")
 def narasi(request):
     project = get_active_project(request)
@@ -188,6 +194,7 @@ def laporan(request):
     })
 
 
+@require_page("regional")
 def regional(request):
     project = get_active_project(request)
     selected_province = request.GET.get("provinsi") or None
@@ -251,6 +258,8 @@ def unmerge_issues(request, history_id):
     return redirect("analytics:taxonomy")
 
 
+@require_page("war_room")
+@require_writer_role
 @require_POST
 def log_response(request, issue_id):
     """Log a response action against the War Room timeline (FR-28.2), creating a
@@ -293,11 +302,15 @@ def brief_view(request):
     if brief_date:
         parsed = parse_date(brief_date)
     else:
-        parsed = (timezone.now() - timezone.timedelta(days=1)).date()
+        parsed = timezone.localdate() - timezone.timedelta(days=1)
 
     brief = (
         DailyBrief.objects.filter(project=project, brief_date=parsed).first()
         if project else None
+    )
+    profile = getattr(request.user, "analyst_profile", None)
+    can_reopen_brief = profile is not None and profile.role in (
+        AnalystProfile.ROLE_TENANT_ADMIN, AnalystProfile.ROLE_SUPER_ADMIN,
     )
     return render(request, "analytics/brief.html", {
         "active_nav": "brief",
@@ -305,6 +318,7 @@ def brief_view(request):
         "brief_date": parsed,
         "risk_labels": regulatory.RISK_LABELS,
         "recent": DailyBrief.objects.filter(project=project)[:7] if project else [],
+        "can_reopen_brief": can_reopen_brief,
     })
 
 
@@ -324,16 +338,18 @@ def brief_print(request, brief_id):
         "brief": brief,
         "instansi": project.tenant.name,
         "proyek": project.name,
+        "risk_labels": regulatory.RISK_LABELS,
     })
 
 
 @require_page("brief")
+@require_writer_role
 @require_POST
 def generate_brief(request):
     project = get_active_project(request)
     parsed = parse_date(request.POST.get("tanggal") or "") or (
-        timezone.now() - timezone.timedelta(days=1)
-    ).date()
+        timezone.localdate() - timezone.timedelta(days=1)
+    )
     actor = request.user.get_full_name() or request.user.username
     try:
         brief = briefs.generate(project, parsed, triggered_by=actor)
@@ -345,7 +361,7 @@ def generate_brief(request):
         return redirect(f"{reverse('analytics:brief')}?tanggal={parsed}")
 
     record_audit_entry(
-        actor_label=actor, action="Membuat draf brief harian", target=str(parsed),
+        actor_label=actor, action="Membuat draf sorotan", target=str(parsed),
     )
     messages.success(
         request,
@@ -355,6 +371,7 @@ def generate_brief(request):
 
 
 @require_page("brief")
+@require_writer_role
 @require_POST
 def review_brief_issue(request, issue_id):
     item = get_object_or_404(DailyBriefIssue, pk=issue_id)
@@ -373,6 +390,7 @@ def review_brief_issue(request, issue_id):
 
 
 @require_page("brief")
+@require_writer_role
 @require_POST
 def finalize_brief(request, brief_id):
     brief = get_object_or_404(DailyBrief, pk=brief_id)
@@ -387,9 +405,32 @@ def finalize_brief(request, brief_id):
         return redirect(f"{reverse('analytics:brief')}?tanggal={brief.brief_date}")
 
     record_audit_entry(
-        actor_label=actor, action="Memfinalisasi brief harian", target=str(brief.brief_date),
+        actor_label=actor, action="Memfinalisasi sorotan", target=str(brief.brief_date),
     )
     messages.success(request, "Brief difinalisasi dan dikunci.")
+    return redirect(f"{reverse('analytics:brief')}?tanggal={brief.brief_date}")
+
+
+@require_page("brief")
+@require_role_at_least(AnalystProfile.ROLE_TENANT_ADMIN, AnalystProfile.ROLE_SUPER_ADMIN)
+@require_POST
+def reopen_brief(request, brief_id):
+    """Emergency correction path (ISS-BTX-001): return a finalized brief to Draft
+    so a substantive error (e.g. a misquoted regulation) can be fixed without a
+    direct database edit. Restricted to Tenant Admin / Super Admin and recorded
+    in the audit log, same as finalize itself."""
+    brief = get_object_or_404(DailyBrief, pk=brief_id)
+    actor = request.user.get_full_name() or request.user.username
+    try:
+        briefs.reopen(brief, actor=actor)
+    except briefs.BriefNotFinal as exc:
+        messages.error(request, str(exc))
+        return redirect(f"{reverse('analytics:brief')}?tanggal={brief.brief_date}")
+
+    record_audit_entry(
+        actor_label=actor, action="Membuka kembali sorotan untuk revisi", target=str(brief.brief_date),
+    )
+    messages.success(request, "Brief dibuka kembali sebagai draf.")
     return redirect(f"{reverse('analytics:brief')}?tanggal={brief.brief_date}")
 
 
@@ -458,6 +499,7 @@ def insiden_detail(request, incident_id):
 
 
 @require_page("insiden")
+@require_writer_role
 @require_POST
 def insiden_promote(request, incident_id):
     incident = _get_incident(request, incident_id)
@@ -467,6 +509,7 @@ def insiden_promote(request, incident_id):
 
 
 @require_page("insiden")
+@require_writer_role
 @require_POST
 def insiden_assign(request, incident_id):
     from .models import OPD
@@ -481,6 +524,7 @@ def insiden_assign(request, incident_id):
 
 
 @require_page("insiden")
+@require_writer_role
 @require_POST
 def insiden_status(request, incident_id):
     incident = _get_incident(request, incident_id)
@@ -493,6 +537,7 @@ def insiden_status(request, incident_id):
 
 
 @require_page("insiden")
+@require_writer_role
 @require_POST
 def insiden_note(request, incident_id):
     incident = _get_incident(request, incident_id)
@@ -506,6 +551,7 @@ def insiden_note(request, incident_id):
 
 
 @require_page("insiden")
+@require_writer_role
 @require_POST
 def insiden_refresh(request):
     project = get_active_project(request)

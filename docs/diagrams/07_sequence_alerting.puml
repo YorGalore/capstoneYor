@@ -1,0 +1,39 @@
+@startuml 07_sequence_alerting
+!theme plain
+title Alur Sequence - Evaluasi Alert dan Pengiriman Notifikasi
+
+participant "governance.\nScheduledJob\n(evaluate_alerts)" as Sched
+participant "analytics.\nalerting.evaluate_rules()" as Alerting
+participant "AlertRule" as Rule
+participant "Mention\n(queryset window)" as Mention
+participant "Alert" as AlertModel
+participant "analytics.\nnotifications.deliver_alert()" as Notif
+participant "NotificationDelivery" as Delivery
+participant "SMTP / Webhook" as Channel
+
+Sched -> Alerting : evaluate_rules(project)
+activate Alerting
+Alerting -> Rule : ambil AlertRule aktif
+loop untuk setiap rule
+  Alerting -> Mention : query window_minutes terakhir
+  Alerting -> Alerting : _evaluate(rule)\n(negative_ratio / volume_spike)
+  alt ambang terlampaui AND belum ada Alert aktif
+    Alerting -> AlertModel : create(severity, title, detail)
+    Alerting -> Notif : deliver_alert(alert)
+    activate Notif
+    alt channel == email
+      Notif -> Channel : send_mail()
+    else channel == webhook
+      Notif -> Channel : POST JSON (Runtime Setting\nalerts.webhook_url)
+    else channel == push
+      Notif -> Notif : skip (belum ada integrasi)
+    end
+    Notif -> Delivery : create(status=sent/failed/skipped)
+    deactivate Notif
+  else sudah ada Alert aktif untuk rule ini
+    Alerting -> Alerting : lewati (dedup)
+  end
+end
+deactivate Alerting
+
+@enduml

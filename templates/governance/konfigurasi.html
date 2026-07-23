@@ -241,7 +241,7 @@
   <div class="pantau-card-title">Aktor Politik Publik</div>
   <div class="pantau-table-scroll">
     <table class="pantau-table">
-      <thead><tr><th>Nama</th><th>Jenis</th><th>Kubu</th><th>Kata kunci</th><th>Akun resmi</th><th>Status</th></tr></thead>
+      <thead><tr><th>Nama</th><th>Jenis</th><th>Kubu</th><th>Kata kunci</th><th>Akun resmi</th><th>Status</th><th></th></tr></thead>
       <tbody>
         {% for actor in actors %}
         <tr>
@@ -258,9 +258,15 @@
               </button>
             </form>
           </td>
+          <td>
+            <form method="post" action="{% url 'governance:delete_actor' actor.pk %}" class="pantau-inline-form">
+              {% csrf_token %}
+              <button type="submit" title="Hapus" {% if election_mode %}disabled{% endif %}>✕</button>
+            </form>
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6">Belum ada aktor politik terdaftar.</td></tr>
+        <tr><td colspan="7">Belum ada aktor politik terdaftar.</td></tr>
         {% endfor %}
       </tbody>
     </table>

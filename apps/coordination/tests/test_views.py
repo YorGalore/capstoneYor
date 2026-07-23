@@ -3,6 +3,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
+from apps.core.models import AnalystProfile
 from apps.core.seed import DEMO_USERNAME, seed_core
 from apps.analytics.seed import seed_analytics
 from apps.coordination.models import CoordinationCluster
@@ -30,13 +31,20 @@ class CoordinationViewsTest(TestCase):
         self.assertEqual(cluster.status, CoordinationCluster.STATUS_REVIEWED_ORGANIC)
         self.assertTrue(AuditLogEntry.objects.filter(target="Klaster-07").exists())
 
-    def test_escalate_cluster_logs_audit_without_changing_status(self):
-        self.client.post("/koordinasi/Klaster-07/eskalasi/")
+    def test_escalate_cluster_marks_status_and_logs_audit(self):
+        # ISS-KOORDINASI-001: escalation must be visible on the board, not only
+        # in the audit log, so an escalated cluster isn't silently re-escalated
+        # or missed by follow-up.
+        response = self.client.post("/koordinasi/Klaster-07/eskalasi/")
+        self.assertRedirects(response, "/koordinasi/?cluster=Klaster-07")
         cluster = CoordinationCluster.objects.get(cluster_code="Klaster-07")
-        self.assertEqual(cluster.status, CoordinationCluster.STATUS_FLAGGED)
+        self.assertEqual(cluster.status, CoordinationCluster.STATUS_ESCALATED)
         self.assertTrue(
             AuditLogEntry.objects.filter(action__icontains="tinjauan analis senior").exists()
         )
+        # The status persists across a fresh GET of the board.
+        follow_up = self.client.get("/koordinasi/?cluster=Klaster-07")
+        self.assertContains(follow_up, "Dieskalasi")
 
     def test_escalate_cluster_rejects_get(self):
         audit_count_before = AuditLogEntry.objects.count()
@@ -78,3 +86,36 @@ class CoordinationViewsTest(TestCase):
         cluster = CoordinationCluster.objects.get(cluster_code="Klaster-07")
         self.assertEqual(cluster.status, CoordinationCluster.STATUS_FLAGGED)
         self.assertEqual(AuditLogEntry.objects.count(), audit_count_before)
+
+
+class CoordinationWriteAccessTest(TestCase):
+    """ISS-KOORDINASI-002 / ISS-KOORDINASI-003: viewer must not be able to reach
+    the koordinasi page or its write actions once denied, and must never be able
+    to escalate/mark-organic regardless of the page-level grant."""
+
+    def setUp(self):
+        self.tenant, project = seed_core()
+        seed_analytics(project, mention_count=20)
+        seed_coordination()
+        self.viewer = get_user_model().objects.create(username="peninjau.koordinasi")
+        AnalystProfile.objects.update_or_create(
+            user=self.viewer,
+            defaults={"tenant": self.tenant, "role": AnalystProfile.ROLE_VIEWER},
+        )
+        self.client.force_login(self.viewer)
+
+    def test_viewer_can_view_board_by_default(self):
+        # koordinasi is a DASHBOARD_PAGES member, so read access is expected.
+        self.assertEqual(self.client.get("/koordinasi/").status_code, 200)
+
+    def test_viewer_cannot_escalate_cluster(self):
+        response = self.client.post("/koordinasi/Klaster-07/eskalasi/")
+        self.assertEqual(response.status_code, 403)
+        cluster = CoordinationCluster.objects.get(cluster_code="Klaster-07")
+        self.assertEqual(cluster.status, CoordinationCluster.STATUS_FLAGGED)
+
+    def test_viewer_cannot_mark_cluster_organic(self):
+        response = self.client.post("/koordinasi/Klaster-07/tandai-organik/")
+        self.assertEqual(response.status_code, 403)
+        cluster = CoordinationCluster.objects.get(cluster_code="Klaster-07")
+        self.assertEqual(cluster.status, CoordinationCluster.STATUS_FLAGGED)

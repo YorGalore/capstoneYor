@@ -1,0 +1,43 @@
+@startuml 10_sequence_coordination_detection
+!theme plain
+title Alur Sequence - Deteksi Coordinated Inauthentic Behavior (CIB)
+
+participant "ScheduledJob\n(detect_coordination)" as Job
+participant "governance.scheduling\n._run_detect_coordination()" as Runner
+participant "analytics.PoliticalIssue" as Issue
+participant "coordination.detection\n.detect()" as Detect
+participant "analytics.Mention" as Mention
+participant "CoordinationCluster" as Cluster
+participant "ClusterAccount" as Account
+participant "CoordinationSignal" as Signal
+participant "DuplicateTextSample" as Sample
+actor Analis
+participant "coordination.views" as View
+participant "AuditLogEntry" as Audit
+
+Job -> Runner : run_job()
+Runner -> Issue : iterasi PoliticalIssue aktif (project)
+loop untuk setiap issue aktif
+  Runner -> Detect : detect(project, issue, threshold=0.6)
+  activate Detect
+  Detect -> Mention : ambil mention terkait issue
+  Detect -> Detect : kelompokkan near-duplicate\n(Jaccard token similarity)
+  Detect -> Detect : filter >= 2 author_handle berbeda
+  Detect -> Detect : skor = 0.45*text_sim + 0.35*time_sync\n+ 0.20*shared_media
+  alt skor >= threshold
+    Detect -> Cluster : create(status=FLAGGED, score)
+    Detect -> Account : create per akun (role=amplifier)
+    Detect -> Signal : create per jenis sinyal
+    Detect -> Sample : create hingga 5 sampel teks duplikat
+  end
+  deactivate Detect
+end
+
+== Tinjauan Analis (manual, tidak ada aksi otomatis ke akun) ==
+Analis -> View : GET koordinasi/
+View -> Cluster : tampilkan daftar cluster + detail
+Analis -> View : POST eskalasi/ atau tandai-organik/
+View -> Cluster : update status (jika tandai organik)
+View -> Audit : record_audit_entry()
+
+@enduml

@@ -46,6 +46,10 @@ class BriefNotReviewed(Exception):
     """All issues must be approved by a human before finalizing (FR-30.3)."""
 
 
+class BriefNotFinal(Exception):
+    """Only a finalized brief can be reopened for revision."""
+
+
 def _shortlist(project, brief_date):
     """Pick the issues worth briefing leadership on, by negative sentiment or volume."""
     rows = (
@@ -235,6 +239,20 @@ def reorder(brief, ordered_issue_ids):
     return brief
 
 
+def _strip_draft_banner(content):
+    """Remove the generation-time draft banner from finalized content.
+
+    _compose() always puts DRAFT_BANNER as the literal first line followed by a
+    blank line (see above) — a finalized brief has been reviewed and locked, so
+    the "belum diverifikasi" disclaimer is no longer true and must not ship to
+    the institution's official record.
+    """
+    if not content.startswith(DRAFT_BANNER):
+        return content
+    return content[len(DRAFT_BANNER):].lstrip("\n")
+
+
+@transaction.atomic
 def finalize(brief, finalized_by):
     """Lock the brief. Every issue must have been reviewed first (FR-30.3/30.4)."""
     _assert_editable(brief)
@@ -242,8 +260,26 @@ def finalize(brief, finalized_by):
         raise BriefNotReviewed(
             "Setiap isu harus ditinjau dan disetujui sebelum brief difinalisasi."
         )
+    for item in brief.issues.all():
+        stripped = _strip_draft_banner(item.content)
+        if stripped != item.content:
+            item.content = stripped
+            item.save(update_fields=["content"])
     brief.status = DailyBrief.STATUS_FINAL
     brief.finalized_by = finalized_by
     brief.finalized_at = timezone.now()
+    brief.save(update_fields=["status", "finalized_by", "finalized_at"])
+    return brief
+
+
+def reopen(brief, actor):
+    """Reopen a finalized brief back to Draft for emergency correction (FR-30.4
+    exception). Restricted to Tenant Admin / Super Admin at the view layer — this
+    function itself only enforces the state transition, not who may call it."""
+    if brief.status != DailyBrief.STATUS_FINAL:
+        raise BriefNotFinal("Hanya brief berstatus Final yang dapat dibuka kembali.")
+    brief.status = DailyBrief.STATUS_DRAFT
+    brief.finalized_by = ""
+    brief.finalized_at = None
     brief.save(update_fields=["status", "finalized_by", "finalized_at"])
     return brief

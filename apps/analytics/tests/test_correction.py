@@ -22,6 +22,7 @@ class SentimentCorrectionTest(TestCase):
         )
         self.super_admin = self._user("super", AnalystProfile.ROLE_SUPER_ADMIN)
         self.analyst = self._user("analis", AnalystProfile.ROLE_ANALYST)
+        self.viewer = self._user("peninjau", AnalystProfile.ROLE_VIEWER)
 
     def _user(self, name, role):
         user = User.objects.create(username=name)
@@ -53,8 +54,22 @@ class SentimentCorrectionTest(TestCase):
         self.assertEqual(correction.new_value, Mention.SENTIMENT_POSITIVE)
         self.assertTrue(correction.corrected_by)
 
-    def test_correction_requires_feed_access(self):
-        self.client.force_login(self.analyst)  # analyst denied feed by default
+    def test_analyst_has_feed_write_access_by_default(self):
+        # ISS-FW-001: sentiment correction (FR-5.3) is core Analyst work, so this
+        # must succeed without any manual permission-matrix grant.
+        self.client.force_login(self.analyst)
+        response = self.client.post(
+            reverse("analytics:correct_sentiment", args=[self.mention.pk]),
+            {"sentiment": Mention.SENTIMENT_NEGATIVE},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.mention.refresh_from_db()
+        self.assertEqual(self.mention.sentiment, Mention.SENTIMENT_NEGATIVE)
+
+    def test_viewer_cannot_correct_sentiment(self):
+        # Peninjau gets default read access to the feed (ISS-FW-001) but must
+        # still be blocked from writing — require_writer_role closes that gap.
+        self.client.force_login(self.viewer)
         response = self.client.post(
             reverse("analytics:correct_sentiment", args=[self.mention.pk]),
             {"sentiment": Mention.SENTIMENT_NEGATIVE},

@@ -290,7 +290,7 @@ class ScheduledJob(models.Model):
         (JOB_COLLECT, "Koleksi data"),
         (JOB_EVALUATE_ALERTS, "Evaluasi peringatan"),
         (JOB_DETECT_COORDINATION, "Deteksi koordinasi"),
-        (JOB_GENERATE_BRIEF, "Brief harian"),
+        (JOB_GENERATE_BRIEF, "Sorotan"),
         (JOB_PURGE_RETENTION, "Purge retensi"),
         (JOB_ENRICH_AUTHORS, "Normalisasi penulis"),
         (JOB_SEND_BRIEF, "Distribusi brief final"),

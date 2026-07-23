@@ -37,6 +37,16 @@ class DefaultMatrixTest(TestCase):
         self.assertTrue(is_reserved(R.ROLE_TENANT_ADMIN, DEV_OPS_PAGE))
         self.assertFalse(is_reserved(R.ROLE_TENANT_ADMIN, "konfigurasi"))
 
+    def test_analyst_has_default_feed_access(self):
+        # ISS-FW-001: sentiment correction (FR-5.3) is core Analyst work, so feed
+        # access should not require a manual permission-matrix grant.
+        self.assertTrue(can_access(R.ROLE_ANALYST, "feed"))
+
+    def test_onboarding_requests_reserved_for_super_admin(self):
+        self.assertTrue(is_reserved(R.ROLE_TENANT_ADMIN, "onboarding_requests"))
+        self.assertFalse(can_access(R.ROLE_TENANT_ADMIN, "onboarding_requests"))
+        self.assertTrue(can_access(R.ROLE_SUPER_ADMIN, "onboarding_requests"))
+
 
 class MatrixOverrideTest(TestCase):
     def test_explicit_row_overrides_default(self):

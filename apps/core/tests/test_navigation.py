@@ -1,7 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
+from django.urls import reverse
 
+from apps.core.models import AnalystProfile, Tenant
 from apps.core.seed import DEMO_USERNAME, seed_core
 
 
@@ -50,3 +52,49 @@ class NavigationSmokeTest(TestCase):
         seed_core()
         self.client.force_login(get_user_model().objects.get(username=DEMO_USERNAME))
         self.assertEqual(self.client.get("/narasi/").status_code, 403)
+
+
+class SidebarDisabledLinkTest(TestCase):
+    """UX-ISSUE-001: a role denied 'konfigurasi'/'pengawasan' must see a
+    non-clickable label instead of a link that leads to a 403."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="Instansi A")
+        self.viewer = get_user_model().objects.create(username="peninjau.sidebar")
+        AnalystProfile.objects.update_or_create(
+            user=self.viewer,
+            defaults={"tenant": self.tenant, "role": AnalystProfile.ROLE_VIEWER},
+        )
+
+    def test_viewer_sees_disabled_konfigurasi_and_pengawasan_links(self):
+        self.client.force_login(self.viewer)
+        response = self.client.get(reverse("analytics:ringkasan"))
+        self.assertContains(
+            response, '<span class="pantau-nav-item disabled" title="Akses dibatasi">Konfigurasi</span>',
+            html=True,
+        )
+        self.assertContains(
+            response, '<span class="pantau-nav-item disabled" title="Akses dibatasi">Pengawasan</span>',
+            html=True,
+        )
+
+    def test_tenant_admin_sees_active_konfigurasi_and_pengawasan_links(self):
+        tenant_admin = get_user_model().objects.create(username="admin.sidebar")
+        AnalystProfile.objects.update_or_create(
+            user=tenant_admin,
+            defaults={"tenant": self.tenant, "role": AnalystProfile.ROLE_TENANT_ADMIN},
+        )
+        self.client.force_login(tenant_admin)
+        response = self.client.get(reverse("analytics:ringkasan"))
+        self.assertContains(response, 'href="/konfigurasi/"')
+        self.assertContains(response, 'href="/pengawasan/"')
+
+    def test_sidebar_shows_rbac_role_alongside_job_title(self):
+        # AUTH-ISSUE-001: role_label is free text and can drift from the
+        # technical RBAC role, so both must be visible.
+        self.viewer.analyst_profile.role_label = "Staf Humas"
+        self.viewer.analyst_profile.save(update_fields=["role_label"])
+        self.client.force_login(self.viewer)
+        response = self.client.get(reverse("analytics:ringkasan"))
+        self.assertContains(response, "Staf Humas")
+        self.assertContains(response, "Peninjau")

@@ -27,6 +27,7 @@ urlpatterns = [
     path("konfigurasi/kubu/<int:pk>/hapus/", views.delete_camp, name="delete_camp"),
     path("konfigurasi/aktor/tambah/", views.add_actor, name="add_actor"),
     path("konfigurasi/aktor/<int:pk>/toggle/", views.toggle_actor, name="toggle_actor"),
+    path("konfigurasi/aktor/<int:pk>/hapus/", views.delete_actor, name="delete_actor"),
     path("konfigurasi/program/tambah/", views.add_program, name="add_program"),
     path("konfigurasi/program/<int:pk>/hapus/", views.delete_program, name="delete_program"),
     path("pengawasan/", views.pengawasan, name="pengawasan"),

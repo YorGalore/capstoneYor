@@ -29,24 +29,27 @@ PAGES = [
     ("laporan", "Laporan"),
     ("konfigurasi", "Konfigurasi"),
     ("pengawasan", "Pengawasan"),
-    ("brief", "Brief Harian"),
+    ("brief", "Sorotan"),
     ("taxonomy", "Taksonomi Isu"),
     ("export", "Ekspor Data"),
     ("permission_matrix", "Matriks Izin Halaman"),
     ("runtime_settings", "Pengaturan Dev/Ops"),
+    ("onboarding_requests", "Permintaan Demo"),
 ]
 PAGE_LABELS = dict(PAGES)
 
 DEV_OPS_PAGE = "runtime_settings"
 # Pages reserved to the Super Admin only — never grantable to another role.
-SUPER_ADMIN_ONLY_PAGES = {DEV_OPS_PAGE, "permission_matrix"}
+SUPER_ADMIN_ONLY_PAGES = {DEV_OPS_PAGE, "permission_matrix", "onboarding_requests"}
 
 # The Daily Brief is written for the Spokesperson/Pimpinan persona and reviewed by
 # Analysts (FR-30.3), so both roles reach it by default — unlike the operational
-# "tool" pages, which stay denied by default (FR-1A.1).
+# "tool" pages, which stay denied by default (FR-1A.1). "feed" also defaults in:
+# sentiment correction (FR-5.3) is core Analyst work, not an opt-in extra an admin
+# has to remember to grant.
 DASHBOARD_PAGES = {
     "ringkasan", "narasi", "war_room", "koordinasi", "regional", "brief",
-    "sosiograf", "laporan", "insiden",
+    "sosiograf", "laporan", "insiden", "feed",
 }
 ROLES = [R.ROLE_SUPER_ADMIN, R.ROLE_TENANT_ADMIN, R.ROLE_ANALYST, R.ROLE_VIEWER]
 
@@ -112,6 +115,48 @@ def require_page(page):
         def wrapped(request, *args, **kwargs):
             if not user_can_access(request.user, page):
                 raise PermissionDenied(f"Akses ditolak untuk halaman: {page}")
+            return view(request, *args, **kwargs)
+
+        return wrapped
+
+    return decorator
+
+
+def require_writer_role(view):
+    """Restrict a write action to roles above Peninjau (viewer), independent of the
+    page-level read gate.
+
+    Several DASHBOARD_PAGES entries (war_room, brief, insiden) intentionally grant
+    Peninjau default *read* access, since viewing is exactly what a read-only role
+    is for. But that same page-level grant would also cover a mutating POST view
+    decorated only with @require_page, letting a viewer write into an auditable
+    timeline it can only legitimately observe. This decorator closes that gap for
+    the write action specifically, leaving the page's read access untouched.
+    """
+
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        profile = getattr(request.user, "analyst_profile", None)
+        if profile is None or profile.role == AnalystProfile.ROLE_VIEWER:
+            raise PermissionDenied("Peran Peninjau tidak memiliki akses tulis pada halaman ini.")
+        return view(request, *args, **kwargs)
+
+    return wrapped
+
+
+def require_role_at_least(*roles):
+    """Restrict a view to an explicit set of roles, stricter than require_writer_role.
+
+    Used for actions that only make sense for Tenant Admin / Super Admin even though
+    Analyst can otherwise write to the same page (e.g. reopening a finalized brief).
+    """
+
+    def decorator(view):
+        @wraps(view)
+        def wrapped(request, *args, **kwargs):
+            profile = getattr(request.user, "analyst_profile", None)
+            if profile is None or profile.role not in roles:
+                raise PermissionDenied("Peran Anda tidak memiliki akses untuk aksi ini.")
             return view(request, *args, **kwargs)
 
         return wrapped

@@ -10,4 +10,5 @@ urlpatterns = [
     path("mulai/berhasil/", views.onboarding_success, name="onboarding_success"),
     path("artikel/<slug:slug>/", views.article_detail, name="artikel_detail"),
     path("profil/", views.profile, name="profile"),
+    path("mulai/permintaan/", views.onboarding_requests, name="onboarding_requests"),
 ]

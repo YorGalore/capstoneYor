@@ -9,6 +9,43 @@
   {% endif %}
 {% endblock %}
 {% block content %}
+{% if summary.insight %}
+<div class="pantau-insight pantau-insight-{{ summary.insight.tone }}">
+  <div class="pantau-insight-icon">{% if summary.insight.tone == 'negative' %}!{% elif summary.insight.tone == 'positive' %}✓{% else %}i{% endif %}</div>
+  <div>
+    <div class="pantau-insight-headline">{{ summary.insight.headline }}</div>
+    <div class="pantau-insight-detail">{{ summary.insight.detail }}</div>
+  </div>
+  {% if summary.insight.volume_change_pct %}
+  <div class="pantau-insight-trend {% if summary.insight.volume_change_pct > 0 %}up{% else %}down{% endif %}">
+    Volume 7 hari
+    <b>{% if summary.insight.volume_change_pct > 0 %}+{% endif %}{{ summary.insight.volume_change_pct }}%</b>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="pantau-quick-actions">
+  <a class="pantau-quick-action" href="{% url 'analytics:war_room' %}">
+    <div class="pantau-quick-action-title">War Room</div>
+    <div class="pantau-quick-action-sub">Tanggap isu aktif real-time</div>
+  </a>
+  <a class="pantau-quick-action" href="{% url 'analytics:insiden' %}">
+    <div class="pantau-quick-action-title">Tinjau Insiden{% if alerts %} · {{ alerts|length }}{% endif %}</div>
+    <div class="pantau-quick-action-sub">Peringatan yang perlu ditindak</div>
+  </a>
+  {% if can_view_taxonomy %}
+  <a class="pantau-quick-action" href="{% url 'analytics:taxonomy' %}">
+    <div class="pantau-quick-action-title">Label Antrean</div>
+    <div class="pantau-quick-action-sub">Klasifikasi konten baru</div>
+  </a>
+  {% endif %}
+  <a class="pantau-quick-action" href="{% url 'analytics:laporan' %}">
+    <div class="pantau-quick-action-title">Susun Laporan</div>
+    <div class="pantau-quick-action-sub">Rekap &amp; ekspor periode</div>
+  </a>
+</div>
+
 <div class="pantau-kpi-row">
   <div class="pantau-card">
     <div class="pantau-kpi-label">Total Sebutan</div>

@@ -178,3 +178,18 @@ class WarRoomResponseLogTest(TestCase):
             "action_type": ResponseAction.ACTION_STATEMENT, "description": "",
         })
         self.assertEqual(ResponseAction.objects.count(), 0)
+
+    def test_viewer_cannot_log_a_response_action(self):
+        # ISS-FW-002: war_room is a DASHBOARD_PAGES member (Peninjau gets default
+        # read access to the timeline), so logging into it needs its own gate.
+        viewer = User.objects.create(username="peninjau.warroom")
+        AnalystProfile.objects.update_or_create(
+            user=viewer, defaults={"tenant": self.tenant, "role": AnalystProfile.ROLE_VIEWER}
+        )
+        self.client.force_login(viewer)
+        response = self.client.post(reverse("analytics:log_response", args=[self.issue.pk]), {
+            "action_type": ResponseAction.ACTION_CLARIFICATION,
+            "description": "Entri palsu dari peninjau",
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(ResponseAction.objects.count(), 0)

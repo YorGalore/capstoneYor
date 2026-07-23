@@ -1,0 +1,89 @@
+@startuml 04_analytics_class_brief_alert
+!theme plain
+title apps.analytics - Diagram Kelas (Alert, Notifikasi & Daily Brief)
+
+class "core.Project" as Project
+
+class AlertRule {
+  + name: CharField
+  + condition_summary: CharField
+  + channel: Choice(email, push, webhook)
+  + condition_type: Choice(negative_ratio, volume_spike)
+  + threshold: Float
+  + window_minutes: PositiveInt
+  + is_active: Boolean
+}
+
+class Alert {
+  + severity: Choice(info, warning, critical)
+  + title: CharField
+  + detail: TextField
+  + triggered_at: DateTime
+  + status: Choice(active, resolved)
+}
+
+class NotificationDelivery {
+  + kind: Choice(alert, brief)
+  + channel: CharField
+  + subject: CharField
+  + recipients: JSONField
+  + status: Choice(sent, failed, skipped)
+  + detail: TextField
+  + created_at: DateTime(auto_now_add)
+}
+
+class DailyBrief {
+  + brief_date: DateField
+  + status: Choice(pending, generating, draft, final, failed)
+  + finalized_by: CharField
+  + finalized_at: DateTime(null)
+  + created_at: DateTime(auto_now_add)
+  .. Meta ..
+  unique_together(project, brief_date)
+  .. property ..
+  + is_locked() : status == FINAL
+}
+
+class DailyBriefIssue {
+  + title: CharField
+  + content: TextField
+  + preview_summary: CharField
+  + risk_level: CharField = "low"
+  + order: PositiveInt
+  + approved: Boolean
+  + edited_by: CharField
+  + regulatory_context: JSONField
+  + mention_count: PositiveInt
+  + negative_pct: Float
+}
+
+class DailyBriefRun {
+  + triggered_by: CharField
+  + started_at: DateTime(auto_now_add)
+  + completed_at: DateTime(null)
+  + succeeded: Boolean
+  + detail: TextField
+}
+
+class "PoliticalIssue" as PI
+
+Project "1" *-- "many" AlertRule
+Project "1" *-- "many" Alert
+Project "1" *-- "many" DailyBrief
+Project "1" *-- "many" NotificationDelivery
+
+AlertRule "1" *-- "many" Alert
+PI "1" -- "many" Alert : SET_NULL
+
+DailyBrief "1" *-- "many" DailyBriefIssue
+DailyBrief "1" *-- "many" DailyBriefRun
+DailyBrief "1" -- "many" NotificationDelivery
+Alert "1" -- "many" NotificationDelivery
+
+note bottom of NotificationDelivery
+  Ditulis oleh apps.analytics.notifications
+  untuk setiap upaya pengiriman
+  (email / webhook / push-skipped)
+end note
+
+@enduml

@@ -25,7 +25,7 @@ class Command(BaseCommand):
 
         brief_date = (
             parse_date(options["date"]) if options["date"]
-            else (timezone.now() - timezone.timedelta(days=1)).date()
+            else timezone.localdate() - timezone.timedelta(days=1)
         )
         try:
             brief = briefs.generate(project, brief_date, triggered_by="terjadwal")

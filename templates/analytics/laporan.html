@@ -70,15 +70,15 @@
     </div>
   </div>
   <div class="pantau-card pantau-laporan-arsip">
-    <div class="pantau-card-title">Arsip Brief Harian <span class="mono-muted">— {{ summary.final_count }} final · {{ summary.draft_count }} belum final</span></div>
+    <div class="pantau-card-title">Arsip Sorotan <span class="mono-muted">— {{ summary.final_count }} final · {{ summary.draft_count }} belum final</span></div>
     {% for brief in summary.briefs %}
       <div class="pantau-region-row">
-        <a href="{% url 'analytics:brief' %}?tanggal={{ brief.brief_date|date:'Y-m-d' }}">Brief {{ brief.brief_date|date:"l, j F Y" }}</a>
+        <a href="{% url 'analytics:brief' %}?tanggal={{ brief.brief_date|date:'Y-m-d' }}">Sorotan {{ brief.brief_date|date:"l, j F Y" }}</a>
         <span class="pantau-badge{% if brief.is_locked %} pantau-badge-positive{% endif %}">{{ brief.get_status_display }}</span>
         <a class="pantau-btn-outline pantau-btn-small" href="{% url 'analytics:brief_print' brief.pk %}" target="_blank" rel="noopener">🖨 Cetak</a>
       </div>
     {% empty %}
-      <span class="mono-muted">Belum ada brief harian. Buat dari halaman Brief Harian.</span>
+      <span class="mono-muted">Belum ada sorotan. Buat dari halaman Sorotan.</span>
     {% endfor %}
   </div>
 </div>

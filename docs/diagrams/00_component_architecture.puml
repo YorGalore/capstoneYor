@@ -1,0 +1,87 @@
+@startuml 00_component_architecture
+!theme plain
+title PANTAU - Diagram Komponen Arsitektur Sistem
+
+skinparam componentStyle rectangle
+skinparam wrapWidth 200
+
+package "Django Project: pantau" {
+  component "pantau.urls\n(Root URLConf)" as urls
+  component "pantau.settings\n(Env-driven config)" as settings
+  component "pantau.wsgi" as wsgi
+  component "pantau.health\n(/healthz/)" as health
+}
+
+package "apps.core\n(Tenancy & Akses)" as core {
+  component "models\nTenant, Project, Platform,\nAnalystProfile, PagePermission,\nProvince, Regency, OnboardingRequest" as core_models
+  component "permissions.py\n(require_page, RBAC)" as core_perms
+  component "selectors.py\n(scope_to_tenant)" as core_sel
+  component "rbac.py\n(pending user, lockout guard)" as core_rbac
+  component "context_processors.py\n(tenant_context)" as core_ctx
+  component "views.py\n(landing, onboarding, profile)" as core_views
+  component "seed.py / demo_kulon_progo.py" as core_seed
+}
+
+package "apps.analytics\n(Intelijen & Brief)" as analytics {
+  component "models\nMention, Author, AlertRule,\nAlert, PoliticalIssue, Issue,\nDailyBrief, NotificationDelivery, ..." as an_models
+  component "selectors.py\n(agregasi dashboard)" as an_sel
+  component "alerting.py\n(evaluate_rules)" as an_alert
+  component "notifications.py\n(deliver_alert, send_brief)" as an_notif
+  component "authors.py\n(link_authors, influence)" as an_authors
+  component "taxonomy.py\n(auto_label, merge_issues)" as an_tax
+  component "briefs.py\n(generate, finalize)" as an_briefs
+  component "views.py" as an_views
+}
+
+package "apps.governance\n(Kontrol & Konfigurasi)" as governance {
+  component "models\nPlatformIntegration, ApifyCredential,\nRuntimeSetting, ScheduledJob,\nCollectionRun, AuditLogEntry, ..." as gov_models
+  component "scheduling.py\n(run_due, kill switch)" as gov_sched
+  component "orchestrator.py\n(run_apify_collection)" as gov_orch
+  component "apify.py / apify_crawler.py" as gov_apify
+  component "portal_crawler.py / scraping.py\n(respectful news crawler)" as gov_crawler
+  component "ingestion.py" as gov_ingest
+  component "crypto.py\n(Fernet encrypt/decrypt)" as gov_crypto
+  component "regulatory.py\n(retrieve, classify_risk)" as gov_reg
+  component "views.py\n(konfigurasi, dev-ops)" as gov_views
+}
+
+package "apps.coordination\n(Deteksi CIB)" as coordination {
+  component "models\nCoordinationCluster, ClusterAccount,\nCoordinationSignal, DuplicateTextSample" as co_models
+  component "detection.py\n(detect - Jaccard similarity)" as co_detect
+  component "views.py\n(koordinasi, escalate)" as co_views
+}
+
+database "PostgreSQL" as db
+
+urls --> core_views
+urls --> an_views
+urls --> gov_views
+urls --> co_views
+
+core_ctx ..> core_sel
+an_views ..> core_perms : "@require_page"
+gov_views ..> core_perms
+co_views ..> core_perms
+
+an_alert --> an_notif : "deliver_alert()"
+an_briefs --> gov_reg : "retrieve() / classify_risk()"
+gov_sched --> an_alert : "evaluate_rules()"
+gov_sched --> an_briefs : "generate() / \nnotifications.send_brief()"
+gov_sched --> an_authors : "enrich()"
+gov_sched --> co_detect : "detect()"
+gov_sched --> gov_orch : "run_apify_collection()"
+gov_orch --> gov_apify
+gov_orch --> gov_ingest
+gov_ingest --> an_models : "simpan Mention"
+gov_crawler --> gov_ingest
+co_detect --> an_models : "baca Mention"
+co_models --> an_models : "FK PoliticalIssue"
+
+core_models --> db
+an_models --> db
+gov_models --> db
+co_models --> db
+
+health --> db : "ensure_connection()"
+
+@enduml

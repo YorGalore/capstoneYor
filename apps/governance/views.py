@@ -215,6 +215,23 @@ def toggle_actor(request, pk):
 @require_page("konfigurasi")
 @require_POST
 @transaction.atomic
+def delete_actor(request, pk):
+    if neutrality.election_mode_active():
+        messages.error(request, "Konfigurasi politik dibekukan selama periode pemilu (§8.5).")
+        return redirect("governance:konfigurasi")
+    actor = get_object_or_404(PoliticalActor, pk=pk, project=_current_project(request))
+    label = actor.name
+    actor.delete()
+    record_audit_entry(
+        actor_label=_actor_label(request), action="Menghapus aktor politik", target=label,
+    )
+    messages.success(request, f'Aktor politik "{label}" dihapus.')
+    return redirect("governance:konfigurasi")
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
 def add_program(request):
     form = GovernmentProgramForm(request.POST, project=_current_project(request))
     if form.is_valid():

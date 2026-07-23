@@ -1,0 +1,48 @@
+@startuml 08_sequence_brief_generation
+!theme plain
+title Alur Sequence - Pembuatan Daily Brief hingga Finalisasi
+
+actor Analis
+participant "analytics.views\n(generate_brief)" as View
+participant "analytics.briefs" as Briefs
+participant "DailyBrief" as Brief
+participant "DailyBriefRun" as Run
+participant "governance.regulatory" as Reg
+participant "DailyBriefIssue" as BriefIssue
+participant "analytics.notifications\n(send_brief)" as Notif
+
+Analis -> View : POST brief/buat/
+View -> Briefs : generate(project, brief_date, triggered_by)
+activate Briefs
+Briefs -> Brief : _claim() [select_for_update]\nstatus = GENERATING
+Briefs -> Run : create()
+Briefs -> Briefs : _shortlist()\n(min 3 mention, min 40% negatif,\nmaks 8 isu)
+loop untuk setiap isu terpilih
+  Briefs -> Briefs : _grounding_query(issue)
+  Briefs -> Reg : retrieve(query, limit=2)
+  Reg --> Briefs : dokumen regulasi terkait
+  Briefs -> Reg : classify_risk(...)
+  Reg --> Briefs : risk_level
+  Briefs -> Briefs : _compose()\n(template deterministik + DRAFT_BANNER)
+  Briefs -> BriefIssue : create(title, content, risk_level, ...)
+end
+Briefs -> Brief : status = DRAFT
+Briefs -> Run : completed_at, succeeded=True
+deactivate Briefs
+
+== Tinjauan Manusia (wajib) ==
+Analis -> View : POST tinjau/ (edit / approve per isu)
+View -> Briefs : approve_issue() [blocked jika is_locked]
+
+Analis -> View : POST finalisasi/
+View -> Briefs : finalize(brief, finalized_by)
+alt ada isu belum di-approve
+  Briefs --> View : raise BriefNotReviewed
+else semua isu approved
+  Briefs -> Brief : status = FINAL, finalized_by/at
+  Briefs -> Notif : send_brief(brief)\n(dipicu scheduler job send_brief)
+  Notif -> Notif : brief_already_sent()? (exactly-once)
+  Notif -> Notif : _send_email(brief.issues)
+end
+
+@enduml

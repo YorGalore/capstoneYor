@@ -1,0 +1,152 @@
+@startuml 03_analytics_class_content
+!theme plain
+title apps.analytics - Diagram Kelas (Konten, Taksonomi & Aktor)
+
+class "core.Project" as Project
+class "core.Platform" as Platform
+class "core.Province" as Province
+class "core.Regency" as Regency
+
+class Coalition {
+  + name: CharField
+  + slug: SlugField(unique)
+  + stance: Choice(petahana, penantang)
+  + color: CharField
+}
+
+class PoliticalIssue {
+  + title: CharField
+  + status: Choice(active, closed)
+  + opened_at: DateTime
+  + owner_label: CharField
+}
+
+class Camp {
+  + name: CharField
+  + color: CharField = "#7C8A99"
+  + is_user_defined: Boolean = True
+  .. Meta ..
+  unique_together(project, name)
+}
+
+class PoliticalActor {
+  + name: CharField
+  + actor_type: Choice(party, coalition, official, organization)
+  + keywords: JSONField
+  + handles: JSONField
+  + is_active: Boolean
+}
+
+class GovernmentProgram {
+  + name: CharField
+  + agency: CharField
+  + keywords: JSONField
+  + is_active: Boolean
+}
+
+class Author {
+  + handle: CharField
+  + display_name: CharField
+  + follower_count: PositiveInt
+  + influence_score: Decimal(6,2)
+  .. Meta ..
+  unique_together(platform, handle)
+}
+
+class Mention {
+  + author_handle: CharField
+  + external_id: CharField(unique, null)
+  + content_snippet: TextField
+  + theme: CharField
+  + sentiment: Choice(pos, neu, neg)
+  + sentiment_confidence: Float
+  + sentiment_model: CharField
+  + emotion: Choice(8x Plutchik)
+  + emotion_labels: JSONField
+  + posted_at: DateTime [indexed]
+  + engagement_count: PositiveInt
+  + reach_estimate: PositiveInt
+  + is_political: Boolean [indexed]
+  + source_url: URLField(unique, null)
+  + matched_keyword: CharField
+  + is_scraped: Boolean
+}
+
+class LabelCorrection {
+  + field: Choice(sentiment, emotion)
+  + old_value: CharField
+  + new_value: CharField
+  + corrected_by: CharField
+  + corrected_at: DateTime(auto_now_add)
+}
+
+class Category {
+  + name: CharField(unique)
+  + is_active: Boolean
+}
+
+class SubCategory {
+  + name: CharField
+  + is_active: Boolean
+  .. Meta ..
+  unique_together(category, name)
+}
+
+class Issue {
+  + name: CharField
+  + keywords: JSONField
+  + is_active: Boolean
+}
+
+class IssueLabel {
+  + source: Choice(auto, manual)
+  + decided_by: CharField
+  + decided_at: DateTime(auto_now)
+}
+
+class IssueMergeHistory {
+  + source_issue_ids: JSONField
+  + moved: JSONField
+  + performed_by: CharField
+  + performed_at: DateTime
+  + reversed_at: DateTime(null)
+}
+
+class ResponseAction {
+  + action_type: Choice(statement, clarification, briefing, escalation, other)
+  + description: TextField
+  + logged_by: CharField
+  + occurred_at: DateTime
+}
+
+Project "1" *-- "many" PoliticalIssue
+Project "1" *-- "many" Camp
+Project "1" *-- "many" PoliticalActor
+Project "1" *-- "many" GovernmentProgram
+Project "1" *-- "many" Mention
+
+Platform "1" -- "many" Author
+Platform "1" -- "many" Mention : PROTECT
+
+Province "1" -- "many" Mention : SET_NULL
+Regency "1" -- "many" Mention : SET_NULL
+
+Author "1" -- "many" Mention : SET_NULL
+Coalition "1" -- "many" Mention : SET_NULL
+PoliticalIssue "1" -- "many" Mention : SET_NULL
+GovernmentProgram "1" -- "many" Mention : SET_NULL
+Mention "many" -- "many" PoliticalActor : political_actors (M2M)
+
+Camp "1" -- "many" PoliticalActor : SET_NULL
+
+Mention "1" -- "many" LabelCorrection
+Mention "1" -- "1" IssueLabel
+
+Category "1" *-- "many" SubCategory
+SubCategory "1" *-- "many" Issue
+Issue "1" -- "many" IssueLabel
+Issue "1" -- "many" IssueMergeHistory : target_issue
+
+PoliticalIssue "1" -- "many" ResponseAction
+
+@enduml

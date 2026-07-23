@@ -21,8 +21,11 @@
   <div>{{ request.user.email|default:"—" }}</div>
 
   {% if profile %}
-  <div class="pantau-kpi-label" style="margin-top: 12px;">Peran</div>
+  <div class="pantau-kpi-label" style="margin-top: 12px;">Jabatan</div>
   <div>{{ profile.role_label }}</div>
+
+  <div class="pantau-kpi-label" style="margin-top: 12px;">Peran Akses (RBAC)</div>
+  <div>{{ profile.get_role_display }}</div>
 
   <div class="pantau-kpi-label" style="margin-top: 12px;">Instansi</div>
   <div>{{ profile.tenant.name }}</div>

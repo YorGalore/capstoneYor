@@ -52,7 +52,19 @@ def ringkasan_summary(project, days=30):
     positive_pct = next(
         (s["pct"] for s in sentiment_breakdown if s["key"] == Mention.SENTIMENT_POSITIVE), 0
     )
+    negative_pct = next(
+        (s["pct"] for s in sentiment_breakdown if s["key"] == Mention.SENTIMENT_NEGATIVE), 0
+    )
     health_index = round((positive_pct * 0.7) + (min(total_mentions, 5000) / 5000 * 30))
+
+    insight = _ringkasan_insight(
+        timeline=timeline,
+        total_mentions=total_mentions,
+        positive_pct=positive_pct,
+        negative_pct=negative_pct,
+        emotion_breakdown=emotion_breakdown,
+        source_breakdown=source_breakdown,
+    )
 
     return {
         "total_mentions": total_mentions,
@@ -64,6 +76,65 @@ def ringkasan_summary(project, days=30):
         "timeline_chart": timeline_chart(timeline),
         "health_index": health_index,
         "positive_pct": positive_pct,
+        "negative_pct": negative_pct,
+        "insight": insight,
+    }
+
+
+def _ringkasan_insight(*, timeline, total_mentions, positive_pct, negative_pct,
+                       emotion_breakdown, source_breakdown):
+    """Turn the raw numbers into a one-line read of the situation so the landing page
+    leads with meaning, not just counts. Returns a headline, supporting detail, and a
+    tone the template uses to colour the banner (positive / negative / neutral)."""
+    # Volume momentum: last 7 days of the window vs the 7 before it.
+    def _window_total(days_slice):
+        return sum(d["positive"] + d["neutral"] + d["negative"] for d in days_slice)
+
+    recent = _window_total(timeline[-7:])
+    prior = _window_total(timeline[-14:-7])
+    if prior:
+        volume_change_pct = round(((recent - prior) / prior) * 100)
+    else:
+        volume_change_pct = 100 if recent else 0
+
+    dominant_emotion = emotion_breakdown[0] if emotion_breakdown else None
+    top_source = source_breakdown[0] if source_breakdown else None
+
+    if total_mentions == 0:
+        return {
+            "tone": "neutral",
+            "headline": "Belum ada sebutan pada periode ini",
+            "detail": "Belum ada data untuk dianalisis. Pastikan kata kunci pemantauan aktif.",
+            "volume_change_pct": 0,
+        }
+
+    if negative_pct >= 35 or (negative_pct >= 25 and volume_change_pct >= 25):
+        tone = "negative"
+        headline = f"Perhatian: {negative_pct}% sebutan bernada negatif"
+    elif positive_pct >= 50 and volume_change_pct >= 0:
+        tone = "positive"
+        headline = f"Kondisi sehat: {positive_pct}% sebutan positif"
+    else:
+        tone = "neutral"
+        headline = "Sentimen relatif seimbang, pantau perkembangan"
+
+    detail_parts = []
+    if volume_change_pct > 5:
+        detail_parts.append(f"volume sebutan naik {volume_change_pct}% dibanding minggu lalu")
+    elif volume_change_pct < -5:
+        detail_parts.append(f"volume sebutan turun {abs(volume_change_pct)}% dibanding minggu lalu")
+    else:
+        detail_parts.append("volume sebutan relatif stabil")
+    if dominant_emotion and dominant_emotion["pct"]:
+        detail_parts.append(f"emosi dominan {dominant_emotion['label'].lower()} ({dominant_emotion['pct']}%)")
+    if top_source:
+        detail_parts.append(f"terbanyak dari {top_source['name']}")
+
+    return {
+        "tone": tone,
+        "headline": headline,
+        "detail": ", ".join(detail_parts).capitalize() + ".",
+        "volume_change_pct": volume_change_pct,
     }
 
 

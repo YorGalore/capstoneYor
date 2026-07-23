@@ -3,7 +3,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from apps.analytics.models import Mention
+from apps.analytics.models import Mention, PoliticalActor
 from apps.core.seed import DEMO_USERNAME, seed_core
 from apps.governance.models import (
     AuditLogEntry, ManualCollectionRequest, MonitoredDomain, MonitoringKeyword,
@@ -126,6 +126,40 @@ class KonfigurasiViewTest(TestCase):
         response = self.client.post("/konfigurasi/pindai/")
         self.assertRedirects(response, "/konfigurasi/")
         self.assertEqual(Mention.objects.filter(is_scraped=True).count(), 0)
+
+    def test_delete_actor_removes_row(self):
+        # ISS-KONFIGURASI-005: actors were previously toggle-only, with no way to
+        # clean up a mis-entered (e.g. typo'd) actor.
+        actor = PoliticalActor.objects.create(
+            project=self.project, name="Nama Salah Ketik", actor_type=PoliticalActor.TYPE_OFFICIAL,
+        )
+        response = self.client.post(f"/konfigurasi/aktor/{actor.pk}/hapus/")
+        self.assertRedirects(response, "/konfigurasi/")
+        self.assertFalse(PoliticalActor.objects.filter(pk=actor.pk).exists())
+        self.assertTrue(AuditLogEntry.objects.filter(action__icontains="Menghapus aktor politik").exists())
+
+    def test_add_domain_rejects_whitespace(self):
+        # ISS-KONFIGURASI-004
+        response = self.client.post("/konfigurasi/domain/tambah/", {
+            "domain": "domain tanpa titik dan spasi", "adapter": "RSS",
+            "feed_url": "https://example.go.id/rss.xml",
+        })
+        self.assertRedirects(response, "/konfigurasi/")
+        self.assertFalse(MonitoredDomain.objects.filter(domain__icontains=" ").exists())
+
+    def test_add_domain_rejects_missing_tld(self):
+        response = self.client.post("/konfigurasi/domain/tambah/", {
+            "domain": "localhost", "adapter": "RSS", "feed_url": "https://example.go.id/rss.xml",
+        })
+        self.assertRedirects(response, "/konfigurasi/")
+        self.assertFalse(MonitoredDomain.objects.filter(domain="localhost").exists())
+
+    def test_add_domain_accepts_well_formed_domain(self):
+        response = self.client.post("/konfigurasi/domain/tambah/", {
+            "domain": "jogja.tribunnews.com", "adapter": "RSS", "feed_url": "https://example.go.id/rss.xml",
+        })
+        self.assertRedirects(response, "/konfigurasi/")
+        self.assertTrue(MonitoredDomain.objects.filter(domain="jogja.tribunnews.com").exists())
 
 
 class PengawasanViewTest(TestCase):

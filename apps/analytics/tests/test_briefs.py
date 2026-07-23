@@ -29,7 +29,7 @@ class BriefGenerationTest(TestCase):
                 "paling lambat 14 hari sejak penetapan."
             ),
         )
-        self.yesterday = (timezone.now() - timedelta(days=1)).date()
+        self.yesterday = timezone.localdate() - timedelta(days=1)
 
     def _mention(self, sentiment, text="bansos terlambat disalurkan"):
         posted = timezone.now() - timedelta(days=1)

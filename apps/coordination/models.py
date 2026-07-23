@@ -5,10 +5,12 @@ from apps.analytics.models import PoliticalIssue
 
 class CoordinationCluster(models.Model):
     STATUS_FLAGGED = "flagged"
+    STATUS_ESCALATED = "escalated"
     STATUS_REVIEWED_ORGANIC = "reviewed_organic"
     STATUS_IGNORED = "ignored"
     STATUS_CHOICES = [
         (STATUS_FLAGGED, "Ditandai"),
+        (STATUS_ESCALATED, "Dieskalasi"),
         (STATUS_REVIEWED_ORGANIC, "Ditinjau — Organik"),
         (STATUS_IGNORED, "Diabaikan"),
     ]

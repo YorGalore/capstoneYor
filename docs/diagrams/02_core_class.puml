@@ -1,0 +1,78 @@
+@startuml 02_core_class
+!theme plain
+title apps.core - Diagram Kelas
+
+class Tenant {
+  + name: CharField(200)
+}
+
+class OnboardingRequest {
+  + organization_type: Choice(brand, government)
+  + organization_name: CharField(200)
+  + contact_name: CharField(150)
+  + work_email: EmailField
+  + phone: CharField(30)
+  + role: CharField(120)
+  + monitoring_goal: TextField
+  + platforms: CharField(300)
+  + team_size: CharField(50)
+  + consent: BooleanField
+  + status: CharField(30) = "new"
+  + created_at: DateTime(auto_now_add)
+}
+
+class Project {
+  + name: CharField(200)
+}
+
+class Platform {
+  + slug: SlugField(unique)
+  + display_name: CharField(100)
+  + brand_color: CharField(7) = "#0E7C86"
+  + method: Choice(apify, internal)
+}
+
+class Province {
+  + name: CharField(100, unique)
+  + population_online: PositiveInt = 0
+}
+
+class Regency {
+  + name: CharField(100)
+}
+
+class PagePermission {
+  + role: CharField(20)
+  + page: CharField(50)
+  + can_access: Boolean = False
+  + updated_by: CharField(150)
+  + updated_at: DateTime(auto_now)
+  .. Meta ..
+  unique_together(role, page)
+}
+
+class AnalystProfile {
+  + role_label: CharField(100) = "Analis Humas"
+  + role: Choice(super_admin, tenant_admin, analyst, viewer)
+  .. properties ..
+  + has_political_monitoring_permission()
+  + is_super_admin()
+  + is_tenant_admin()
+}
+
+class "User\n(AUTH_USER_MODEL)" as DjangoUser
+
+Tenant "1" *-- "many" Project : project_set >
+Tenant "1" *-- "many" AnalystProfile : analysts >
+Province "1" *-- "many" Regency : regencies >
+DjangoUser "1" -- "1" AnalystProfile : user (O2O, CASCADE)
+AnalystProfile "many" --> "1" Tenant
+
+note right of AnalystProfile
+  has_political_monitoring_permission
+  dihitung langsung dari
+  apps.governance.PoliticalMonitoringPermission
+  (tidak diduplikasi di core)
+end note
+
+@enduml

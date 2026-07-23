@@ -1,0 +1,51 @@
+@startuml 06_coordination_class
+!theme plain
+title apps.coordination - Diagram Kelas
+
+class "analytics.PoliticalIssue" as PoliticalIssue
+class "analytics.Mention" as Mention
+
+class CoordinationCluster {
+  + cluster_code: CharField(30, unique)
+  + score: Decimal(3,2)
+  + status: Choice(flagged, reviewed_organic, ignored)
+  + account_count: PositiveInt
+  + detected_at: DateTime
+  + note: CharField(255)
+  .. Meta ..
+  ordering = ["-score"]
+}
+
+class ClusterAccount {
+  + handle: CharField(150)
+  + role: Choice(hub, amplifier, satellite)
+  + reach: PositiveInt
+  + post_count: PositiveInt
+}
+
+class CoordinationSignal {
+  + signal_type: Choice(text_similarity, time_sync,\naccount_age, shared_media)
+  + score: Decimal(3,2)
+}
+
+class DuplicateTextSample {
+  + account_handle: CharField(150)
+  + posted_at: DateTime
+  + text: TextField
+  + highlighted_phrase: CharField(255)
+}
+
+PoliticalIssue "1" *-- "many" CoordinationCluster
+CoordinationCluster "1" *-- "many" ClusterAccount
+CoordinationCluster "1" *-- "many" CoordinationSignal
+CoordinationCluster "1" *-- "many" DuplicateTextSample
+CoordinationCluster ..> Mention : dibangun dari (detection.py)
+
+note bottom of CoordinationCluster
+  Skor komposit = 0.45*text_similarity
+  + 0.35*time_sync + 0.20*shared_media
+  Ambang default 0.6; minimal 2 akun berbeda.
+  Tidak pernah otomatis menindak akun (FR-26.2).
+end note
+
+@enduml

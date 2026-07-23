@@ -1,10 +1,19 @@
 from django.contrib.auth.decorators import login_not_required
 from django.http import Http404
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
 from .articles import ARTICLES, get_article
 from .forms import OnboardingRequestForm
-from .models import AnalystProfile
+from .models import AnalystProfile, OnboardingRequest
+from .permissions import require_page
+
+# A second submission with the same email + organization within this window is
+# almost certainly the same lead re-submitting (double-click, browser back, retry
+# after a network hiccup), not a genuinely new request — so we don't create a
+# duplicate row, but we also don't tell the public form that (avoids leaking
+# whether a given organization/email has already contacted us).
+DUPLICATE_WINDOW_DAYS = 7
 
 
 @login_not_required
@@ -25,7 +34,15 @@ def onboarding(request):
     if request.method == "POST":
         form = OnboardingRequestForm(request.POST)
         if form.is_valid():
-            form.save()
+            cutoff = timezone.now() - timezone.timedelta(days=DUPLICATE_WINDOW_DAYS)
+            duplicate = OnboardingRequest.objects.filter(
+                work_email__iexact=form.cleaned_data["work_email"],
+                organization_name__iexact=form.cleaned_data["organization_name"],
+                created_at__gte=cutoff,
+            ).exists()
+            if not duplicate:
+                form.save()
+            request.session["onboarding_submitted"] = True
             return redirect("core:onboarding_success")
     else:
         form = OnboardingRequestForm(initial={"organization_type": initial_type})
@@ -34,6 +51,8 @@ def onboarding(request):
 
 @login_not_required
 def onboarding_success(request):
+    if not request.session.pop("onboarding_submitted", False):
+        return redirect("core:onboarding")
     return render(request, "core/onboarding_success.html")
 
 
@@ -53,4 +72,15 @@ def profile(request):
     return render(request, "core/profile.html", {
         "active_nav": "profile",
         "profile": analyst_profile,
+    })
+
+
+@require_page("onboarding_requests")
+def onboarding_requests(request):
+    """First-party list of public demo requests (OnboardingRequest), so a Platform
+    Super Admin can verify submissions without needing Django-admin staff/model
+    permissions — AnalystProfile.role is intentionally not wired into is_staff."""
+    return render(request, "core/onboarding_requests.html", {
+        "active_nav": "onboarding_requests",
+        "requests": OnboardingRequest.objects.all()[:200],
     })

@@ -1,8 +1,18 @@
+import re
+
 from django import forms
 
 from apps.analytics.models import AlertRule, Camp, GovernmentProgram, PoliticalActor
 
 from .models import MonitoredDomain, MonitoringKeyword
+
+# Bare hostname, e.g. "antaranews.com" or "jogja.tribunnews.com" — no scheme, no
+# path, no whitespace, at least one dot (a real TLD). Deliberately conservative:
+# rejecting a borderline-valid domain is cheap (the operator retypes it), while
+# accepting "domain tanpa titik" silently breaks collection several layers away.
+_DOMAIN_RE = re.compile(
+    r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+)
 
 
 class _CommaSeparatedListField(forms.CharField):
@@ -44,6 +54,10 @@ class MonitoredDomainForm(forms.ModelForm):
 
     def clean_domain(self):
         domain = self.cleaned_data["domain"].strip().lower()
+        if not _DOMAIN_RE.match(domain):
+            raise forms.ValidationError(
+                "Format domain tidak valid — gunakan nama domain tanpa spasi, mis. contoh.go.id."
+            )
         if MonitoredDomain.objects.filter(project=self.project, domain=domain).exists():
             raise forms.ValidationError("Domain ini sudah dipantau dalam proyek aktif.")
         return domain

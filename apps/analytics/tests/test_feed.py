@@ -39,10 +39,21 @@ class FeedViewTest(TestCase):
         )
         return user
 
-    def test_analyst_denied_feed_by_default(self):
+    def test_analyst_has_feed_access_by_default(self):
+        # ISS-FW-001: sentiment correction (FR-5.3) is core Analyst work, so read
+        # access to the feed it operates on must not require a manual grant.
         self.client.force_login(self.analyst)
         response = self.client.get(reverse("analytics:feed"))
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+
+    def test_viewer_has_read_only_feed_access_by_default(self):
+        # Feed joined DASHBOARD_PAGES (ISS-FW-001), so Peninjau's default read
+        # access follows too — consistent with every other dashboard page.
+        # Write access (sentiment correction) stays blocked; see test_correction.py.
+        viewer = self._user("peninjau", AnalystProfile.ROLE_VIEWER, self.tenant_a)
+        self.client.force_login(viewer)
+        response = self.client.get(reverse("analytics:feed"))
+        self.assertEqual(response.status_code, 200)
 
     def test_super_admin_sees_feed(self):
         self.client.force_login(self.super_admin)

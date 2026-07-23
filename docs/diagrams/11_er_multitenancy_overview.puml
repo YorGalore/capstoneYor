@@ -1,0 +1,87 @@
+@startuml 11_er_multitenancy_overview
+!theme plain
+title Diagram ER - Ringkasan Multi-Tenancy Lintas Modul
+
+entity Tenant {
+  *id
+  --
+  name
+}
+
+entity Project {
+  *id
+  --
+  tenant_id (FK)
+  name
+}
+
+entity AnalystProfile {
+  *id
+  --
+  user_id (FK, O2O)
+  tenant_id (FK)
+  role
+}
+
+package "apps.analytics (scoped ke Project)" {
+  entity Mention
+  entity PoliticalIssue
+  entity AlertRule
+  entity Alert
+  entity Camp
+  entity PoliticalActor
+  entity GovernmentProgram
+  entity DailyBrief
+  entity NotificationDelivery
+}
+
+package "apps.governance (scoped ke Project via ProjectOwnedModel)" {
+  entity PlatformIntegration
+  entity ApifyCredential
+  entity MonitoredDomain
+  entity MonitoringKeyword
+  entity CollectionRun
+  entity ManualCollectionRequest
+  entity ScheduledJob
+}
+
+package "apps.governance (scoped ke Tenant)" {
+  entity PolicyAcknowledgment
+}
+
+package "apps.coordination (scoped tidak langsung, via PoliticalIssue)" {
+  entity CoordinationCluster
+}
+
+Tenant ||--o{ Project
+Tenant ||--o{ AnalystProfile
+Tenant ||--o{ PolicyAcknowledgment
+
+Project ||--o{ Mention
+Project ||--o{ PoliticalIssue
+Project ||--o{ AlertRule
+Project ||--o{ Alert
+Project ||--o{ Camp
+Project ||--o{ PoliticalActor
+Project ||--o{ GovernmentProgram
+Project ||--o{ DailyBrief
+Project ||--o{ NotificationDelivery
+Project ||--o{ PlatformIntegration
+Project ||--o{ ApifyCredential
+Project ||--o{ MonitoredDomain
+Project ||--o{ MonitoringKeyword
+Project ||--o{ CollectionRun
+Project ||--o{ ManualCollectionRequest
+Project ||--o{ ScheduledJob
+
+PoliticalIssue ||--o{ CoordinationCluster
+
+note bottom of Project
+  Mekanisme isolasi tenant tunggal:
+  apps.core.selectors.scope_to_tenant(qs, request, project_path)
+  memfilter setiap queryset lewat {project_path}__tenant=active_tenant.
+  Kebocoran lintas-tenant pada PoliticalIssue pernah terjadi
+  dan telah ditutup (lihat commit 1ad5abf, FR-1.2).
+end note
+
+@enduml

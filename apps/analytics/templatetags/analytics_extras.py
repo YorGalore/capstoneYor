@@ -41,10 +41,10 @@ def _inline(text):
 
 @register.filter
 def incident_body(content):
-    """Render the deterministic markdown the incident composer produces —
-    `## subheading`, `- bullet`, `**bold**`, blank-line paragraphs — as clean,
-    escaped HTML. Intentionally tiny: it handles exactly what `incidents.py`
-    writes and nothing more, so it can never render untrusted markup."""
+    """Render the deterministic markdown our composers produce — `## heading`,
+    `### subheading`, `- bullet`, `**bold**`, blank-line paragraphs — as clean,
+    escaped HTML. Intentionally tiny: it handles exactly what `incidents.py` and
+    `briefs.py` write and nothing more, so it can never render untrusted markup."""
     body = strip_draft_banner(content)
     if not body:
         return ""
@@ -63,7 +63,10 @@ def incident_body(content):
         if not line:
             close_list()
             continue
-        if line.startswith("## "):
+        if line.startswith("### "):
+            close_list()
+            html.append(f"<h5 class=\"incident-narrative-subsub\">{_inline(line[4:])}</h5>")
+        elif line.startswith("## "):
             close_list()
             html.append(f"<h4 class=\"incident-narrative-sub\">{_inline(line[3:])}</h4>")
         elif line.startswith("- "):
@@ -77,6 +80,18 @@ def incident_body(content):
 
     close_list()
     return mark_safe("".join(html))
+
+
+@register.filter
+def brief_body(content):
+    """Same renderer, for brief sections. A brief section already prints its own
+    numbered title and risk chip, so the `## title` the composer repeats as the
+    first body line is dropped to avoid showing the title twice."""
+    body = strip_draft_banner(content)
+    lines = body.split("\n")
+    if lines and lines[0].strip().startswith("## "):
+        lines = lines[1:]
+    return incident_body("\n".join(lines).lstrip("\n"))
 
 
 # Contextual glyph for an incident, matched on issue keywords. Decorative only —

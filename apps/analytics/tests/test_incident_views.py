@@ -183,6 +183,67 @@ class IncidentActionTest(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class IncidentWriteAccessTest(TestCase):
+    """ISS-FW-003: insiden is a DASHBOARD_PAGES member (Peninjau gets default read
+    access to the board), so mutation actions need their own role check."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="Instansi A")
+        self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
+        self.viewer = get_user_model().objects.create(username="peninjau.insiden")
+        AnalystProfile.objects.update_or_create(
+            user=self.viewer,
+            defaults={"tenant": self.tenant, "role": AnalystProfile.ROLE_VIEWER},
+        )
+        self.client.force_login(self.viewer)
+        self.opd = OPD.objects.create(
+            project=self.project, name="Dinas Pekerjaan Umum", slug="pu-viewer", abbr="PU"
+        )
+        self.incident = Incident.objects.create(
+            project=self.project, title="Jalan Rusak", severity=Incident.SEVERITY_HIGH,
+        )
+
+    def test_viewer_can_view_board_and_detail(self):
+        self.assertEqual(self.client.get(reverse("analytics:insiden")).status_code, 200)
+        self.assertEqual(
+            self.client.get(reverse("analytics:insiden_detail", args=[self.incident.pk])).status_code,
+            200,
+        )
+
+    def test_viewer_cannot_promote_candidate(self):
+        response = self.client.post(reverse("analytics:insiden_promote", args=[self.incident.pk]))
+        self.assertEqual(response.status_code, 403)
+        self.incident.refresh_from_db()
+        self.assertFalse(self.incident.is_confirmed)
+
+    def test_viewer_cannot_assign_opd(self):
+        response = self.client.post(
+            reverse("analytics:insiden_assign", args=[self.incident.pk]), {"opd": self.opd.pk},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.incident.refresh_from_db()
+        self.assertIsNone(self.incident.assigned_opd)
+
+    def test_viewer_cannot_change_status(self):
+        response = self.client.post(
+            reverse("analytics:insiden_status", args=[self.incident.pk]),
+            {"status": Incident.STATUS_ASSIGNED},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_viewer_cannot_add_note(self):
+        response = self.client.post(
+            reverse("analytics:insiden_note", args=[self.incident.pk]),
+            {"description": "Catatan dari peninjau"},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(self.incident.events.filter(description="Catatan dari peninjau").exists())
+
+    def test_viewer_cannot_trigger_refresh(self):
+        response = self.client.post(reverse("analytics:insiden_refresh"))
+        self.assertEqual(response.status_code, 403)
+
+
 class DemoSeedTest(TestCase):
     def setUp(self):
         # seed_kulon_progo_demo() reuses the shared platform/reference rows created

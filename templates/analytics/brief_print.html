@@ -1,4 +1,5 @@
 {% load static %}
+{% load analytics_extras %}
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -14,7 +15,14 @@
     .meta { display: flex; justify-content: space-between; font: 11px 'Arial', sans-serif; color: #475569; margin-top: 10px; }
     h2 { font: 700 15px 'Arial', sans-serif; margin: 22px 0 6px; }
     .stats { font: 11px 'Arial', sans-serif; color: #64748B; margin-bottom: 8px; }
-    .content { white-space: pre-wrap; margin-bottom: 6px; }
+    .content { margin-bottom: 6px; }
+    .content p { margin: 6px 0; }
+    .content ul { margin: 6px 0 8px 20px; }
+    .content li { margin: 2px 0; }
+    .content h4 { font: 700 13px 'Arial', sans-serif; margin: 10px 0 4px; }
+    .content h5 { font: 700 11px 'Arial', sans-serif; text-transform: uppercase; letter-spacing: .5px; color: #475569; margin: 12px 0 4px; }
+    .draft-notice { border: 1px solid #C6483F; border-left: 4px solid #C6483F; background: #FDF4F3; padding: 10px 12px; margin-bottom: 20px; font: 11.5px/1.5 'Arial', sans-serif; color: #7A2E28; }
+    .draft-notice strong { display: block; margin-bottom: 2px; }
     .risk { display: inline-block; font: 700 10px 'Arial', sans-serif; padding: 2px 8px; border: 1px solid #1a2332; border-radius: 3px; margin-left: 8px; vertical-align: 2px; text-transform: uppercase; }
     .regulasi { margin: 8px 0 0 16px; padding-left: 12px; border-left: 3px solid #CBD5E1; font-size: 12px; color: #334155; }
     .regulasi-src { font: 700 10px 'Arial', sans-serif; color: #64748B; }
@@ -43,17 +51,23 @@
     </div>
   </header>
 
+  {% if not brief.is_locked %}
+  <div class="draft-notice">
+    <strong>DRAF — dihasilkan AI, menunggu tinjauan manusia.</strong>
+    Isi dokumen ini belum diverifikasi. Angka, kutipan, dan rujukan regulasi wajib diperiksa terhadap sumber aslinya sebelum dikutip publik. Bukan pernyataan resmi institusi.
+  </div>
+  {% endif %}
+
   {% for item in brief.issues.all %}
     <section>
-      <h2>{{ forloop.counter }}. {{ item.title }}<span class="risk">Risiko: {{ item.risk_level }}</span></h2>
+      <h2>{{ forloop.counter }}. {{ item.title }} <span class="risk">Risiko: {{ risk_labels|get_item:item.risk_level }}</span></h2>
       <div class="stats">{{ item.mention_count }} sebutan · {{ item.negative_pct }}% negatif{% if not item.approved %} · BELUM DITINJAU{% endif %}</div>
-      <div class="content">{{ item.content }}</div>
-      {% for ref in item.regulatory_context %}
-        <div class="regulasi">
-          <div class="regulasi-src">{{ ref.source_ref }}</div>
-          “{{ ref.passage }}”
-        </div>
-      {% endfor %}
+      {% comment %}
+        The composed body already carries a "Dasar regulasi" section with the
+        same source refs and passages, so regulatory_context is not repeated
+        here — printing both showed every citation twice.
+      {% endcomment %}
+      <div class="content">{{ item.content|brief_body }}</div>
     </section>
   {% empty %}
     <p>Tidak ada isu yang memenuhi ambang prioritas pada tanggal ini.</p>

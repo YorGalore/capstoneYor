@@ -1,0 +1,140 @@
+@startuml 05_governance_class
+!theme plain
+title apps.governance - Diagram Kelas
+
+abstract class ProjectOwnedModel {
+  + project: FK(core.Project, CASCADE)
+}
+
+class "core.Project" as Project
+class "core.Platform" as Platform
+class "core.Tenant" as Tenant
+
+class PlatformIntegration {
+  + method: Choice(apify, internal)
+  + actor_id: CharField(150)
+  + is_active: Boolean = True
+  + status_note: CharField(255)
+  .. Meta ..
+  UniqueConstraint(project, platform)
+}
+
+class ApifyCredential {
+  + masked_token: CharField(100)
+  + token_encrypted: TextField
+  + status: Choice(active, invalid, revoked)
+  + last_verified_at: DateTime(null)
+}
+
+class RuntimeSetting {
+  + key: CharField(150, unique)
+  + value: TextField
+  + is_secret: Boolean
+  + scope: CharField(50) = "platform"
+  + updated_by: CharField(150)
+  + updated_at: DateTime(auto_now)
+}
+
+class MonitoredDomain {
+  + domain: CharField(200)
+  + adapter: CharField(100)
+  + status: Choice(active, needs_review, inactive)
+  + last_tested_at: DateTime(null)
+  + feed_url: URLField(500)
+  .. Meta ..
+  UniqueConstraint(project, domain)
+}
+
+class MonitoringKeyword {
+  + keyword: CharField(150)
+  + is_active: Boolean = True
+  + match_count: PositiveInt = 0
+  + created_at: DateTime(auto_now_add)
+  + created_by: CharField(150)
+  .. Meta ..
+  UniqueConstraint(project, keyword)
+}
+
+class PoliticalMonitoringPermission {
+  + approved_by: CharField(150)
+  + approved_at: DateTime
+  + active: Boolean = True
+  + revoked_at: DateTime(null)
+}
+
+class AuditLogEntry {
+  + timestamp: DateTime(auto_now_add)
+  + actor_label: CharField(150)
+  + action: CharField(255)
+  + target: CharField(150)
+  .. append-only ..
+  update()/delete() -> ValidationError
+}
+
+class RegulatoryDocument {
+  + title: CharField(300)
+  + source_ref: CharField(200)
+  + body: TextField
+  + indexed_at: DateTime(auto_now)
+  + retired_at: DateTime(null)
+  .. property ..
+  + is_active() : retired_at is None
+}
+
+class CollectionRun {
+  + source: CharField(50)
+  + status: Choice(running, completed, failed, skipped)
+  + keywords_count: PositiveInt
+  + items_found: PositiveInt
+  + cost_estimate: Decimal(10,4)
+  + error: CharField(500)
+  + started_at: DateTime(auto_now_add)
+  + finished_at: DateTime(null)
+}
+
+class ManualCollectionRequest {
+  + collection_type: Choice(social, news)
+  + status: Choice(queued, running, completed, failed, skipped) [indexed]
+  + requested_by: CharField(150)
+  + requested_at: DateTime(auto_now_add)
+  + started_at, finished_at: DateTime(null)
+  + items_found: PositiveInt
+  + sources_processed: PositiveInt
+  + detail: CharField(500)
+  .. Index ..
+  (status, requested_at)
+}
+
+class ScheduledJob {
+  + job_type: Choice(collect, evaluate_alerts,\ndetect_coordination, generate_brief,\npurge_retention, enrich_authors, send_brief)
+  + cadence_minutes: PositiveInt = 60
+  + enabled: Boolean = True
+  + next_run_at: DateTime [indexed]
+  + last_run_at: DateTime(null)
+  + last_status: Choice(ok, failed, skipped)
+  + last_error: CharField(500)
+  + last_detail: CharField(255)
+  + consecutive_failures: PositiveInt = 0
+  .. Meta ..
+  unique_together(project, job_type)
+}
+
+class PolicyAcknowledgment {
+  + approved_by: CharField(150)
+  + approved_at: DateTime
+  + next_review_at: DateTime
+}
+
+ProjectOwnedModel <|-- PlatformIntegration
+ProjectOwnedModel <|-- ApifyCredential
+ProjectOwnedModel <|-- MonitoredDomain
+ProjectOwnedModel <|-- MonitoringKeyword
+ProjectOwnedModel <|-- CollectionRun
+ProjectOwnedModel <|-- ManualCollectionRequest
+
+Project "1" o-- ProjectOwnedModel
+Platform "1" -- "many" PlatformIntegration
+Tenant "1" *-- "many" PolicyAcknowledgment
+Project "1" *-- "many" ScheduledJob
+
+@enduml

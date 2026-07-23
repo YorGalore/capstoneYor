@@ -8,38 +8,55 @@
   </div>
   <nav class="pantau-nav">
     <a class="pantau-nav-item{% if active_nav == 'ringkasan' %} active{% endif %}" href="{% url 'analytics:ringkasan' %}">Ringkasan</a>
+
+    <div class="pantau-nav-group-label">Pantau</div>
     {% if can_view_feed %}
     <a class="pantau-nav-item{% if active_nav == 'feed' %} active{% endif %}" href="{% url 'analytics:feed' %}">Umpan Sebutan</a>
     {% else %}
     <span class="pantau-nav-item disabled" title="Akses dibatasi">Umpan Sebutan</span>
     {% endif %}
+    <a class="pantau-nav-item{% if active_nav == 'regional' %} active{% endif %}" href="{% url 'analytics:regional' %}">Regional</a>
+    <a class="pantau-nav-item{% if active_nav == 'sosiograf' %} active{% endif %}" href="{% url 'analytics:sosiograf' %}">Sosiograf</a>
+
+    <div class="pantau-nav-group-label">Analisis</div>
     {% if can_view_taxonomy %}
     <a class="pantau-nav-item{% if active_nav == 'taxonomy' %} active{% endif %}" href="{% url 'analytics:taxonomy' %}">Taksonomi Isu</a>
     {% else %}
     <span class="pantau-nav-item disabled" title="Akses dibatasi">Taksonomi Isu</span>
     {% endif %}
     <a class="pantau-nav-item{% if active_nav == 'narasi' %} active{% endif %}" href="{% url 'analytics:narasi' %}">Narasi Politik</a>
-    <a class="pantau-nav-item{% if active_nav == 'war_room' %} active{% endif %}" href="{% url 'analytics:war_room' %}">War Room</a>
-    <a class="pantau-nav-item{% if active_nav == 'insiden' %} active{% endif %}" href="{% url 'analytics:insiden' %}">Insiden</a>
     <a class="pantau-nav-item{% if active_nav == 'koordinasi' %} active{% endif %}" href="{% url 'coordination:koordinasi' %}">Deteksi Koordinasi</a>
-    <a class="pantau-nav-item{% if active_nav == 'regional' %} active{% endif %}" href="{% url 'analytics:regional' %}">Regional</a>
-    <a class="pantau-nav-item{% if active_nav == 'sosiograf' %} active{% endif %}" href="{% url 'analytics:sosiograf' %}">Sosiograf</a>
-    <a class="pantau-nav-item{% if active_nav == 'brief' %} active{% endif %}" href="{% url 'analytics:brief' %}">Brief Harian</a>
+
+    <div class="pantau-nav-group-label">Tanggap</div>
+    <a class="pantau-nav-item{% if active_nav == 'insiden' %} active{% endif %}" href="{% url 'analytics:insiden' %}">Insiden</a>
+    <a class="pantau-nav-item{% if active_nav == 'war_room' %} active{% endif %}" href="{% url 'analytics:war_room' %}">War Room</a>
+
+    <div class="pantau-nav-group-label">Laporan</div>
+    <a class="pantau-nav-item{% if active_nav == 'brief' %} active{% endif %}" href="{% url 'analytics:brief' %}">Sorotan</a>
     <a class="pantau-nav-item{% if active_nav == 'laporan' %} active{% endif %}" href="{% url 'analytics:laporan' %}">Laporan</a>
   </nav>
   <div class="pantau-nav-footer">
+    {% if can_view_konfigurasi %}
     <a class="pantau-nav-item{% if active_nav == 'konfigurasi' %} active{% endif %}" href="{% url 'governance:konfigurasi' %}">Konfigurasi</a>
+    {% else %}
+    <span class="pantau-nav-item disabled" title="Akses dibatasi">Konfigurasi</span>
+    {% endif %}
+    {% if can_view_pengawasan %}
     <a class="pantau-nav-item{% if active_nav == 'pengawasan' %} active{% endif %}" href="{% url 'governance:pengawasan' %}">Pengawasan</a>
+    {% else %}
+    <span class="pantau-nav-item disabled" title="Akses dibatasi">Pengawasan</span>
+    {% endif %}
     {% if analyst_profile.is_super_admin %}
     <a class="pantau-nav-item{% if active_nav == 'permission_matrix' %} active{% endif %}" href="{% url 'governance:permission_matrix' %}">Matriks Izin</a>
     <a class="pantau-nav-item{% if active_nav == 'runtime_settings' %} active{% endif %}" href="{% url 'governance:runtime_settings' %}">Dev/Ops</a>
+    <a class="pantau-nav-item{% if active_nav == 'onboarding_requests' %} active{% endif %}" href="{% url 'core:onboarding_requests' %}">Permintaan Demo</a>
     {% endif %}
     {% if analyst_profile %}
     <a class="pantau-user" href="{% url 'core:profile' %}">
       <div class="pantau-user-avatar">{{ analyst_profile.user.first_name|slice:":1" }}{{ analyst_profile.user.last_name|slice:":1" }}</div>
       <div>
         <div class="pantau-user-name">{{ analyst_profile.user.get_full_name }}</div>
-        <div class="pantau-user-role">{{ analyst_profile.role_label }}</div>
+        <div class="pantau-user-role">{{ analyst_profile.role_label }} &middot; {{ analyst_profile.get_role_display }}</div>
       </div>
     </a>
     {% endif %}

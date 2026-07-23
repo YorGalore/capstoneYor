@@ -9,7 +9,7 @@
       <a class="pantau-card pantau-cluster-card{% if cluster == selected %} pantau-cluster-selected{% endif %}" href="?cluster={{ cluster.cluster_code }}">
         <div class="pantau-card-header">
           <span class="mono-strong">{{ cluster.cluster_code }}</span>
-          <span class="pantau-badge pantau-badge-{% if cluster.status == 'flagged' %}warning{% elif cluster.status == 'reviewed_organic' %}positive{% else %}neutral{% endif %}">{{ cluster.get_status_display }}</span>
+          <span class="pantau-badge pantau-badge-{% if cluster.status == 'flagged' %}warning{% elif cluster.status == 'escalated' %}info{% elif cluster.status == 'reviewed_organic' %}positive{% else %}neutral{% endif %}">{{ cluster.get_status_display }}</span>
         </div>
         <div class="pantau-cluster-score">{{ cluster.score }}</div>
         <div class="mono-muted">{{ cluster.note }}</div>

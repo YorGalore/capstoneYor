@@ -1,72 +1,173 @@
 {% extends "core/base_dashboard.html" %}
 {% block title %}Umpan Sebutan{% endblock %}
+{% block body_class %}page-feed{% endblock %}
 {% block content %}
-<div class="pantau-page-head">
-  <h1 class="pantau-page-title">Umpan Sebutan</h1>
-  <p class="pantau-page-sub">Aliran mention mentah dari koleksi Apify &amp; berita — saring per platform, sentimen, dan penulis (FR-3.1).</p>
-</div>
+<main class="feed-page">
+  <header class="feed-head">
+    <div>
+      <div class="feed-eyebrow"><span></span> Operasi pemantauan</div>
+      <h1 class="feed-title">Umpan Sebutan</h1>
+      <p class="feed-lead">Percakapan publik terbaru dari media sosial dan berita daring, siap ditinjau dalam satu aliran kerja.</p>
+    </div>
+    <div class="feed-live" aria-label="Status aliran data">
+      <span class="feed-live-dot"></span>
+      <span>
+        <strong>Aliran aktif</strong>
+        <small>Urutan terbaru</small>
+      </span>
+    </div>
+  </header>
 
-<div class="pantau-card">
-  <form method="get" class="pantau-inline-form">
-    <select class="pantau-input" name="platform">
-      <option value="">Semua platform</option>
-      {% for p in platforms %}
-      <option value="{{ p.slug }}" {% if filters.platform == p.slug %}selected{% endif %}>{{ p.display_name }}</option>
-      {% endfor %}
-    </select>
-    <select class="pantau-input" name="sentiment">
-      <option value="">Semua sentimen</option>
-      {% for key, label in sentiment_choices %}
-      <option value="{{ key }}" {% if filters.sentiment == key %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-    <input class="pantau-input" type="text" name="author" value="{{ filters.author }}" placeholder="Penulis mengandung…">
-    <button type="submit" class="pantau-btn">Saring</button>
-  </form>
-</div>
+  <section class="feed-filter-panel" aria-labelledby="feed-filter-title">
+    <div class="feed-filter-intro">
+      <span class="feed-filter-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M4 6h16M7 12h10M10 18h4"/>
+        </svg>
+      </span>
+      <span>
+        <strong id="feed-filter-title">Saring percakapan</strong>
+        <small>Persempit hasil tanpa kehilangan konteks.</small>
+      </span>
+    </div>
+    <form method="get" class="feed-filter-form">
+      <label class="feed-field">
+        <span>Platform</span>
+        <select class="pantau-input" name="platform">
+          <option value="">Semua platform</option>
+          {% for p in platforms %}
+          <option value="{{ p.slug }}" {% if filters.platform == p.slug %}selected{% endif %}>{{ p.display_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="feed-field">
+        <span>Sentimen</span>
+        <select class="pantau-input" name="sentiment">
+          <option value="">Semua sentimen</option>
+          {% for key, label in sentiment_choices %}
+          <option value="{{ key }}" {% if filters.sentiment == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="feed-field feed-field-search">
+        <span>Penulis</span>
+        <input class="pantau-input" type="search" name="author" value="{{ filters.author }}" placeholder="Cari nama atau @handle">
+      </label>
+      <button type="submit" class="feed-filter-submit">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path>
+        </svg>
+        Terapkan
+      </button>
+      {% if filters.platform or filters.sentiment or filters.author %}
+      <a class="feed-filter-reset" href="{% url 'analytics:feed' %}">Hapus filter</a>
+      {% endif %}
+    </form>
+  </section>
 
-<div class="pantau-card">
-  <div class="pantau-table-scroll">
-    <table class="pantau-table">
-      <thead>
-        <tr><th>Waktu</th><th>Platform</th><th>Penulis</th><th>Sentimen</th><th>Koreksi</th><th>Interaksi</th><th>Konten</th></tr>
-      </thead>
-      <tbody>
-        {% for m in page_obj %}
-        <tr>
-          <td class="mono">{{ m.posted_at|date:"d M H:i" }}</td>
-          <td>{{ m.platform.display_name }}</td>
-          <td>{{ m.author_handle }}</td>
-          <td>
+  <section class="feed-results" aria-labelledby="feed-results-title">
+    <div class="feed-results-head">
+      <div>
+        <h2 id="feed-results-title">Percakapan terbaru</h2>
+        <p>
+          <strong>{{ page_obj.paginator.count }}</strong> sebutan ditemukan
+          {% if filters.platform or filters.sentiment or filters.author %}<span class="feed-filter-active">Filter aktif</span>{% endif %}
+        </p>
+      </div>
+      <div class="feed-sort-note">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M8 6h12M8 12h8M8 18h4M4 4v16"></path>
+        </svg>
+        Terbaru dahulu
+      </div>
+    </div>
+
+    <div class="feed-stream">
+      {% for m in page_obj %}
+      <article class="feed-item sentiment-{{ m.sentiment }}">
+        <div class="feed-time">
+          <span class="feed-time-day">{{ m.posted_at|date:"d" }}</span>
+          <span class="feed-time-month">{{ m.posted_at|date:"M" }}</span>
+          <span class="feed-time-clock">{{ m.posted_at|date:"H:i" }}</span>
+        </div>
+
+        <div class="feed-mention">
+          <div class="feed-mention-top">
+            <span class="feed-platform-mark" aria-hidden="true">{{ m.platform.display_name|slice:":1"|upper }}</span>
+            <span class="feed-author">{{ m.author_handle }}</span>
+            <span class="feed-platform">{{ m.platform.display_name }}</span>
             <span class="pantau-badge pantau-badge-{{ m.sentiment }}">{{ m.get_sentiment_display }}</span>
-            <div class="pantau-hint mono">{{ m.sentiment_model|default:"—" }}{% if m.sentiment_confidence %} · {{ m.sentiment_confidence }}{% endif %}</div>
-          </td>
-          <td>
-            <form method="post" action="{% url 'analytics:correct_sentiment' m.pk %}" class="pantau-inline-form" style="margin:0">
-              {% csrf_token %}
-              <select class="pantau-input" name="sentiment">
-                {% for key, label in sentiment_choices %}
-                <option value="{{ key }}" {% if m.sentiment == key %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-              </select>
-              <button type="submit" class="pantau-chip pantau-chip-allow">Koreksi</button>
-            </form>
-          </td>
-          <td class="mono">{{ m.engagement_count }}</td>
-          <td>{% if m.source_url %}<a href="{{ m.source_url }}" target="_blank" rel="noopener">{{ m.content_snippet|truncatechars:90 }}</a>{% else %}{{ m.content_snippet|truncatechars:90 }}{% endif %}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="7">Belum ada mention yang cocok.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if page_obj.paginator.num_pages > 1 %}
-  <div class="pantau-pager">
-    {% if page_obj.has_previous %}<a class="pantau-btn" href="?page={{ page_obj.previous_page_number }}&platform={{ filters.platform }}&sentiment={{ filters.sentiment }}&author={{ filters.author }}">‹ Sebelumnya</a>{% endif %}
-    <span class="pantau-hint">Halaman {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}<a class="pantau-btn" href="?page={{ page_obj.next_page_number }}&platform={{ filters.platform }}&sentiment={{ filters.sentiment }}&author={{ filters.author }}">Berikutnya ›</a>{% endif %}
-  </div>
-  {% endif %}
-</div>
+          </div>
+
+          <p class="feed-content">
+            {% if m.source_url %}
+            <a href="{{ m.source_url }}" target="_blank" rel="noopener noreferrer">
+              {{ m.content_snippet|truncatechars:210 }}
+              <span class="feed-external" aria-label="Buka sumber asli">↗</span>
+            </a>
+            {% else %}
+            {{ m.content_snippet|truncatechars:210 }}
+            {% endif %}
+          </p>
+
+          <div class="feed-meta">
+            <span title="Jumlah interaksi">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path>
+              </svg>
+              {{ m.engagement_count }} interaksi
+            </span>
+            {% if m.matched_keyword %}<span>Kata kunci: <strong>{{ m.matched_keyword }}</strong></span>{% endif %}
+            {% if m.theme %}<span>Tema: <strong>{{ m.theme }}</strong></span>{% endif %}
+          </div>
+        </div>
+
+        <aside class="feed-review" aria-label="Tinjauan sentimen">
+          <div class="feed-review-head">
+            <span>Analisis sentimen</span>
+            {% if m.sentiment_model %}
+            <span class="feed-model">{{ m.sentiment_model }}{% if m.sentiment_confidence %} · {{ m.sentiment_confidence|floatformat:2 }}{% endif %}</span>
+            {% endif %}
+          </div>
+          {% if analyst_profile.role != "viewer" %}
+          <form method="post" action="{% url 'analytics:correct_sentiment' m.pk %}" class="feed-correction-form">
+            {% csrf_token %}
+            <label class="sr-only" for="sentiment-{{ m.pk }}">Koreksi sentimen untuk {{ m.author_handle }}</label>
+            <select class="pantau-input" id="sentiment-{{ m.pk }}" name="sentiment">
+              {% for key, label in sentiment_choices %}
+              <option value="{{ key }}" {% if m.sentiment == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">Simpan koreksi</button>
+          </form>
+          {% else %}
+          <div class="feed-readonly">Mode baca saja</div>
+          {% endif %}
+        </aside>
+      </article>
+      {% empty %}
+      <div class="feed-empty">
+        <span class="feed-empty-icon" aria-hidden="true">⌁</span>
+        <h3>Belum ada sebutan yang cocok</h3>
+        <p>Coba longgarkan filter platform, sentimen, atau nama penulis.</p>
+        <a href="{% url 'analytics:feed' %}">Tampilkan semua sebutan</a>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="feed-pager" aria-label="Navigasi halaman">
+      <span>Halaman <strong>{{ page_obj.number }}</strong> dari {{ page_obj.paginator.num_pages }}</span>
+      <div>
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&amp;platform={{ filters.platform }}&amp;sentiment={{ filters.sentiment }}&amp;author={{ filters.author|urlencode }}">← Sebelumnya</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a class="is-primary" href="?page={{ page_obj.next_page_number }}&amp;platform={{ filters.platform }}&amp;sentiment={{ filters.sentiment }}&amp;author={{ filters.author|urlencode }}">Berikutnya →</a>
+        {% endif %}
+      </div>
+    </nav>
+    {% endif %}
+  </section>
+</main>
 {% endblock %}
