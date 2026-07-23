@@ -47,18 +47,36 @@
 </div>
 
 <div class="pantau-kpi-row">
+  {% with m=summary.metrics.mentions %}
   <div class="pantau-card">
     <div class="pantau-kpi-label">Total Sebutan</div>
     <div class="pantau-kpi-value">{{ summary.total_mentions }}</div>
+    <div class="pantau-kpi-meta">
+      <span class="pantau-delta pantau-delta-{{ m.delta.direction }}">{{ m.delta.label }}</span>
+      <span class="pantau-kpi-context">{{ m.context }}</span>
+    </div>
   </div>
+  {% endwith %}
+  {% with m=summary.metrics.interactions %}
   <div class="pantau-card">
     <div class="pantau-kpi-label">Total Interaksi</div>
     <div class="pantau-kpi-value">{{ summary.total_interactions }}</div>
+    <div class="pantau-kpi-meta">
+      <span class="pantau-delta pantau-delta-{{ m.delta.direction }}">{{ m.delta.label }}</span>
+      <span class="pantau-kpi-context">{{ m.context }}</span>
+    </div>
   </div>
+  {% endwith %}
+  {% with m=summary.metrics.authors %}
   <div class="pantau-card">
     <div class="pantau-kpi-label">Penulis Unik</div>
     <div class="pantau-kpi-value">{{ summary.unique_authors }}</div>
+    <div class="pantau-kpi-meta">
+      <span class="pantau-delta pantau-delta-{{ m.delta.direction }}">{{ m.delta.label }}</span>
+      <span class="pantau-kpi-context">{{ m.context }}</span>
+    </div>
   </div>
+  {% endwith %}
   <div class="pantau-card pantau-card-dark">
     <div class="pantau-health-gauge" style="--pct: {{ summary.health_index }}"><span>{{ summary.health_index }}</span></div>
     <div>

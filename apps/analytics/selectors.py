@@ -25,6 +25,39 @@ def ringkasan_summary(project, days=30):
     total_interactions = qs.aggregate(total=Sum("engagement_count"))["total"] or 0
     unique_authors = qs.values("author_handle").distinct().count()
 
+    # A raw count means nothing without a reference point, so every headline number
+    # is paired with the same window immediately before it (trend) and a derived
+    # figure that says what the count implies (rate, intensity, concentration).
+    prev_since = since - timezone.timedelta(days=days)
+    prev_qs = Mention.objects.filter(
+        project=project, posted_at__gte=prev_since, posted_at__lt=since, is_political=False
+    )
+    prev_mentions = prev_qs.count()
+    prev_interactions = prev_qs.aggregate(total=Sum("engagement_count"))["total"] or 0
+    prev_authors = prev_qs.values("author_handle").distinct().count()
+
+    per_day = round(total_mentions / days, 1)
+    interactions_per_mention = round(total_interactions / total_mentions) if total_mentions else 0
+    mentions_per_author = round(total_mentions / unique_authors, 1) if unique_authors else 0
+
+    metrics = {
+        "mentions": {
+            "value": total_mentions,
+            "delta": _pct_delta(total_mentions, prev_mentions),
+            "context": f"± {per_day} per hari",
+        },
+        "interactions": {
+            "value": total_interactions,
+            "delta": _pct_delta(total_interactions, prev_interactions),
+            "context": f"± {interactions_per_mention} per sebutan",
+        },
+        "authors": {
+            "value": unique_authors,
+            "delta": _pct_delta(unique_authors, prev_authors),
+            "context": f"± {mentions_per_author} sebutan/penulis",
+        },
+    }
+
     sentiment_counts = {row["sentiment"]: row["n"] for row in qs.values("sentiment").annotate(n=Count("id"))}
     sentiment_breakdown = []
     for key, label in SENTIMENT_LABELS.items():
@@ -70,6 +103,7 @@ def ringkasan_summary(project, days=30):
         "total_mentions": total_mentions,
         "total_interactions": total_interactions,
         "unique_authors": unique_authors,
+        "metrics": metrics,
         "sentiment_breakdown": sentiment_breakdown,
         "source_breakdown": source_breakdown,
         "emotion_breakdown": emotion_breakdown,
@@ -79,6 +113,19 @@ def ringkasan_summary(project, days=30):
         "negative_pct": negative_pct,
         "insight": insight,
     }
+
+
+def _pct_delta(current, previous):
+    """Percentage change vs the previous window, with a direction the template colours.
+    Volume moving is information, not a verdict — direction is 'up'/'down'/'flat', not
+    good/bad; the sentiment and health readings carry the value judgement."""
+    if not previous:
+        # No baseline to compare against: report the arrival of activity, not a
+        # meaningless "+100%" off zero, and stay silent when there is nothing either side.
+        return {"pct": None, "direction": "up" if current else "flat", "label": "baru" if current else "—"}
+    change = round(((current - previous) / previous) * 100)
+    direction = "up" if change > 0 else "down" if change < 0 else "flat"
+    return {"pct": abs(change), "direction": direction, "label": f"{'+' if change > 0 else '−' if change < 0 else ''}{abs(change)}%"}
 
 
 def _ringkasan_insight(*, timeline, total_mentions, positive_pct, negative_pct,

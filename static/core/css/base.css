@@ -192,6 +192,17 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-kpi-label.light { color: #7FA0B8; }
 .pantau-kpi-value { font: 600 30px Archivo, sans-serif; color: var(--navy); margin: 8px 0 4px; }
 
+/* KPI trend + context — gives each headline number a reference point and a meaning. */
+.pantau-kpi-meta { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.pantau-delta {
+  font: 600 10.5px 'IBM Plex Mono', monospace; padding: 2px 7px; border-radius: 20px;
+  background: #EEF2F5; color: var(--text-muted); white-space: nowrap;
+}
+.pantau-delta-up::before { content: "\25B2 "; font-size: 8px; }
+.pantau-delta-down::before { content: "\25BC "; font-size: 8px; }
+.pantau-delta-flat { color: var(--text-faint); }
+.pantau-kpi-context { font: 400 10.5px 'IBM Plex Sans', sans-serif; color: var(--text-faint); }
+
 .pantau-health-gauge {
   --pct: 0;
   width: 64px; height: 64px; border-radius: 50%; flex: none;
