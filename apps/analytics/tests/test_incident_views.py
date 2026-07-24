@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.analytics import incidents
 from apps.analytics.models import (
     Category, Incident, IncidentEvent, Issue, IssueLabel, Mention, OPD,
     SubCategory,
@@ -227,6 +228,25 @@ class IncidentActionTest(TestCase):
         )
         response = self.client.get(reverse("analytics:insiden_detail", args=[foreign.pk]))
         self.assertEqual(response.status_code, 404)
+
+    def test_detail_shows_compose_button_when_no_draft_response(self):
+        url = reverse("analytics:insiden_detail", args=[self.incident.pk])
+        response = self.client.get(url)
+        self.assertContains(response, "Susun draf tanggapan")
+
+    def test_detail_renders_existing_draft_response_and_sources(self):
+        from apps.governance.models import RegulatoryDocument
+        RegulatoryDocument.objects.create(
+            title="Standar Pelayanan Minimal Jalan",
+            source_ref="Permen PU No. 1/2014",
+            body="Jalan rusak berlubang wajib diperbaiki oleh penyelenggara jalan.",
+        )
+        incidents.generate_response(self.incident, by="Operator Satu")
+        url = reverse("analytics:insiden_detail", args=[self.incident.pk])
+        response = self.client.get(url)
+        self.assertContains(response, "Draf Tanggapan")
+        self.assertContains(response, "Permen PU No. 1/2014")
+        self.assertContains(response, "Susun ulang")
 
 
 class IncidentWriteAccessTest(TestCase):
