@@ -1,5 +1,5 @@
 {% extends "core/base_dashboard.html" %}
-{% load analytics_extras %}
+{% load analytics_extras static %}
 {% block title %}{{ incident.title }}{% endblock %}
 {% block content %}
 <div class="incident-detail-head severity-{{ incident.severity }}">
@@ -38,6 +38,22 @@
       <span class="icon">⚠️</span>
       <span class="incident-draft-banner-text"><strong>Draf — dihasilkan AI, menunggu tinjauan manusia.</strong> Teks di bawah belum diverifikasi; angka dan kutipan harus diperiksa terhadap sumber aslinya sebelum dikutip publik.</span>
     </div>
+    {% endif %}
+
+    {% if incident.evidence_image_path %}
+    <figure class="incident-evidence">
+      <div class="incident-evidence-media">
+        <img src="{% static incident.evidence_image_path %}" alt="Visualisasi jalan berlubang untuk insiden {{ incident.title }}">
+        {% if incident.evidence_is_simulated %}<span class="incident-evidence-badge">Simulasi AI</span>{% endif %}
+      </div>
+      <figcaption>
+        <strong>Bukti visual insiden</strong>
+        <span>{{ incident.evidence_caption }}</span>
+        {% if incident.evidence_is_simulated %}
+        <span class="incident-evidence-disclaimer">Gambar dihasilkan AI untuk data demonstrasi — bukan foto lokasi atau bukti verifikasi lapangan.</span>
+        {% endif %}
+      </figcaption>
+    </figure>
     {% endif %}
 
     <div class="incident-narrative-block">

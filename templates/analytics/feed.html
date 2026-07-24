@@ -100,7 +100,7 @@
           </div>
 
           <p class="feed-content">
-            {% if m.source_url %}
+            {% if m.has_clickable_source %}
             <a href="{{ m.source_url }}" target="_blank" rel="noopener noreferrer">
               {{ m.content_snippet|truncatechars:210 }}
               <span class="feed-external" aria-label="Buka sumber asli">↗</span>

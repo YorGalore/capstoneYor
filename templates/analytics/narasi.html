@@ -4,9 +4,13 @@
 {% block content %}
 <div class="pantau-neutrality-notice">⚖ {{ neutrality_notice }} Tampilan simetris; tidak ada penilaian atas kebenaran narasi. Kueri ini tercatat di log audit (FR-29.2/29.5).</div>
 
+{% if summary %}
 <div class="pantau-card">
   <div class="pantau-card-header">
-    <div class="pantau-card-title">Pangsa Suara (SoV) pada isu ini</div>
+    <div>
+      <div class="pantau-card-title">Pangsa Suara (SoV) pada isu ini</div>
+      <div class="mono-muted">{{ summary.issue.title }}</div>
+    </div>
     <div class="mono-muted">total {{ summary.total_attributed }} sebutan teratribusi · {{ summary.unattributed_pct }}% tidak teratribusi ke kubu manapun</div>
   </div>
   <div class="narasi-sov-row">
@@ -61,4 +65,10 @@
     {% endfor %}
   </svg>
 </div>
+{% else %}
+<div class="pantau-card">
+  <div class="pantau-card-title">Belum ada narasi aktif</div>
+  <p class="mono-muted">Aktifkan isu politik dan atribusikan mention untuk menampilkan perbandingan narasi.</p>
+</div>
+{% endif %}
 {% endblock %}

@@ -141,7 +141,7 @@
         <div class="pantau-topmention-foot">
           <span class="pantau-badge pantau-badge-{{ mention.sentiment }}">{{ mention.get_sentiment_display }}</span>
           <span class="mono">{{ mention.engagement_count }} interaksi</span>
-          {% if mention.source_url %}<a class="mono-link" href="{{ mention.source_url }}" target="_blank" rel="noopener">Buka →</a>{% endif %}
+          {% if mention.has_clickable_source %}<a class="mono-link" href="{{ mention.source_url }}" target="_blank" rel="noopener">Buka →</a>{% endif %}
         </div>
       </div>
     {% empty %}

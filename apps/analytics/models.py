@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from django.db import models
 
 from apps.core.models import Platform, Project, Province, Regency
@@ -131,6 +133,13 @@ class Mention(models.Model):
 
     def __str__(self):
         return f"{self.author_handle} ({self.platform.slug}, {self.sentiment})"
+
+    @property
+    def has_clickable_source(self):
+        """Whether the UI may present source_url as a real external link."""
+        if not self.source_url:
+            return False
+        return urlsplit(self.source_url).hostname != "demo.pantau.local"
 
 
 class LabelCorrection(models.Model):
@@ -609,6 +618,9 @@ class Incident(models.Model):
     root_cause = models.TextField(blank=True)
     impact = models.TextField(blank=True)
     recommendation = models.TextField(blank=True)
+    evidence_image_path = models.CharField(max_length=255, blank=True)
+    evidence_caption = models.CharField(max_length=300, blank=True)
+    evidence_is_simulated = models.BooleanField(default=False)
     is_confirmed = models.BooleanField(default=False)
     first_seen_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)

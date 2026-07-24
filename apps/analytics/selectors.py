@@ -372,9 +372,15 @@ def _geo_hotspots(issue, limit=6):
 
 
 def narasi_summary(issue):
-    coalitions = Coalition.objects.all()
+    # Coalition is a shared reference model, but a narrative page must only show
+    # perspectives that actually have political mentions on this tenant's issue.
+    coalitions = Coalition.objects.filter(
+        mentions__issue=issue, mentions__is_political=True
+    ).distinct()
     total_political = Mention.objects.filter(issue=issue, is_political=True).count()
-    total_attributed = Mention.objects.filter(issue=issue, coalition__isnull=False).count()
+    total_attributed = Mention.objects.filter(
+        issue=issue, is_political=True, coalition__isnull=False
+    ).count()
     unattributed_pct = (
         round(((total_political - total_attributed) / total_political) * 100)
         if total_political else 0
@@ -384,7 +390,9 @@ def narasi_summary(issue):
     for coalition in coalitions:
         qs = Mention.objects.filter(issue=issue, coalition=coalition)
         count = qs.count()
-        share_pct = round((count / total_attributed) * 100) if total_attributed else 0
+        # The bar also includes the unattributed grey segment, so every segment
+        # must use the same denominator or its total width can exceed 100%.
+        share_pct = round((count / total_political) * 100) if total_political else 0
         sentiment_counts = {row["sentiment"]: row["n"] for row in qs.values("sentiment").annotate(n=Count("id"))}
         sentiment_breakdown = []
         for key, label in SENTIMENT_LABELS.items():

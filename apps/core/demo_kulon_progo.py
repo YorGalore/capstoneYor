@@ -13,15 +13,17 @@ from datetime import datetime, time, timedelta
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from apps.analytics import briefs
+from apps.analytics import briefs, incidents
 from apps.analytics.models import (
     Alert,
     AlertRule,
     Category,
+    Coalition,
     DailyBrief,
     GovernmentProgram,
     Issue,
     IssueLabel,
+    Incident,
     Mention,
     PoliticalActor,
     PoliticalIssue,
@@ -123,6 +125,63 @@ NEWS_ITEMS = [
 # fixture stays reproducible and idempotent across re-seeds.
 SOCIAL_BUZZ_SEED = 20260717
 SOCIAL_BUZZ_COUNT = 220
+
+# Narrative comparison: two symmetric, fictional perspectives plus a small
+# unattributed pool. These records power /narasi/ for the Kulon Progo tenant.
+NARRATIVE_SEED = 20260724
+NARRATIVE_UNATTRIBUTED_COUNT = 12
+NARRATIVE_PERSPECTIVES = [
+    {
+        "slug": "kulon-progo-penanganan",
+        "name": "Narasi Penanganan & Klarifikasi",
+        "stance": Coalition.STANCE_PETAHANA,
+        "color": "#0E7C86",
+        "count": 48,
+        "sentiments": [
+            (Mention.SENTIMENT_POSITIVE, 0.46),
+            (Mention.SENTIMENT_NEUTRAL, 0.42),
+            (Mention.SENTIMENT_NEGATIVE, 0.12),
+        ],
+        "themes": [
+            ("proses pemeriksaan berjalan", 0.34),
+            ("komitmen keterbukaan hasil", 0.27),
+            ("koordinasi Inspektorat", 0.22),
+            ("kanal aduan resmi", 0.17),
+        ],
+        "snippets": [
+            "Pemkab menyampaikan pemeriksaan dugaan pungli Garongan sedang berjalan dan hasilnya akan diumumkan setelah verifikasi.",
+            "Inspektorat diminta menelusuri laporan warga secara objektif serta menjaga kerahasiaan pelapor.",
+            "Warga diimbau menyampaikan bukti melalui kanal aduan resmi agar setiap laporan dapat ditindaklanjuti.",
+            "Koordinasi dengan pemerintah kalurahan dilakukan untuk memastikan layanan publik tetap berjalan selama pemeriksaan.",
+            "Keterbukaan hasil pemeriksaan diperlukan agar warga memperoleh informasi yang jelas dan terverifikasi.",
+        ],
+    },
+    {
+        "slug": "kulon-progo-akuntabilitas",
+        "name": "Narasi Kritik & Akuntabilitas",
+        "stance": Coalition.STANCE_PENANTANG,
+        "color": "#B2601F",
+        "count": 36,
+        "sentiments": [
+            (Mention.SENTIMENT_POSITIVE, 0.08),
+            (Mention.SENTIMENT_NEUTRAL, 0.31),
+            (Mention.SENTIMENT_NEGATIVE, 0.61),
+        ],
+        "themes": [
+            ("desakan penyelesaian", 0.36),
+            ("keterbukaan hasil pemeriksaan", 0.28),
+            ("perlindungan pelapor", 0.21),
+            ("pengawasan layanan kalurahan", 0.15),
+        ],
+        "snippets": [
+            "Warga meminta pemeriksaan dugaan pungli Garongan segera dituntaskan dengan tenggat yang jelas.",
+            "Hasil pemeriksaan perlu dibuka kepada publik agar proses penanganan dapat diawasi bersama.",
+            "Pelapor dan saksi harus memperoleh perlindungan supaya warga tidak takut menyampaikan bukti.",
+            "Pengawasan layanan di tingkat kalurahan perlu diperkuat agar keluhan serupa tidak berulang.",
+            "Masyarakat menunggu penjelasan tentang tahapan pemeriksaan dan tindak lanjut yang sudah dilakukan.",
+        ],
+    },
+]
 
 # Citizen-service complaints sized to exercise the Incident board.
 #
@@ -444,7 +503,6 @@ def _seed_mentions(project, province, regency, issues, programs, actors):
                 "posted_at": _posted_at(days_ago, index),
                 "engagement_count": 80 + (index * 37),
                 "reach_estimate": 1_500 + (index * 850),
-                "source_url": f"https://demo.pantau.local/kulon-progo/berita/{index:02d}",
                 "matched_keyword": subject,
                 "is_scraped": False,
                 "program": programs.get(program_name),
@@ -512,7 +570,6 @@ def _seed_social_buzz(project, province, regency, issues, programs):
             posted_at=now - timedelta(days=rng.uniform(0, 30), hours=rng.uniform(0, 24)),
             engagement_count=rng.randint(3, 850),
             reach_estimate=rng.randint(150, 60_000),
-            source_url=f"https://demo.pantau.local/kulon-progo/sosial/{i + 1:03d}",
             matched_keyword=rng.choice(KEYWORDS),
             is_scraped=False,
             program=rng.choice(program_list) if rng.random() < 0.4 else None,
@@ -578,10 +635,6 @@ def _seed_incident_clusters(project, province, regency):
                 posted_at=now - timedelta(days=rng.uniform(0, 5), hours=rng.uniform(0, 24)),
                 engagement_count=rng.randint(5, 900),
                 reach_estimate=rng.randint(200, 45_000),
-                source_url=(
-                    f"https://demo.pantau.local/kulon-progo/insiden/"
-                    f"{cluster['key']}-{index + 1:03d}"
-                ),
                 matched_keyword=cluster["keywords"][0],
                 is_scraped=False,
             )
@@ -590,6 +643,24 @@ def _seed_incident_clusters(project, province, regency):
                 issue=issue,
                 source=IssueLabel.SOURCE_AUTO,
             )
+
+
+def _seed_incident_board(project):
+    """Materialize demo candidates and attach the generated evidence simulation."""
+    incidents.refresh_candidates(project)
+    Incident.objects.filter(
+        project=project, issue__name="Jalan Rusak Wates–Sentolo"
+    ).update(
+        evidence_image_path=(
+            "analytics/img/incidents/"
+            "jalan-rusak-wates-sentolo-simulasi-ai.webp"
+        ),
+        evidence_caption=(
+            "Visualisasi kondisi jalan berlubang berdasarkan pola keluhan "
+            "warga dalam data demonstrasi."
+        ),
+        evidence_is_simulated=True,
+    )
 
 
 def _seed_coordination_cluster(project):
@@ -676,6 +747,109 @@ def _seed_issue_and_alerts(project, mentions):
             "status": Alert.STATUS_ACTIVE,
         },
     )
+    return live_issue
+
+
+def _seed_narrative_mentions(project, province, regency, issue):
+    """Populate a balanced, explicitly fictional comparison for /narasi/.
+
+    The fake fixture must not expose fake external links. Its provenance is
+    carried by ``sentiment_model`` and ``external_id`` instead.
+    """
+    if Mention.objects.filter(
+        project=project, sentiment_model="demo-narrative-v1"
+    ).exists():
+        return
+
+    rng = random.Random(NARRATIVE_SEED)
+    now = timezone.now()
+    platforms = list(Platform.objects.exclude(slug="berita"))
+    emotion_by_sentiment = {
+        Mention.SENTIMENT_POSITIVE: Mention.EMOTION_TRUST,
+        Mention.SENTIMENT_NEUTRAL: Mention.EMOTION_ANTICIPATION,
+        Mention.SENTIMENT_NEGATIVE: Mention.EMOTION_ANGER,
+    }
+    narrative_mentions = []
+
+    for perspective in NARRATIVE_PERSPECTIVES:
+        coalition, _ = Coalition.objects.update_or_create(
+            slug=perspective["slug"],
+            defaults={
+                "name": perspective["name"],
+                "stance": perspective["stance"],
+                "color": perspective["color"],
+            },
+        )
+        for index in range(perspective["count"]):
+            sentiment = _weighted_choice(rng, perspective["sentiments"])
+            narrative_mentions.append(
+                Mention(
+                    project=project,
+                    platform=rng.choice(platforms),
+                    province=province,
+                    regency=regency,
+                    author_handle=rng.choice(SOCIAL_HANDLES),
+                    external_id=f"demo-kp-narasi-{perspective['slug']}-{index + 1:03d}",
+                    content_snippet=rng.choice(perspective["snippets"]),
+                    theme=_weighted_choice(rng, perspective["themes"]),
+                    sentiment=sentiment,
+                    sentiment_confidence=round(rng.uniform(0.72, 0.96), 2),
+                    sentiment_model="demo-narrative-v1",
+                    emotion=emotion_by_sentiment[sentiment],
+                    emotion_labels=[emotion_by_sentiment[sentiment]],
+                    posted_at=now - timedelta(
+                        days=rng.uniform(0, 30), hours=rng.uniform(0, 24)
+                    ),
+                    engagement_count=rng.randint(8, 1_200),
+                    reach_estimate=rng.randint(300, 75_000),
+                    is_political=True,
+                    coalition=coalition,
+                    issue=issue,
+                    matched_keyword="dugaan pungli Garongan",
+                    is_scraped=False,
+                )
+            )
+
+    for index in range(NARRATIVE_UNATTRIBUTED_COUNT):
+        sentiment = _weighted_choice(
+            rng,
+            [
+                (Mention.SENTIMENT_POSITIVE, 0.15),
+                (Mention.SENTIMENT_NEUTRAL, 0.55),
+                (Mention.SENTIMENT_NEGATIVE, 0.30),
+            ],
+        )
+        narrative_mentions.append(
+            Mention(
+                project=project,
+                platform=rng.choice(platforms),
+                province=province,
+                regency=regency,
+                author_handle=rng.choice(SOCIAL_HANDLES),
+                external_id=f"demo-kp-narasi-tidak-teratribusi-{index + 1:03d}",
+                content_snippet=(
+                    "Percakapan warga membahas penanganan laporan Garongan, "
+                    "namun posisinya belum cukup jelas untuk diatribusikan."
+                ),
+                theme="percakapan campuran",
+                sentiment=sentiment,
+                sentiment_confidence=round(rng.uniform(0.64, 0.82), 2),
+                sentiment_model="demo-narrative-v1",
+                emotion=emotion_by_sentiment[sentiment],
+                emotion_labels=[emotion_by_sentiment[sentiment]],
+                posted_at=now - timedelta(
+                    days=rng.uniform(0, 30), hours=rng.uniform(0, 24)
+                ),
+                engagement_count=rng.randint(5, 500),
+                reach_estimate=rng.randint(200, 25_000),
+                is_political=True,
+                issue=issue,
+                matched_keyword="dugaan pungli Garongan",
+                is_scraped=False,
+            )
+        )
+
+    Mention.objects.bulk_create(narrative_mentions)
 
 
 def _seed_reviewable_brief(project):
@@ -691,10 +865,17 @@ def seed_kulon_progo_demo():
     issues = _seed_taxonomy()
     actors, programs = _seed_entities(project)
     _seed_opds(project)
+    # Older fixture revisions stored links on a deliberately unresolvable host.
+    # Clear them on every reseed so existing deployments stop rendering 404 links.
+    Mention.objects.filter(
+        project=project, source_url__contains="demo.pantau.local"
+    ).update(source_url=None)
     mentions = _seed_mentions(project, province, regency, issues, programs, actors)
-    _seed_issue_and_alerts(project, mentions)
+    live_issue = _seed_issue_and_alerts(project, mentions)
     _seed_social_buzz(project, province, regency, issues, programs)
     _seed_incident_clusters(project, province, regency)
+    _seed_incident_board(project)
+    _seed_narrative_mentions(project, province, regency, live_issue)
     _seed_coordination_cluster(project)
     _seed_reviewable_brief(project)
     return tenant, project

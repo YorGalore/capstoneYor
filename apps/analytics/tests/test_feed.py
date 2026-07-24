@@ -84,3 +84,17 @@ class FeedViewTest(TestCase):
         response = self.client.get(reverse("analytics:feed"), {"author": "pos_a"})
         self.assertContains(response, "@pos_a")
         self.assertNotContains(response, "@neg_a")
+
+    def test_feed_does_not_link_to_legacy_demo_source(self):
+        mention = Mention.objects.filter(project=self.project_a).first()
+        mention.source_url = "https://demo.pantau.local/kulon-progo/berita/13"
+        mention.save(update_fields=["source_url"])
+
+        self.client.force_login(self.super_admin)
+        response = self.client.get(reverse("analytics:feed"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(
+            response,
+            'href="https://demo.pantau.local/kulon-progo/berita/13"',
+        )
