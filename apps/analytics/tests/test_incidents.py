@@ -566,3 +566,52 @@ class ComposeIncidentResponseTest(TestCase):
         )
         result = incidents.compose_incident_response(self._incident(assigned_opd=opd))
         self.assertIn("Dinas PU", result["text"])
+
+
+class IncidentResponseServiceTest(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="Instansi A")
+        self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
+        self.province = Province.objects.create(name="DI Yogyakarta")
+        self.regency = Regency.objects.create(province=self.province, name="Sleman")
+        RegulatoryDocument.objects.create(
+            title="Standar Pelayanan Minimal Jalan",
+            source_ref="Permen PU No. 1/2014",
+            body="Jalan rusak berlubang wajib diperbaiki oleh penyelenggara jalan.",
+        )
+        self.incident = Incident.objects.create(
+            project=self.project, title="Jalan Rusak Berlubang", regency=self.regency,
+            severity=Incident.SEVERITY_HIGH, mention_count=312, negative_pct=95,
+        )
+
+    def test_generate_stores_text_context_and_logs_event(self):
+        incidents.generate_response(self.incident, by="Operator Satu")
+        self.incident.refresh_from_db()
+        self.assertIn("Permen PU No. 1/2014", self.incident.draft_response)
+        self.assertTrue(self.incident.response_regulatory_context)
+        self.assertIsNotNone(self.incident.response_generated_at)
+        event = self.incident.events.filter(
+            kind=IncidentEvent.KIND_RESPONSE_DRAFTED
+        ).last()
+        self.assertEqual(event.logged_by, "Operator Satu")
+        self.assertEqual(event.description, "Draf tanggapan disusun.")
+
+    def test_edit_overwrites_text_but_keeps_regulatory_context(self):
+        incidents.generate_response(self.incident, by="Operator Satu")
+        self.incident.refresh_from_db()
+        original_context = self.incident.response_regulatory_context
+        incidents.edit_response(self.incident, "Teks suntingan manusia.", by="Operator Satu")
+        self.incident.refresh_from_db()
+        self.assertEqual(self.incident.draft_response, "Teks suntingan manusia.")
+        self.assertEqual(self.incident.response_regulatory_context, original_context)
+        self.assertEqual(
+            self.incident.events.filter(kind=IncidentEvent.KIND_RESPONSE_DRAFTED).count(),
+            2,
+        )
+
+    def test_regenerate_overwrites_the_previous_draft(self):
+        incidents.edit_response(self.incident, "Draf lama.", by="Operator Satu")
+        incidents.generate_response(self.incident, by="Operator Satu")
+        self.incident.refresh_from_db()
+        self.assertNotEqual(self.incident.draft_response, "Draf lama.")
+        self.assertIn("Permen PU No. 1/2014", self.incident.draft_response)

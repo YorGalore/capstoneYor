@@ -450,3 +450,37 @@ def log_note(incident, description, by):
         description=description,
         logged_by=by,
     )
+
+
+def generate_response(incident, by):
+    """Compose and persist a fresh regulation-grounded draft response, replacing any
+    prior draft, and log it to the timeline (FR-31.4)."""
+    result = compose_incident_response(incident)
+    incident.draft_response = result["text"]
+    incident.response_regulatory_context = result["regulatory_context"]
+    incident.response_generated_at = timezone.now()
+    incident.save(update_fields=[
+        "draft_response", "response_regulatory_context",
+        "response_generated_at", "updated_at",
+    ])
+    IncidentEvent.objects.create(
+        incident=incident,
+        kind=IncidentEvent.KIND_RESPONSE_DRAFTED,
+        description="Draf tanggapan disusun.",
+        logged_by=by,
+    )
+    return incident
+
+
+def edit_response(incident, text, by):
+    """Persist a human edit to the draft response text. The retrieved regulatory
+    context is left untouched so the original sources stay auditable."""
+    incident.draft_response = text
+    incident.save(update_fields=["draft_response", "updated_at"])
+    IncidentEvent.objects.create(
+        incident=incident,
+        kind=IncidentEvent.KIND_RESPONSE_DRAFTED,
+        description="Draf tanggapan disunting.",
+        logged_by=by,
+    )
+    return incident
