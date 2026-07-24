@@ -32,4 +32,6 @@ urlpatterns = [
     path("insiden/<int:incident_id>/tugaskan/", views.insiden_assign, name="insiden_assign"),
     path("insiden/<int:incident_id>/status/", views.insiden_status, name="insiden_status"),
     path("insiden/<int:incident_id>/catat/", views.insiden_note, name="insiden_note"),
+    path("insiden/<int:incident_id>/tanggapan/susun/", views.insiden_response_generate, name="insiden_response_generate"),
+    path("insiden/<int:incident_id>/tanggapan/simpan/", views.insiden_response_save, name="insiden_response_save"),
 ]

@@ -553,6 +553,45 @@ def insiden_note(request, incident_id):
 @require_page("insiden")
 @require_writer_role
 @require_POST
+def insiden_response_generate(request, incident_id):
+    incident = _get_incident(request, incident_id)
+    actor = _actor(request)
+    incidents.generate_response(incident, by=actor)
+    record_audit_entry(
+        actor_label=actor,
+        action="Menyusun draf tanggapan insiden",
+        target=incident.title,
+    )
+    messages.success(
+        request,
+        "Draf tanggapan disusun. Wajib ditinjau manusia sebelum dikeluarkan ke publik.",
+    )
+    return redirect("analytics:insiden_detail", incident_id=incident.pk)
+
+
+@require_page("insiden")
+@require_writer_role
+@require_POST
+def insiden_response_save(request, incident_id):
+    incident = _get_incident(request, incident_id)
+    text = (request.POST.get("draft_response") or "").strip()
+    if not text:
+        messages.error(request, "Teks tanggapan tidak boleh kosong.")
+    else:
+        actor = _actor(request)
+        incidents.edit_response(incident, text, by=actor)
+        record_audit_entry(
+            actor_label=actor,
+            action="Menyunting draf tanggapan insiden",
+            target=incident.title,
+        )
+        messages.success(request, "Suntingan tanggapan disimpan.")
+    return redirect("analytics:insiden_detail", incident_id=incident.pk)
+
+
+@require_page("insiden")
+@require_writer_role
+@require_POST
 def insiden_refresh(request):
     project = get_active_project(request)
     if project is None:

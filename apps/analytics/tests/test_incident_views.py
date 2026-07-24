@@ -141,6 +141,52 @@ class IncidentActionTest(TestCase):
         self.incident.refresh_from_db()
         self.assertEqual(self.incident.status, Incident.STATUS_OPEN)
 
+    def test_generate_response_creates_draft_and_logs_event(self):
+        from apps.governance.models import RegulatoryDocument
+        RegulatoryDocument.objects.create(
+            title="Standar Pelayanan Minimal Jalan",
+            source_ref="Permen PU No. 1/2014",
+            body="Jalan rusak berlubang wajib diperbaiki oleh penyelenggara jalan.",
+        )
+        response = self.client.post(
+            reverse("analytics:insiden_response_generate", args=[self.incident.pk])
+        )
+        self.assertEqual(response.status_code, 302)
+        self.incident.refresh_from_db()
+        self.assertIn("Permen PU No. 1/2014", self.incident.draft_response)
+        event = self.incident.events.filter(
+            kind=IncidentEvent.KIND_RESPONSE_DRAFTED
+        ).last()
+        self.assertEqual(event.logged_by, "Operator Satu")
+
+    def test_save_response_persists_edited_text(self):
+        response = self.client.post(
+            reverse("analytics:insiden_response_save", args=[self.incident.pk]),
+            {"draft_response": "Tanggapan resmi hasil suntingan."},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.incident.refresh_from_db()
+        self.assertEqual(self.incident.draft_response, "Tanggapan resmi hasil suntingan.")
+
+    def test_save_response_rejects_empty_text(self):
+        self.client.post(
+            reverse("analytics:insiden_response_save", args=[self.incident.pk]),
+            {"draft_response": "   "},
+        )
+        self.incident.refresh_from_db()
+        self.assertEqual(self.incident.draft_response, "")
+
+    def test_generate_response_rejects_another_tenants_incident(self):
+        other = Tenant.objects.create(name="Instansi B")
+        other_project = Project.objects.create(tenant=other, name="Proyek B")
+        foreign = Incident.objects.create(
+            project=other_project, title="Milik Tetangga", severity=Incident.SEVERITY_LOW,
+        )
+        response = self.client.post(
+            reverse("analytics:insiden_response_generate", args=[foreign.pk])
+        )
+        self.assertEqual(response.status_code, 404)
+
     def test_actions_reject_another_tenants_incident(self):
         other = Tenant.objects.create(name="Instansi B")
         other_project = Project.objects.create(tenant=other, name="Proyek B")
@@ -238,6 +284,12 @@ class IncidentWriteAccessTest(TestCase):
         )
         self.assertEqual(response.status_code, 403)
         self.assertFalse(self.incident.events.filter(description="Catatan dari peninjau").exists())
+
+    def test_viewer_cannot_generate_response(self):
+        response = self.client.post(
+            reverse("analytics:insiden_response_generate", args=[self.incident.pk])
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_viewer_cannot_trigger_refresh(self):
         response = self.client.post(reverse("analytics:insiden_refresh"))
