@@ -248,6 +248,19 @@ class IncidentActionTest(TestCase):
         self.assertContains(response, "Permen PU No. 1/2014")
         self.assertContains(response, "Susun ulang")
 
+    def test_detail_renders_draft_with_no_sources_when_corpus_empty(self):
+        # When the regulatory corpus is empty, generate_response produces a draft
+        # with the no-fabrication line but response_regulatory_context remains [].
+        # The template guards the sources list with {% if %}, so it should not
+        # render, but the draft text with its embedded disclaimer must still appear.
+        incidents.generate_response(self.incident, by="Operator Satu")
+        url = reverse("analytics:insiden_detail", args=[self.incident.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Draf Tanggapan")
+        self.assertContains(response, "Tidak ditemukan rujukan regulasi")
+        self.assertNotContains(response, "Rujukan terambil")
+
 
 class IncidentWriteAccessTest(TestCase):
     """ISS-FW-003: insiden is a DASHBOARD_PAGES member (Peninjau gets default read
