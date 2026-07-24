@@ -19,6 +19,7 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 
+from apps.governance import regulatory
 from .briefs import DRAFT_BANNER
 from .models import Incident, IncidentEvent, IssueLabel, Mention
 
@@ -135,6 +136,76 @@ def compose_incident_narrative(candidate):
         "root_cause": root_cause,
         "impact": impact,
         "recommendation": recommendation,
+    }
+
+
+def _response_grounding_query(incident):
+    """Build the regulatory-retrieval query from what people actually said, not just
+    the incident label — mirrors ``briefs._grounding_query``. An incident titled
+    "Jalan Rusak" shares little vocabulary with "Standar Pelayanan Minimal Jalan";
+    the underlying conversation and the issue keywords bridge them.
+    """
+    snippets = list(
+        incident.mentions.order_by("-engagement_count")
+        .values_list("content_snippet", flat=True)[:10]
+    )
+    keywords = " ".join(incident.issue.keywords or []) if incident.issue else ""
+    return " ".join([incident.title, keywords, *snippets])
+
+
+def compose_incident_response(incident):
+    """Compose a regulation-grounded draft public response for an incident.
+
+    The seam a hosted LLM would replace: accept an incident, return
+    ``{"text", "regulatory_context"}``. Deterministic and grounded — every
+    regulatory citation is a passage actually retrieved from the corpus, shown
+    verbatim with its source, and the whole text carries the draft banner (FR-31.4).
+    """
+    hits = regulatory.retrieve(_response_grounding_query(incident), limit=3)
+    location = incident.regency.name if incident.regency else "wilayah terkait"
+
+    lines = [
+        DRAFT_BANNER,
+        "",
+        f"Menanggapi keresahan warga di **{location}** terkait "
+        f"\"{incident.title}\", kami mencatat **{incident.mention_count}** sebutan "
+        f"di ruang publik dengan **{incident.negative_pct}%** bersentimen negatif. "
+        "Keluhan ini menjadi perhatian kami dan akan ditindaklanjuti.",
+        "",
+        "### Dasar regulasi",
+    ]
+    if hits:
+        for hit in hits:
+            lines.append(f"- **{hit['source_ref']}** — \"{hit['passage']}\"")
+    else:
+        lines.append(
+            "- Tidak ditemukan rujukan regulasi yang relevan pada korpus. "
+            "Jangan mengarang kutipan; tambahkan dokumen ke korpus bila diperlukan."
+        )
+
+    lines.append("")
+    lines.append("### Langkah tindak lanjut")
+    if incident.assigned_opd:
+        lines.append(
+            f"Penanganan ditugaskan kepada **{incident.assigned_opd.name}** untuk "
+            f"verifikasi lapangan di {location} dan perbaikan sesuai kewenangan."
+        )
+    else:
+        lines.append(
+            "Penanganan akan ditugaskan kepada OPD yang berwenang untuk verifikasi "
+            f"lapangan di {location}."
+        )
+    lines.append("")
+    lines.append(
+        "_Draf ini menunggu persetujuan pejabat berwenang sebelum dikeluarkan ke publik._"
+    )
+
+    return {
+        "text": "\n".join(lines),
+        "regulatory_context": [
+            {"source_ref": h["source_ref"], "passage": h["passage"], "score": h["score"]}
+            for h in hits
+        ],
     }
 
 

@@ -9,6 +9,7 @@ from apps.analytics.models import (
     SubCategory,
 )
 from apps.core.models import Platform, Project, Province, Regency, Tenant
+from apps.governance.models import RegulatoryDocument
 
 
 class IncidentModelTest(TestCase):
@@ -513,3 +514,55 @@ class LifecycleTest(TestCase):
         self.incident.refresh_from_db()
         self.assertEqual(self.incident.status, Incident.STATUS_OPEN)
         self.assertEqual(self.incident.events.filter(kind=IncidentEvent.KIND_NOTE).count(), 1)
+
+
+class ComposeIncidentResponseTest(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="Instansi A")
+        self.project = Project.objects.create(tenant=self.tenant, name="Proyek A")
+        self.province = Province.objects.create(name="DI Yogyakarta")
+        self.regency = Regency.objects.create(province=self.province, name="Sleman")
+
+    def _incident(self, **kwargs):
+        defaults = dict(
+            project=self.project, title="Jalan Rusak Berlubang",
+            regency=self.regency, severity=Incident.SEVERITY_HIGH,
+            mention_count=312, negative_pct=95,
+        )
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def test_response_cites_retrieved_passage_verbatim_with_source(self):
+        RegulatoryDocument.objects.create(
+            title="Standar Pelayanan Minimal Jalan",
+            source_ref="Permen PU No. 1/2014",
+            body="Jalan rusak berlubang yang membahayakan pengguna wajib "
+                 "diperbaiki oleh penyelenggara jalan dalam tenggat yang ditetapkan.",
+        )
+        result = incidents.compose_incident_response(self._incident())
+        self.assertIn("Permen PU No. 1/2014", result["text"])
+        self.assertIn("wajib", result["text"])
+        self.assertTrue(result["regulatory_context"])
+        self.assertEqual(
+            result["regulatory_context"][0]["source_ref"], "Permen PU No. 1/2014"
+        )
+
+    def test_response_carries_draft_banner_and_incident_numbers(self):
+        result = incidents.compose_incident_response(self._incident())
+        self.assertIn(incidents.DRAFT_BANNER, result["text"])
+        self.assertIn("312", result["text"])
+        self.assertIn("95", result["text"])
+        self.assertIn("Sleman", result["text"])
+
+    def test_response_refuses_to_fabricate_a_citation_when_corpus_is_empty(self):
+        result = incidents.compose_incident_response(self._incident())
+        self.assertEqual(result["regulatory_context"], [])
+        self.assertIn("Tidak ditemukan rujukan regulasi", result["text"])
+        self.assertIn("Jangan mengarang", result["text"])
+
+    def test_response_names_assigned_opd_when_present(self):
+        opd = OPD.objects.create(
+            project=self.project, name="Dinas PU", slug="pu", abbr="PU"
+        )
+        result = incidents.compose_incident_response(self._incident(assigned_opd=opd))
+        self.assertIn("Dinas PU", result["text"])
