@@ -77,11 +77,12 @@
     </div>
   </div>
   {% endwith %}
-  <div class="pantau-card pantau-card-dark">
+  <div class="pantau-card pantau-card-dark" title="Gabungan sentimen positif (bobot 70%) dan volume sebutan (bobot 30%). 0–100; makin tinggi makin sehat.">
     <div class="pantau-health-gauge" style="--pct: {{ summary.health_index }}"><span>{{ summary.health_index }}</span></div>
     <div>
       <div class="pantau-kpi-label light">Indeks Kesehatan Digital</div>
-      <div class="pantau-health-status">Sentimen {{ summary.positive_pct }}% positif</div>
+      <div class="pantau-health-status">{{ summary.health_band }}</div>
+      <div class="pantau-health-sub">{{ summary.positive_pct }}% positif · {{ summary.negative_pct }}% negatif</div>
     </div>
   </div>
 </div>
@@ -90,6 +91,11 @@
   <div class="pantau-card-header">
     <div class="pantau-card-title">Komposisi Sentimen</div>
     <div>
+      {% if summary.negative_shift %}
+      <span class="pantau-shift pantau-shift-{% if summary.negative_shift > 0 %}up{% else %}down{% endif %}" title="Perubahan pangsa sentimen negatif dibanding periode sebelumnya">
+        Negatif {% if summary.negative_shift > 0 %}▲ +{{ summary.negative_shift }}{% else %}▼ −{{ summary.negative_shift|cut:"-" }}{% endif %} poin
+      </span>
+      {% endif %}
       {% for item in summary.sentiment_breakdown %}
         <span class="pantau-legend-item pantau-dot-{{ item.key }}">{{ item.label }} {{ item.count }} ({{ item.pct }}%)</span>
       {% endfor %}
@@ -102,14 +108,78 @@
   </div>
 </div>
 
+<div class="pantau-grid-2">
+  <div class="pantau-card">
+    <div class="pantau-card-header">
+      <div class="pantau-card-title">Isu Teratas</div>
+      {% if can_view_taxonomy %}<a class="mono-link" href="{% url 'analytics:taxonomy' %}">Kelola →</a>{% endif %}
+    </div>
+    {% for issue in summary.top_issues %}
+      <div class="pantau-issue-row">
+        <div class="pantau-issue-main">
+          <span class="pantau-issue-name">{{ issue.name }}</span>
+          <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ issue.pct }}%"></div></div>
+        </div>
+        <div class="pantau-issue-meta">
+          <span class="mono">{{ issue.count }}</span>
+          <span class="pantau-issue-neg{% if issue.negative_pct >= 40 %} hot{% endif %}">{{ issue.negative_pct }}% negatif</span>
+        </div>
+      </div>
+    {% empty %}
+      <div class="pantau-empty">Belum ada konten yang dilabeli ke isu. {% if can_view_taxonomy %}Mulai dari <a href="{% url 'analytics:taxonomy' %}">Taksonomi Isu</a>.{% endif %}</div>
+    {% endfor %}
+  </div>
+  <div class="pantau-card">
+    <div class="pantau-card-title">Sebutan Paling Berdampak</div>
+    {% for mention in summary.top_mentions %}
+      <div class="pantau-topmention pantau-topmention-{{ mention.sentiment }}">
+        <div class="pantau-topmention-head">
+          <span class="pantau-topmention-author">{{ mention.author_handle }}</span>
+          <span class="mono-muted">{{ mention.platform.display_name }} · {{ mention.posted_at|date:"j M" }}</span>
+        </div>
+        <div class="pantau-topmention-text">{{ mention.content_snippet|truncatechars:130 }}</div>
+        <div class="pantau-topmention-foot">
+          <span class="pantau-badge pantau-badge-{{ mention.sentiment }}">{{ mention.get_sentiment_display }}</span>
+          <span class="mono">{{ mention.engagement_count }} interaksi</span>
+          {% if mention.source_url %}<a class="mono-link" href="{{ mention.source_url }}" target="_blank" rel="noopener">Buka →</a>{% endif %}
+        </div>
+      </div>
+    {% empty %}
+      <div class="pantau-empty">Belum ada sebutan pada periode ini.</div>
+    {% endfor %}
+  </div>
+</div>
+
 <div class="pantau-grid-2-1">
   <div class="pantau-card">
-    <div class="pantau-card-title">Linimasa Sebutan</div>
-    <svg width="100%" height="{{ summary.timeline_chart.height }}" viewBox="0 0 {{ summary.timeline_chart.width }} {{ summary.timeline_chart.height }}" preserveAspectRatio="none">
-      <polyline points="{{ summary.timeline_chart.positive_points }}" fill="none" stroke="#178A5C" stroke-width="2.5"></polyline>
-      <polyline points="{{ summary.timeline_chart.neutral_points }}" fill="none" stroke="#AEBBC7" stroke-width="2" stroke-dasharray="5 4"></polyline>
-      <polyline points="{{ summary.timeline_chart.negative_points }}" fill="none" stroke="#C6483F" stroke-width="2.5"></polyline>
-    </svg>
+    {% with tc=summary.timeline_chart %}
+    <div class="pantau-card-header">
+      <div class="pantau-card-title">Linimasa Sebutan</div>
+      <div>
+        <span class="pantau-legend-item pantau-dot-positive">Positif</span>
+        <span class="pantau-legend-item pantau-dot-neutral">Netral</span>
+        <span class="pantau-legend-item pantau-dot-negative">Negatif</span>
+      </div>
+    </div>
+    <div class="pantau-chart">
+      <div class="pantau-chart-yaxis">
+        <span>{{ tc.max_value }}</span><span>{{ tc.mid_value }}</span><span>0</span>
+      </div>
+      <div class="pantau-chart-plot">
+        <div class="pantau-chart-grid"><span></span><span></span><span></span></div>
+        {% if tc.peak %}<div class="pantau-chart-peak" style="left: {{ tc.peak.left_pct }}%" title="Puncak negatif {{ tc.peak.date|date:'j M' }}: {{ tc.peak.value }} sebutan"></div>{% endif %}
+        <svg class="pantau-chart-svg" width="100%" height="{{ tc.height }}" viewBox="0 0 {{ tc.width }} {{ tc.height }}" preserveAspectRatio="none">
+          <polyline points="{{ tc.positive_points }}" fill="none" stroke="#178A5C" stroke-width="2.5" vector-effect="non-scaling-stroke"></polyline>
+          <polyline points="{{ tc.neutral_points }}" fill="none" stroke="#AEBBC7" stroke-width="2" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"></polyline>
+          <polyline points="{{ tc.negative_points }}" fill="none" stroke="#C6483F" stroke-width="2.5" vector-effect="non-scaling-stroke"></polyline>
+        </svg>
+      </div>
+    </div>
+    <div class="pantau-chart-xaxis">
+      {% for tick in tc.x_labels %}<span style="left: {{ tick.left_pct }}%">{{ tick.label }}</span>{% endfor %}
+    </div>
+    {% if tc.peak %}<div class="pantau-chart-caption">Puncak negatif: <b>{{ tc.peak.date|date:"j M" }}</b> ({{ tc.peak.value }} sebutan)</div>{% endif %}
+    {% endwith %}
   </div>
   <div class="pantau-card">
     <div class="pantau-card-title">Sumber Sebutan</div>
@@ -126,12 +196,14 @@
 <div class="pantau-grid-2">
   <div class="pantau-card">
     <div class="pantau-card-title">Emosi Dominan — Roda Plutchik</div>
-    {% for item in summary.emotion_breakdown %}
+    {% for item in summary.emotion_breakdown|slice:":4" %}
+      {% if item.pct %}
       <div class="pantau-source-row">
         <span>{{ item.label }}</span>
         <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ item.pct }}%"></div></div>
         <span class="mono">{{ item.pct }}%</span>
       </div>
+      {% endif %}
     {% endfor %}
   </div>
   <div class="pantau-card">

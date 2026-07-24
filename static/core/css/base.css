@@ -164,8 +164,6 @@ a:hover { color: #0A5C64; text-decoration: underline; }
   color: var(--text-faint);
 }
 .pantau-insight-trend b { display: block; font: 600 22px Archivo, sans-serif; color: var(--navy); text-transform: none; }
-.pantau-insight-trend.up b { color: var(--negative); }
-.pantau-insight-trend.down b { color: var(--positive); }
 
 /* Quick actions — turns the overview into a launch pad for the next task. */
 .pantau-quick-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
@@ -202,6 +200,57 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-delta-down::before { content: "\25BC "; font-size: 8px; }
 .pantau-delta-flat { color: var(--text-faint); }
 .pantau-kpi-context { font: 400 10.5px 'IBM Plex Sans', sans-serif; color: var(--text-faint); }
+.pantau-health-sub { font: 400 10.5px 'IBM Plex Sans', sans-serif; color: #7FA0B8; margin-top: 2px; }
+
+/* Sentiment shift chip — did the negative share grow vs the previous window? */
+.pantau-shift {
+  font: 600 10.5px 'IBM Plex Mono', monospace; padding: 2px 8px; border-radius: 20px; margin-right: 12px;
+}
+.pantau-shift-up { background: #FBEDEC; color: var(--negative); }
+.pantau-shift-down { background: #EAF5F0; color: var(--positive); }
+
+.mono-link { font: 500 11px 'IBM Plex Mono', monospace; color: var(--teal); }
+.pantau-empty { font: 400 12px 'IBM Plex Sans', sans-serif; color: var(--text-faint); padding: 10px 0; }
+
+/* Isu Teratas — the issues actually driving the window, with their own negativity. */
+.pantau-issue-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #F1F5F8; }
+.pantau-issue-row:last-child { border-bottom: none; }
+.pantau-issue-main { flex: 1; min-width: 0; }
+.pantau-issue-name { font: 600 12.5px 'IBM Plex Sans', sans-serif; color: var(--navy-2); display: block; margin-bottom: 6px; }
+.pantau-issue-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
+.pantau-issue-neg { font: 500 10px 'IBM Plex Sans', sans-serif; color: var(--text-faint); }
+.pantau-issue-neg.hot { color: var(--negative); font-weight: 600; }
+
+/* Sebutan Paling Berdampak — the individual posts carrying the reach. */
+.pantau-topmention { padding: 10px 12px; border-radius: 8px; border: 1px solid #EEF2F5; border-left: 3px solid var(--neutral); margin-bottom: 9px; }
+.pantau-topmention:last-child { margin-bottom: 0; }
+.pantau-topmention-positive { border-left-color: var(--positive); }
+.pantau-topmention-negative { border-left-color: var(--negative); }
+.pantau-topmention-neutral { border-left-color: var(--neutral); }
+.pantau-topmention-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 5px; }
+.pantau-topmention-author { font: 600 12px 'IBM Plex Sans', sans-serif; color: var(--navy-2); }
+.pantau-topmention-text { font: 400 12px 'IBM Plex Sans', sans-serif; color: #334155; line-height: 1.45; margin-bottom: 8px; }
+.pantau-topmention-foot { display: flex; align-items: center; gap: 12px; font: 400 11px 'IBM Plex Sans', sans-serif; }
+.pantau-topmention-foot .mono { font-size: 11px; }
+
+/* Readable timeline: y-axis scale, date ticks, gridlines, peak-negative marker. */
+.pantau-chart { display: flex; gap: 8px; margin-top: 4px; }
+.pantau-chart-yaxis {
+  width: 30px; height: 190px; display: flex; flex-direction: column; justify-content: space-between;
+  text-align: right; font: 500 9.5px 'IBM Plex Mono', monospace; color: var(--text-faint);
+}
+.pantau-chart-plot { position: relative; flex: 1; height: 190px; }
+.pantau-chart-grid { position: absolute; inset: 0; }
+.pantau-chart-grid span { position: absolute; left: 0; right: 0; height: 1px; background: #EEF2F5; }
+.pantau-chart-grid span:nth-child(1) { top: 0; }
+.pantau-chart-grid span:nth-child(2) { top: 50%; }
+.pantau-chart-grid span:nth-child(3) { bottom: 0; }
+.pantau-chart-peak { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed #E0A9A4; }
+.pantau-chart-svg { position: relative; width: 100%; height: 100%; display: block; }
+.pantau-chart-xaxis { position: relative; height: 15px; margin: 5px 0 0 38px; }
+.pantau-chart-xaxis span { position: absolute; transform: translateX(-50%); font: 500 9.5px 'IBM Plex Mono', monospace; color: var(--text-faint); white-space: nowrap; }
+.pantau-chart-caption { font: 400 10.5px 'IBM Plex Sans', sans-serif; color: var(--text-faint); margin-top: 8px; }
+.pantau-chart-caption b { color: var(--negative); font-weight: 600; }
 
 .pantau-health-gauge {
   --pct: 0;

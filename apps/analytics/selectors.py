@@ -81,6 +81,7 @@ def ringkasan_summary(project, days=30):
         emotion_breakdown.append({"key": key, "label": label, "count": count, "pct": pct})
     emotion_breakdown.sort(key=lambda item: item["count"], reverse=True)
 
+    dates = [(since + timezone.timedelta(days=offset)).date() for offset in range(days)]
     timeline = _daily_timeline(qs, since, days)
     positive_pct = next(
         (s["pct"] for s in sentiment_breakdown if s["key"] == Mention.SENTIMENT_POSITIVE), 0
@@ -88,7 +89,22 @@ def ringkasan_summary(project, days=30):
     negative_pct = next(
         (s["pct"] for s in sentiment_breakdown if s["key"] == Mention.SENTIMENT_NEGATIVE), 0
     )
+    prev_negative = prev_qs.filter(sentiment=Mention.SENTIMENT_NEGATIVE).count()
+    prev_negative_pct = round((prev_negative / prev_mentions) * 100) if prev_mentions else 0
+    negative_shift = negative_pct - prev_negative_pct  # percentage points, +/-
+
     health_index = round((positive_pct * 0.7) + (min(total_mentions, 5000) / 5000 * 30))
+    if health_index >= 70:
+        health_band = "Sehat"
+    elif health_index >= 45:
+        health_band = "Waspada"
+    else:
+        health_band = "Perlu perhatian"
+
+    # The aggregates say how much and how positive; these say about what and by whom —
+    # the actual issues driving volume and the individual posts carrying the reach.
+    top_issues = _top_issues(qs, total_mentions)
+    top_mentions = list(qs.select_related("platform").order_by("-engagement_count")[:3])
 
     insight = _ringkasan_insight(
         timeline=timeline,
@@ -107,12 +123,40 @@ def ringkasan_summary(project, days=30):
         "sentiment_breakdown": sentiment_breakdown,
         "source_breakdown": source_breakdown,
         "emotion_breakdown": emotion_breakdown,
-        "timeline_chart": timeline_chart(timeline),
+        "timeline_chart": timeline_chart(timeline, dates=dates),
         "health_index": health_index,
+        "health_band": health_band,
         "positive_pct": positive_pct,
         "negative_pct": negative_pct,
+        "negative_shift": negative_shift,
+        "top_issues": top_issues,
+        "top_mentions": top_mentions,
         "insight": insight,
     }
+
+
+def _top_issues(qs, total_mentions, limit=4):
+    """The taxonomy issues driving the window's volume, each with the share of its own
+    mentions that are negative — so 'which issue' comes with 'and is it a problem'."""
+    rows = (
+        qs.filter(issue_label__isnull=False)
+        .values("issue_label__issue__name")
+        .annotate(
+            n=Count("id"),
+            negative=Count("id", filter=Q(sentiment=Mention.SENTIMENT_NEGATIVE)),
+        )
+        .order_by("-n")[:limit]
+    )
+    issues = []
+    for row in rows:
+        count = row["n"]
+        issues.append({
+            "name": row["issue_label__issue__name"],
+            "count": count,
+            "pct": round((count / total_mentions) * 100) if total_mentions else 0,
+            "negative_pct": round((row["negative"] / count) * 100) if count else 0,
+        })
+    return issues
 
 
 def _pct_delta(current, previous):
@@ -166,7 +210,9 @@ def _ringkasan_insight(*, timeline, total_mentions, positive_pct, negative_pct,
         headline = "Sentimen relatif seimbang, pantau perkembangan"
 
     detail_parts = []
-    if volume_change_pct > 5:
+    if recent == 0 and prior > 0:
+        detail_parts.append("tidak ada sebutan dalam 7 hari terakhir")
+    elif volume_change_pct > 5:
         detail_parts.append(f"volume sebutan naik {volume_change_pct}% dibanding minggu lalu")
     elif volume_change_pct < -5:
         detail_parts.append(f"volume sebutan turun {abs(volume_change_pct)}% dibanding minggu lalu")
@@ -211,17 +257,40 @@ def _scale_points(values, width, height, max_value):
     return " ".join(points)
 
 
-def timeline_chart(timeline, width=760, height=230):
+def timeline_chart(timeline, width=760, height=230, dates=None):
     max_value = max(
         [max(day["positive"], day["neutral"], day["negative"]) for day in timeline] or [0]
     ) or 1
-    return {
+    chart = {
         "positive_points": _scale_points([d["positive"] for d in timeline], width, height, max_value),
         "neutral_points": _scale_points([d["neutral"] for d in timeline], width, height, max_value),
         "negative_points": _scale_points([d["negative"] for d in timeline], width, height, max_value),
         "width": width,
         "height": height,
+        "max_value": max_value,
+        "mid_value": round(max_value / 2),
     }
+    # Axis labels turn the polylines from a shape into something readable: a handful of
+    # evenly spaced date ticks and a marker on the worst negative day. Only computed when
+    # the caller has real calendar dates (the daily overview), not the hourly war room.
+    if dates and len(dates) == len(timeline) and len(dates) > 1:
+        n = len(dates)
+        tick_indexes = sorted({0, n // 4, n // 2, (3 * n) // 4, n - 1})
+        # Formatted as dot-strings, not floats: these land directly in a CSS `left:`
+        # value, and under an id/ID locale Django would render a float as "24,1" —
+        # invalid CSS that the browser silently drops, collapsing every label to 0.
+        chart["x_labels"] = [
+            {"label": f"{dates[i].day}/{dates[i].month}", "left_pct": f"{i / (n - 1) * 100:.1f}"}
+            for i in tick_indexes
+        ]
+        peak_i = max(range(n), key=lambda i: timeline[i]["negative"])
+        if timeline[peak_i]["negative"] > 0:
+            chart["peak"] = {
+                "date": dates[peak_i],
+                "value": timeline[peak_i]["negative"],
+                "left_pct": f"{peak_i / (n - 1) * 100:.1f}",
+            }
+    return chart
 
 
 def recent_alerts(project, limit=5):
