@@ -618,6 +618,12 @@ class Incident(models.Model):
     root_cause = models.TextField(blank=True)
     impact = models.TextField(blank=True)
     recommendation = models.TextField(blank=True)
+    draft_response = models.TextField(blank=True)
+    # Retrieved regulatory grounding for the response: [{source_ref, passage, score}, ...]
+    # Kept separately from the editable text so the retrieved sources stay visible
+    # for verification even after a human edits the wording (FR-31.4).
+    response_regulatory_context = models.JSONField(default=list, blank=True)
+    response_generated_at = models.DateTimeField(null=True, blank=True)
     evidence_image_path = models.CharField(max_length=255, blank=True)
     evidence_caption = models.CharField(max_length=300, blank=True)
     evidence_is_simulated = models.BooleanField(default=False)
@@ -663,6 +669,7 @@ class IncidentEvent(models.Model):
     KIND_STATUS_CHANGE = "status_change"
     KIND_ACTION_LOGGED = "action_logged"
     KIND_NOTE = "note"
+    KIND_RESPONSE_DRAFTED = "response_drafted"
     KIND_CHOICES = [
         (KIND_DETECTED, "Terdeteksi"),
         (KIND_VOLUME_UPDATE, "Perubahan volume"),
@@ -670,6 +677,7 @@ class IncidentEvent(models.Model):
         (KIND_STATUS_CHANGE, "Perubahan status"),
         (KIND_ACTION_LOGGED, "Tindakan dicatat"),
         (KIND_NOTE, "Catatan"),
+        (KIND_RESPONSE_DRAFTED, "Tanggapan disusun"),
     ]
 
     incident = models.ForeignKey(Incident, on_delete=models.CASCADE, related_name="events")

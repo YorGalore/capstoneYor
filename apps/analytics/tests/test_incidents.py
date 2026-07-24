@@ -68,6 +68,24 @@ class IncidentModelTest(TestCase):
 
         self.assertEqual(list(Incident.objects.all()), [incident, other])
 
+    def test_incident_has_empty_draft_response_by_default(self):
+        incident = Incident.objects.create(
+            project=self.project, title="Jalan Rusak", severity=Incident.SEVERITY_HIGH,
+        )
+        self.assertEqual(incident.draft_response, "")
+        self.assertEqual(incident.response_regulatory_context, [])
+        self.assertIsNone(incident.response_generated_at)
+
+    def test_incident_event_supports_response_drafted_kind(self):
+        incident = Incident.objects.create(
+            project=self.project, title="Sampah", severity=Incident.SEVERITY_MEDIUM,
+        )
+        event = IncidentEvent.objects.create(
+            incident=incident, kind=IncidentEvent.KIND_RESPONSE_DRAFTED,
+            description="Draf tanggapan disusun.", logged_by="Operator Satu",
+        )
+        self.assertEqual(event.get_kind_display(), "Tanggapan disusun")
+
 
 class SeverityTest(TestCase):
     def test_calm_low_volume_issue_is_low(self):
