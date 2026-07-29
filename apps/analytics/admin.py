@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import (
-    Alert, AlertRule, Author, Camp, Category, Coalition, DailyBrief, DailyBriefIssue,
+    ActorSentimentAssessment, Alert, AlertRule, Author, Camp, Category, Coalition, DailyBrief, DailyBriefIssue,
     DailyBriefRun, GovernmentProgram, Issue, IssueLabel, IssueMergeHistory, LabelCorrection,
     Mention, PoliticalActor, PoliticalIssue, ResponseAction, SubCategory,
 )
@@ -45,6 +45,7 @@ class LabelCorrectionAdmin(admin.ModelAdmin):
 
 admin.site.register(Camp)
 admin.site.register(PoliticalActor)
+admin.site.register(ActorSentimentAssessment)
 admin.site.register(GovernmentProgram)
 admin.site.register(ResponseAction)
 admin.site.register(DailyBriefRun)

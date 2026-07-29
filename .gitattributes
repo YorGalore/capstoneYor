@@ -6,3 +6,7 @@
 Dockerfile text eol=lf
 docker-compose.yml text eol=lf
 .dockerignore text eol=lf
+
+# Compiled documents are versioned only when explicitly requested. Keep Git from
+# invoking the system PDF-to-text driver and presenting thousands of fake text lines.
+*.pdf binary

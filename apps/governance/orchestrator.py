@@ -6,7 +6,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.utils import timezone
 
-from . import apify_crawler
+from . import apify_crawler, comment_crawler
 from .ingestion import ingest_items
 from .models import CollectionRun, MonitoredDomain, MonitoringKeyword, PlatformIntegration
 
@@ -20,9 +20,18 @@ PRICING_PER_1000 = {
     "youtube": Decimal("2.40"),
 }
 
+COMMENT_PRICING_PER_1000 = {
+    "x": Decimal("1.61"),
+    "instagram": Decimal("1.00"),
+    "tiktok": Decimal("0.20"),
+    "facebook": Decimal("3.00"),
+    "youtube": Decimal("1.50"),
+}
 
-def estimate_cost(platform, item_count):
-    price = PRICING_PER_1000.get(platform, Decimal("0"))
+
+def estimate_cost(platform, item_count, *, comments=False):
+    pricing = COMMENT_PRICING_PER_1000 if comments else PRICING_PER_1000
+    price = pricing.get(platform, Decimal("0"))
     cost = (Decimal(item_count) / Decimal(1000)) * price
     return cost.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
@@ -33,10 +42,26 @@ def _is_overlapping(project, source):
     ).exists()
 
 
-def collect_platform(project, platform, keywords, token):
+def collect_platform(
+    project,
+    platform,
+    keywords,
+    token,
+    *,
+    actor_id=None,
+    start_date=None,
+    end_date=None,
+    max_results=None,
+):
     """Run one Apify platform for the active keywords, skipping if a prior run for
     the same source is still in flight (REQ-SC-05)."""
     source = platform.slug
+    if start_date or end_date:
+        source = (
+            f"{source}:history:"
+            f"{start_date.strftime('%Y%m%d') if start_date else 'open'}-"
+            f"{end_date.strftime('%Y%m%d') if end_date else 'open'}"
+        )
     if _is_overlapping(project, source):
         return CollectionRun.objects.create(
             project=project, source=source, status=CollectionRun.STATUS_SKIPPED,
@@ -49,12 +74,49 @@ def collect_platform(project, platform, keywords, token):
     )
     try:
         items = apify_crawler.collect(
-            source, [kw.keyword for kw in keywords], token=token
+            platform.slug,
+            [kw.keyword for kw in keywords],
+            token=token,
+            max_results=max_results,
+            start_date=start_date,
+            end_date=end_date,
+            actor_id=actor_id,
         )
         ingest_items(project, platform, items)
-        run.items_found = len(items)
-        run.cost_estimate = estimate_cost(source, len(items))
+        comments = []
+        comment_error = ""
+        if (
+            project.collect_comments
+            and platform.slug in comment_crawler.supported_platforms()
+        ):
+            max_posts = min(max(project.comment_posts_per_run, 1), 50)
+            max_comments = min(max(project.comments_per_post, 1), 500)
+            parent_items = sorted(
+                items, key=lambda item: item.get("engagement_count", 0), reverse=True
+            )[:max_posts]
+            try:
+                comments = comment_crawler.collect(
+                    platform.slug,
+                    parent_items,
+                    token=token,
+                    max_comments_per_post=max_comments,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                ingest_items(project, platform, comments)
+            except Exception as exc:
+                # A dedicated comment Actor can be unavailable while post search is
+                # healthy. Preserve the successfully collected posts and expose the
+                # partial-coverage reason instead of misreporting the whole run as lost.
+                comment_error = f"Koleksi komentar gagal: {exc}"[:500]
+
+        run.items_found = len(items) + len(comments)
+        run.cost_estimate = (
+            estimate_cost(platform.slug, len(items))
+            + estimate_cost(platform.slug, len(comments), comments=True)
+        )
         run.status = CollectionRun.STATUS_COMPLETED
+        run.error = comment_error
     except Exception as exc:  # a failed actor run must not abort the batch (doc §3)
         run.status = CollectionRun.STATUS_FAILED
         run.error = str(exc)[:500]
@@ -63,7 +125,15 @@ def collect_platform(project, platform, keywords, token):
     return run
 
 
-def run_apify_collection(project, token, platforms=None):
+def run_apify_collection(
+    project,
+    token,
+    platforms=None,
+    *,
+    start_date=None,
+    end_date=None,
+    max_results=None,
+):
     """Collect from every enabled Apify platform. Returns the CollectionRun list.
     Degrades gracefully (no runs) when there is no token or no active keyword."""
     # The kill switch is enforced here, at the collection boundary, rather than in the
@@ -94,7 +164,16 @@ def run_apify_collection(project, token, platforms=None):
         integrations = integrations.filter(platform__slug__in=platforms)
 
     return [
-        collect_platform(project, integ.platform, active_keywords, token)
+        collect_platform(
+            project,
+            integ.platform,
+            active_keywords,
+            token,
+            actor_id=integ.actor_id or None,
+            start_date=start_date,
+            end_date=end_date,
+            max_results=max_results,
+        )
         for integ in integrations
     ]
 

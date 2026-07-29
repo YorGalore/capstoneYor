@@ -121,6 +121,41 @@ class KonfigurasiViewTest(TestCase):
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.json()["request"]["id"], payload["id"])
 
+    @patch(
+        "apps.governance.views.apify.get_active_token",
+        return_value="apify_api_environment",
+    )
+    def test_history_trigger_queues_bounded_date_window(self, _token):
+        response = self.client.post(
+            "/konfigurasi/koleksi/historis/",
+            {
+                "history_start_date": "2026-07-21",
+                "history_end_date": "2026-07-27",
+                "max_results_per_platform": "75",
+            },
+        )
+        self.assertRedirects(response, "/konfigurasi/")
+        queued = ManualCollectionRequest.objects.get()
+        self.assertEqual(queued.collection_type, ManualCollectionRequest.TYPE_SOCIAL)
+        self.assertEqual(queued.history_start_date.isoformat(), "2026-07-21")
+        self.assertEqual(queued.history_end_date.isoformat(), "2026-07-27")
+        self.assertEqual(queued.max_results_per_platform, 75)
+
+    @patch(
+        "apps.governance.views.apify.get_active_token",
+        return_value="apify_api_environment",
+    )
+    def test_history_trigger_rejects_window_over_31_days(self, _token):
+        self.client.post(
+            "/konfigurasi/koleksi/historis/",
+            {
+                "history_start_date": "2026-06-01",
+                "history_end_date": "2026-07-27",
+                "max_results_per_platform": "75",
+            },
+        )
+        self.assertFalse(ManualCollectionRequest.objects.exists())
+
     def test_run_scan_blocked_without_active_keywords(self):
         MonitoringKeyword.objects.update(is_active=False)
         response = self.client.post("/konfigurasi/pindai/")

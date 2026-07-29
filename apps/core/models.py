@@ -35,6 +35,9 @@ class OnboardingRequest(models.Model):
 class Project(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="projects")
     name = models.CharField(max_length=200)
+    collect_comments = models.BooleanField(default=False, db_default=False)
+    comment_posts_per_run = models.PositiveSmallIntegerField(default=10, db_default=10)
+    comments_per_post = models.PositiveSmallIntegerField(default=25, db_default=25)
 
     def __str__(self):
         return self.name
@@ -45,10 +48,22 @@ class Platform(models.Model):
     METHOD_INTERNAL = "internal"
     METHOD_CHOICES = [(METHOD_APIFY, "Apify"), (METHOD_INTERNAL, "Internal")]
 
+    CHANNEL_NEWS = "news"
+    CHANNEL_SOCIAL = "social"
+    CHANNEL_OTHER = "other"
+    CHANNEL_CHOICES = [
+        (CHANNEL_NEWS, "Media Online"),
+        (CHANNEL_SOCIAL, "Media Sosial"),
+        (CHANNEL_OTHER, "Sumber Lain"),
+    ]
+
     slug = models.SlugField(unique=True)
     display_name = models.CharField(max_length=100)
     brand_color = models.CharField(max_length=7, default="#0E7C86")
     method = models.CharField(max_length=20, choices=METHOD_CHOICES, default=METHOD_INTERNAL)
+    channel_type = models.CharField(
+        max_length=20, choices=CHANNEL_CHOICES, default=CHANNEL_OTHER
+    )
 
     def __str__(self):
         return self.display_name

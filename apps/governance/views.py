@@ -3,6 +3,7 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
 from apps.core.models import AnalystProfile, PagePermission, Platform
@@ -55,6 +56,7 @@ def konfigurasi(request):
         "active_nav": "konfigurasi",
         "integrations": integrations,
         "credential": credential,
+        "credential_source": apify.credential_source(project),
         "domains": domains,
         "keywords": keywords,
         "recent_runs": recent_runs,
@@ -74,7 +76,42 @@ def konfigurasi(request):
         "programs": GovernmentProgram.objects.filter(project=project),
         "program_form": GovernmentProgramForm(project=project),
         "election_mode": neutrality.election_mode_active(),
+        "comment_collection": {
+            "enabled": project.collect_comments,
+            "posts_per_run": project.comment_posts_per_run,
+            "comments_per_post": project.comments_per_post,
+        },
     })
+
+
+@require_page("konfigurasi")
+@require_POST
+@transaction.atomic
+def save_comment_collection(request):
+    project = _current_project(request)
+    try:
+        posts_per_run = min(max(int(request.POST.get("posts_per_run", 10)), 1), 50)
+        comments_per_post = min(max(int(request.POST.get("comments_per_post", 25)), 1), 500)
+    except (TypeError, ValueError):
+        messages.error(request, "Batas koleksi komentar harus berupa angka.")
+        return redirect("governance:konfigurasi")
+
+    project.collect_comments = request.POST.get("enabled") == "1"
+    project.comment_posts_per_run = posts_per_run
+    project.comments_per_post = comments_per_post
+    project.save(update_fields=[
+        "collect_comments", "comment_posts_per_run", "comments_per_post",
+    ])
+    record_audit_entry(
+        actor_label=_actor_label(request),
+        action="Memperbarui koleksi komentar publik",
+        target=(
+            f"{'aktif' if project.collect_comments else 'nonaktif'}; "
+            f"{posts_per_run} post x {comments_per_post} komentar"
+        ),
+    )
+    messages.success(request, "Pengaturan koleksi komentar publik diperbarui.")
+    return redirect("governance:konfigurasi")
 
 
 def _form_errors(form):
@@ -461,14 +498,26 @@ def test_domain_connection(request, pk):
 
 
 def _manual_request_payload(collection_request):
+    type_label = collection_request.get_collection_type_display()
+    if collection_request.history_start_date:
+        type_label = "Social Media Historis"
     return {
         "id": collection_request.pk,
         "type": collection_request.collection_type,
-        "type_label": collection_request.get_collection_type_display(),
+        "type_label": type_label,
         "status": collection_request.status,
         "status_label": collection_request.get_status_display(),
         "items_found": collection_request.items_found,
         "sources_processed": collection_request.sources_processed,
+        "history_start_date": (
+            collection_request.history_start_date.isoformat()
+            if collection_request.history_start_date else None
+        ),
+        "history_end_date": (
+            collection_request.history_end_date.isoformat()
+            if collection_request.history_end_date else None
+        ),
+        "max_results_per_platform": collection_request.max_results_per_platform,
         "detail": collection_request.detail,
         "requested_at": collection_request.requested_at.isoformat(),
         "started_at": collection_request.started_at.isoformat() if collection_request.started_at else None,
@@ -481,7 +530,14 @@ def _manual_request_payload(collection_request):
     }
 
 
-def _enqueue_collection(request, collection_type):
+def _enqueue_collection(
+    request,
+    collection_type,
+    *,
+    history_start_date=None,
+    history_end_date=None,
+    max_results_per_platform=None,
+):
     project = _current_project(request)
     wants_json = request.headers.get("x-requested-with") == "XMLHttpRequest"
 
@@ -505,11 +561,10 @@ def _enqueue_collection(request, collection_type):
         if not available:
             return reject("Tambahkan minimal satu domain berita aktif dengan URL starter.")
     else:
-        has_token = ApifyCredential.objects.filter(
-            project=project, status=ApifyCredential.STATUS_ACTIVE
-        ).exclude(token_encrypted="").exists()
-        if not has_token:
-            return reject("Simpan token Apify aktif sebelum menjalankan koleksi social media.")
+        if not apify.get_active_token(project):
+            return reject(
+                "Simpan token Apify proyek atau konfigurasi APIFY_API_TOKEN/APIFY_KEY."
+            )
         if not PlatformIntegration.objects.filter(
             project=project, method=PlatformIntegration.METHOD_APIFY, is_active=True,
         ).exists():
@@ -528,14 +583,24 @@ def _enqueue_collection(request, collection_type):
         return redirect("governance:konfigurasi")
 
     collection_request = ManualCollectionRequest.objects.create(
-        project=project, collection_type=collection_type, requested_by=_actor_label(request),
+        project=project,
+        collection_type=collection_type,
+        requested_by=_actor_label(request),
+        history_start_date=history_start_date,
+        history_end_date=history_end_date,
+        max_results_per_platform=max_results_per_platform,
+    )
+    request_label = (
+        "Social Media Historis"
+        if history_start_date
+        else collection_request.get_collection_type_display()
     )
     record_audit_entry(
         actor_label=_actor_label(request),
-        action=f"Mengantrekan koleksi manual {collection_request.get_collection_type_display()}",
+        action=f"Mengantrekan koleksi manual {request_label}",
         target=f"manual_collection:{collection_request.pk}",
     )
-    message = f"Koleksi {collection_request.get_collection_type_display()} masuk antrean worker."
+    message = f"Koleksi {request_label} masuk antrean worker."
     if wants_json:
         return JsonResponse({"ok": True, "message": message, "request": _manual_request_payload(collection_request)}, status=202)
     messages.success(request, message)
@@ -552,6 +617,37 @@ def queue_news_collection(request):
 @require_POST
 def queue_social_collection(request):
     return _enqueue_collection(request, ManualCollectionRequest.TYPE_SOCIAL)
+
+
+@require_page("konfigurasi")
+@require_POST
+def queue_history_collection(request):
+    start_date = parse_date(request.POST.get("history_start_date", ""))
+    end_date = parse_date(request.POST.get("history_end_date", ""))
+    if start_date is None or end_date is None:
+        messages.error(request, "Tanggal awal dan akhir koleksi historis wajib diisi.")
+        return redirect("governance:konfigurasi")
+    if start_date > end_date:
+        messages.error(request, "Tanggal awal tidak boleh melewati tanggal akhir.")
+        return redirect("governance:konfigurasi")
+    if (end_date - start_date).days >= 31:
+        messages.error(request, "Satu backfill dibatasi maksimal 31 hari.")
+        return redirect("governance:konfigurasi")
+    try:
+        maximum = min(
+            max(int(request.POST.get("max_results_per_platform", 100)), 1),
+            500,
+        )
+    except (TypeError, ValueError):
+        messages.error(request, "Batas hasil historis harus berupa angka.")
+        return redirect("governance:konfigurasi")
+    return _enqueue_collection(
+        request,
+        ManualCollectionRequest.TYPE_SOCIAL,
+        history_start_date=start_date,
+        history_end_date=end_date,
+        max_results_per_platform=maximum,
+    )
 
 
 @require_page("konfigurasi")

@@ -165,10 +165,18 @@ def _execute_manual_collection(request):
         token = apify.get_active_token(request.project)
         if not token:
             request.status = ManualCollectionRequest.STATUS_FAILED
-            request.detail = "Token Apify aktif belum tersedia untuk proyek ini."
+            request.detail = (
+                "Token Apify proyek maupun fallback environment belum tersedia."
+            )
             runs = []
         else:
-            runs = orchestrator.run_apify_collection(request.project, token)
+            runs = orchestrator.run_apify_collection(
+                request.project,
+                token,
+                start_date=request.history_start_date,
+                end_date=request.history_end_date,
+                max_results=request.max_results_per_platform,
+            )
             if not runs:
                 request.status = ManualCollectionRequest.STATUS_FAILED
                 request.detail = "Tidak ada integrasi social media dan kata kunci aktif yang dapat diproses."

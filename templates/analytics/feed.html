@@ -96,6 +96,7 @@
             <span class="feed-platform-mark" aria-hidden="true">{{ m.platform.display_name|slice:":1"|upper }}</span>
             <span class="feed-author">{{ m.author_handle }}</span>
             <span class="feed-platform">{{ m.platform.display_name }}</span>
+            <span class="pantau-badge">{% if m.content_type == "comment" %}Komentar{% else %}Post/Artikel{% endif %}</span>
             <span class="pantau-badge pantau-badge-{{ m.sentiment }}">{{ m.get_sentiment_display }}</span>
           </div>
 
@@ -119,6 +120,7 @@
             </span>
             {% if m.matched_keyword %}<span>Kata kunci: <strong>{{ m.matched_keyword }}</strong></span>{% endif %}
             {% if m.theme %}<span>Tema: <strong>{{ m.theme }}</strong></span>{% endif %}
+            {% if m.parent %}<span>Induk: <strong>#{{ m.parent.pk }} · {{ m.parent.author_handle }}</strong></span>{% endif %}
           </div>
         </div>
 
@@ -143,6 +145,24 @@
           {% else %}
           <div class="feed-readonly">Mode baca saja</div>
           {% endif %}
+          {% for assessment in m.actor_sentiments.all %}
+          <div class="feed-review-head feed-actor-review-head">
+            <span>{{ assessment.actor.name }}</span>
+            <span class="feed-model">{{ assessment.get_source_display }}</span>
+          </div>
+          {% if analyst_profile.role != "viewer" %}
+          <form method="post" action="{% url 'analytics:correct_actor_sentiment' m.pk assessment.pk %}" class="feed-correction-form">
+            {% csrf_token %}
+            <label class="sr-only" for="actor-sentiment-{{ assessment.pk }}">Sentimen terhadap {{ assessment.actor.name }}</label>
+            <select class="pantau-input" id="actor-sentiment-{{ assessment.pk }}" name="sentiment">
+              {% for key, label in sentiment_choices %}
+              <option value="{{ key }}" {% if assessment.sentiment == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">Simpan aktor</button>
+          </form>
+          {% endif %}
+          {% endfor %}
         </aside>
       </article>
       {% empty %}

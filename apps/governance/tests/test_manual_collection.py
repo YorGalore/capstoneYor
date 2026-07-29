@@ -1,3 +1,4 @@
+from datetime import date
 from unittest import mock
 
 from django.test import TestCase
@@ -49,6 +50,31 @@ class ManualCollectionWorkerTest(TestCase):
         request.refresh_from_db()
         self.assertEqual(request.status, ManualCollectionRequest.STATUS_FAILED)
         self.assertIn("Token Apify", request.detail)
+
+    @mock.patch("apps.governance.orchestrator.run_apify_collection")
+    @mock.patch("apps.governance.apify.get_active_token", return_value="tok")
+    def test_history_request_forwards_window_and_bound(self, _token, collect):
+        collect.return_value = []
+        request = ManualCollectionRequest.objects.create(
+            project=self.project,
+            collection_type=ManualCollectionRequest.TYPE_SOCIAL,
+            requested_by="Operator",
+            history_start_date=date(2026, 7, 21),
+            history_end_date=date(2026, 7, 27),
+            max_results_per_platform=75,
+        )
+
+        scheduling.run_pending_manual_collections()
+
+        collect.assert_called_once_with(
+            self.project,
+            "tok",
+            start_date=date(2026, 7, 21),
+            end_date=date(2026, 7, 27),
+            max_results=75,
+        )
+        request.refresh_from_db()
+        self.assertEqual(request.status, ManualCollectionRequest.STATUS_FAILED)
 
     @mock.patch("apps.governance.orchestrator.run_news_collection")
     def test_failed_source_is_visible_on_manual_request(self, collect):

@@ -34,6 +34,12 @@ def ingest_items(project, platform, items):
         content = item.get("content", "") or ""
         result = classify(content)
         author = _author_for(platform, item.get("author"))
+        parent = None
+        parent_external_id = item.get("parent_external_id")
+        if parent_external_id:
+            parent = Mention.objects.filter(
+                project=project, external_id=parent_external_id
+            ).first()
         mention = Mention.objects.create(
             project=project,
             platform=platform,
@@ -52,6 +58,11 @@ def ingest_items(project, platform, items):
             source_url=item.get("url") or None,
             matched_keyword=item.get("matched_keyword", ""),
             is_scraped=True,
+            content_type=item.get("content_type", Mention.CONTENT_POST),
+            parent=parent,
+            reported_comment_count=(
+                (item.get("engagement") or {}).get("comments", 0) or 0
+            ),
         )
         # Auto-assign to the Issue Taxonomy where the content confidently matches;
         # anything unmatched surfaces in the manual review queue (FR-3A.2/3A.3).

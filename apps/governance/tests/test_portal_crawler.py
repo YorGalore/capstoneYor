@@ -3,6 +3,7 @@ from unittest import mock
 
 from django.test import SimpleTestCase
 
+from apps.core.demo_kulon_progo import DOMAINS
 from apps.governance import portal_crawler
 
 
@@ -10,17 +11,7 @@ class PortalRegistryTest(SimpleTestCase):
     def test_all_kulon_progo_demo_publishers_have_adapters(self):
         self.assertSetEqual(
             set(portal_crawler.PORTALS),
-            {
-                "jogja.tribunnews.com",
-                "jogjapolitan.harianjogja.com",
-                "jogja.antaranews.com",
-                "www.prolimannews.id",
-                "rri.co.id",
-                "jogja.viva.co.id",
-                "www.detik.com",
-                "www.purworejo24.com",
-                "kominfo.kulonprogokab.go.id",
-            },
+            {domain for domain, _adapter, _feed_url in DOMAINS},
         )
 
     @mock.patch("apps.governance.portal_crawler._get")

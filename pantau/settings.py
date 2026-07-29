@@ -1,9 +1,18 @@
 import os
+import sys
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 from pantau import env
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Compose/production inject environment variables directly. Local Django commands
+# additionally read .env, while preserving already-injected values. Developer
+# secrets are deliberately not loaded into the test process.
+if "test" not in sys.argv:
+    load_dotenv(BASE_DIR / ".env", override=False)
 
 # Production is the default. Turning DEBUG on has to be a deliberate act, so that
 # forgetting to set it can never be what exposes tracebacks and settings to the world.

@@ -259,6 +259,9 @@ class ManualCollectionRequest(ProjectOwnedModel):
     finished_at = models.DateTimeField(null=True, blank=True)
     items_found = models.PositiveIntegerField(default=0)
     sources_processed = models.PositiveIntegerField(default=0)
+    history_start_date = models.DateField(null=True, blank=True)
+    history_end_date = models.DateField(null=True, blank=True)
+    max_results_per_platform = models.PositiveIntegerField(null=True, blank=True)
     detail = models.CharField(max_length=500, blank=True)
 
     class Meta:

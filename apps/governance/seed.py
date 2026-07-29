@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from apps.core.models import Platform
 
+from .apify_crawler import ACTOR_CONFIG
 from .models import (
     ApifyCredential, AuditLogEntry, MonitoredDomain, MonitoringKeyword, PlatformIntegration,
     PoliticalMonitoringPermission, PolicyAcknowledgment, ScheduledJob,
@@ -60,11 +61,7 @@ AUDIT_ENTRIES = [
 ]
 
 ACTOR_IDS = {
-    "instagram": "apify/instagram-scraper",
-    "tiktok": "clockworks/tiktok-scraper",
-    "youtube": "streamers/youtube-scraper",
-    "facebook": "apify/facebook-posts-scraper",
-    "x": "scraper internal v2.4.1",
+    slug: config["actor_id"] for slug, config in ACTOR_CONFIG.items()
 }
 
 

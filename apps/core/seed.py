@@ -7,13 +7,13 @@ DEMO_USERNAME = "dewi.anjani"
 DEMO_PASSWORD = "demo12345"
 
 PLATFORMS = [
-    ("x", "X (Twitter)", "#0B1F33", Platform.METHOD_INTERNAL),
-    ("instagram", "Instagram", "#DD2A7B", Platform.METHOD_APIFY),
-    ("tiktok", "TikTok", "#0B1F33", Platform.METHOD_APIFY),
-    ("youtube", "YouTube", "#FF0000", Platform.METHOD_APIFY),
-    ("facebook", "Facebook", "#0866FF", Platform.METHOD_APIFY),
-    ("berita", "Berita Daring", "#0E7C86", Platform.METHOD_INTERNAL),
-    ("forum", "Forum/Blog", "#7C8A99", Platform.METHOD_INTERNAL),
+    ("x", "X (Twitter)", "#0B1F33", Platform.METHOD_APIFY, Platform.CHANNEL_SOCIAL),
+    ("instagram", "Instagram", "#DD2A7B", Platform.METHOD_APIFY, Platform.CHANNEL_SOCIAL),
+    ("tiktok", "TikTok", "#0B1F33", Platform.METHOD_APIFY, Platform.CHANNEL_SOCIAL),
+    ("youtube", "YouTube", "#FF0000", Platform.METHOD_APIFY, Platform.CHANNEL_SOCIAL),
+    ("facebook", "Facebook", "#0866FF", Platform.METHOD_APIFY, Platform.CHANNEL_SOCIAL),
+    ("berita", "Berita Daring", "#0E7C86", Platform.METHOD_INTERNAL, Platform.CHANNEL_NEWS),
+    ("forum", "Forum/Blog", "#7C8A99", Platform.METHOD_INTERNAL, Platform.CHANNEL_OTHER),
 ]
 
 PROVINCES = [
@@ -41,10 +41,15 @@ def seed_core():
     tenant, _ = Tenant.objects.get_or_create(name="Kemenko PMK")
     project, _ = Project.objects.get_or_create(tenant=tenant, name="Program Pangan Rakyat")
 
-    for slug, display_name, brand_color, method in PLATFORMS:
-        Platform.objects.get_or_create(
+    for slug, display_name, brand_color, method, channel_type in PLATFORMS:
+        Platform.objects.update_or_create(
             slug=slug,
-            defaults={"display_name": display_name, "brand_color": brand_color, "method": method},
+            defaults={
+                "display_name": display_name,
+                "brand_color": brand_color,
+                "method": method,
+                "channel_type": channel_type,
+            },
         )
 
     for name, population_online in PROVINCES:

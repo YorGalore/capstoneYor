@@ -54,6 +54,13 @@ class Author(models.Model):
 
 
 class Mention(models.Model):
+    CONTENT_POST = "post"
+    CONTENT_COMMENT = "comment"
+    CONTENT_CHOICES = [
+        (CONTENT_POST, "Posting/Artikel"),
+        (CONTENT_COMMENT, "Komentar/Balasan"),
+    ]
+
     SENTIMENT_POSITIVE = "positive"
     SENTIMENT_NEUTRAL = "neutral"
     SENTIMENT_NEGATIVE = "negative"
@@ -116,6 +123,13 @@ class Mention(models.Model):
     source_url = models.URLField(max_length=500, null=True, blank=True, unique=True)
     matched_keyword = models.CharField(max_length=150, blank=True)
     is_scraped = models.BooleanField(default=False)
+    content_type = models.CharField(
+        max_length=20, choices=CONTENT_CHOICES, default=CONTENT_POST
+    )
+    parent = models.ForeignKey(
+        "self", on_delete=models.CASCADE, null=True, blank=True, related_name="comments"
+    )
+    reported_comment_count = models.PositiveIntegerField(default=0)
     political_actors = models.ManyToManyField(
         "PoliticalActor", blank=True, related_name="mentions"
     )
@@ -129,6 +143,9 @@ class Mention(models.Model):
             models.Index(fields=["posted_at"]),
             models.Index(fields=["sentiment"]),
             models.Index(fields=["is_political"]),
+            models.Index(
+                fields=["content_type"], name="analytics_m_content_6bf398_idx"
+            ),
         ]
 
     def __str__(self):
@@ -349,6 +366,39 @@ class PoliticalActor(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class ActorSentimentAssessment(models.Model):
+    """Sentiment toward one configured public/organizational actor within a mention.
+
+    A single article can be negative toward the institution while neutral toward a
+    quoted official. Keeping this separate from Mention.sentiment is required for
+    defensible actor-by-actor comparisons in periodic reports.
+    """
+
+    SOURCE_AUTO = "auto"
+    SOURCE_MANUAL = "manual"
+    SOURCE_CHOICES = [(SOURCE_AUTO, "Otomatis"), (SOURCE_MANUAL, "Manual")]
+
+    mention = models.ForeignKey(
+        Mention, on_delete=models.CASCADE, related_name="actor_sentiments"
+    )
+    actor = models.ForeignKey(
+        PoliticalActor, on_delete=models.CASCADE, related_name="sentiment_assessments"
+    )
+    sentiment = models.CharField(max_length=20, choices=Mention.SENTIMENT_CHOICES)
+    confidence = models.FloatField(default=0.0)
+    model = models.CharField(max_length=50, blank=True)
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_AUTO)
+    reviewed_by = models.CharField(max_length=150, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("mention", "actor")
+        ordering = ["actor__name"]
+
+    def __str__(self):
+        return f"{self.mention_id} / {self.actor.name}: {self.sentiment}"
 
 
 class GovernmentProgram(models.Model):

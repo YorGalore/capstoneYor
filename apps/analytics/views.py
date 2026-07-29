@@ -15,10 +15,10 @@ from apps.core.selectors import get_active_project, scope_to_tenant
 from apps.governance import regulatory
 from apps.governance.neutrality import NEUTRALITY_NOTICE, require_political_monitoring
 from apps.governance.services import record_audit_entry
-from . import briefs, exports, incidents, selectors, taxonomy
+from . import briefs, exports, incidents, media_report_pdf, selectors, taxonomy
 from .models import (
-    DailyBrief, DailyBriefIssue, Issue, IssueMergeHistory, LabelCorrection, Mention,
-    PoliticalIssue, ResponseAction,
+    ActorSentimentAssessment, DailyBrief, DailyBriefIssue, Issue, IssueMergeHistory,
+    LabelCorrection, Mention, PoliticalIssue, ResponseAction,
 )
 
 
@@ -62,7 +62,9 @@ def feed(request):
     """Raw mention feed, filterable by platform/sentiment/author/date (FR-3.1),
     tenant-scoped (FR-1.2)."""
     mentions = scope_to_tenant(
-        Mention.objects.select_related("platform", "author"), request
+        Mention.objects.select_related("platform", "author", "parent")
+        .prefetch_related("actor_sentiments__actor"),
+        request,
     ).order_by("-posted_at")
 
     platform = request.GET.get("platform") or ""
@@ -110,6 +112,39 @@ def correct_sentiment(request, mention_id):
         mention.sentiment_model = "manual"
         mention.save(update_fields=["sentiment", "sentiment_model"])
         messages.success(request, "Sentimen diperbarui dan dicatat sebagai koreksi manual.")
+    return redirect("analytics:feed")
+
+
+@require_page("feed")
+@require_writer_role
+@require_POST
+def correct_actor_sentiment(request, mention_id, assessment_id):
+    mention = get_object_or_404(
+        scope_to_tenant(Mention.objects.all(), request), pk=mention_id
+    )
+    assessment = get_object_or_404(
+        ActorSentimentAssessment.objects.select_related("actor"),
+        pk=assessment_id,
+        mention=mention,
+    )
+    new_value = request.POST.get("sentiment", "")
+    valid = {key for key, _label in Mention.SENTIMENT_CHOICES}
+    if new_value not in valid:
+        messages.error(request, "Nilai sentimen aktor tidak valid.")
+        return redirect("analytics:feed")
+    if new_value != assessment.sentiment:
+        assessment.sentiment = new_value
+        assessment.source = ActorSentimentAssessment.SOURCE_MANUAL
+        assessment.reviewed_by = request.user.get_full_name() or request.user.username
+        assessment.save(update_fields=["sentiment", "source", "reviewed_by", "updated_at"])
+        record_audit_entry(
+            actor_label=assessment.reviewed_by,
+            action="Mengoreksi sentimen per aktor",
+            target=f"{assessment.actor.name} / mention {mention.id}: {new_value}",
+        )
+        messages.success(
+            request, f"Sentimen terhadap {assessment.actor.name} diperbarui."
+        )
     return redirect("analytics:feed")
 
 
@@ -182,16 +217,63 @@ def laporan(request):
     """Report center: archive of finalized daily briefs plus a periodic recap of
     the reporting window, with links to the raw-data exports."""
     project = get_active_project(request)
-    try:
-        days = min(max(int(request.GET.get("periode", 30)), 7), 90)
-    except (TypeError, ValueError):
-        days = 30
-    summary = selectors.laporan_summary(project, days=days) if project else None
+    start_date, end_date, days = _laporan_period(request)
+    summary = (
+        selectors.laporan_summary(
+            project, days=days, start_date=start_date, end_date=end_date
+        )
+        if project else None
+    )
     return render(request, "analytics/laporan.html", {
         "active_nav": "laporan",
         "summary": summary,
         "can_export": user_can_access(request.user, "export"),
     })
+
+
+def _laporan_period(request):
+    try:
+        days = min(max(int(request.GET.get("periode", 30)), 1), 366)
+    except (TypeError, ValueError):
+        days = 30
+    end_date = parse_date(request.GET.get("to") or "") or timezone.localdate()
+    start_date = parse_date(request.GET.get("from") or "")
+    if start_date is None:
+        start_date = end_date - timezone.timedelta(days=days - 1)
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
+    if (end_date - start_date).days >= 366:
+        start_date = end_date - timezone.timedelta(days=365)
+    return start_date, end_date, (end_date - start_date).days + 1
+
+
+@require_page("laporan")
+def laporan_pdf(request):
+    """Generate the reviewed date range as a real PDF inside PANTAU."""
+    project = get_active_project(request)
+    if project is None:
+        raise Http404("Proyek aktif tidak ditemukan.")
+    start_date, end_date, days = _laporan_period(request)
+    summary = selectors.laporan_summary(
+        project, days=days, start_date=start_date, end_date=end_date
+    )
+    actor = request.user.get_full_name() or request.user.username
+    content = media_report_pdf.build(
+        summary,
+        institution=project.tenant.name,
+        project_name=project.name,
+        generated_by=actor,
+    )
+    record_audit_entry(
+        actor_label=actor,
+        action="Menghasilkan PDF analisis media",
+        target=f"{project.name}: {start_date} s.d. {end_date}",
+    )
+    filename = f"analisis-media-{start_date:%Y%m%d}-{end_date:%Y%m%d}.pdf"
+    response = HttpResponse(content, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Content-Length"] = len(content)
+    return response
 
 
 @require_page("regional")

@@ -7,6 +7,7 @@ boundary rather than hitting Apify.
 """
 import http.client
 import json
+import os
 import urllib.error
 import urllib.request
 
@@ -27,8 +28,11 @@ def verify_token(token):
     """Real connectivity/auth probe against the Apify API. Returns True when the
     token authenticates successfully."""
     request = urllib.request.Request(
-        f"{APIFY_ME_URL}?token={token}",
-        headers={"User-Agent": "PantauConfigConsole/1.0"},
+        APIFY_ME_URL,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "PantauConfigConsole/1.0",
+        },
     )
     try:
         with urllib.request.urlopen(request, timeout=VERIFY_TIMEOUT_SECONDS) as response:
@@ -66,13 +70,38 @@ def store_token(token, updated_by, project):
     )
 
 
-def get_active_token(project):
+def get_environment_token():
+    """Return the deployment fallback without persisting or logging it."""
+    return (
+        os.environ.get("APIFY_API_TOKEN", "").strip()
+        or os.environ.get("APIFY_KEY", "").strip()
+        or None
+    )
+
+
+def get_active_token(project, *, allow_environment_fallback=True):
+    """Resolve a project credential first, then the deployment-wide fallback."""
     cred = ApifyCredential.objects.filter(
         project=project, status=ApifyCredential.STATUS_ACTIVE
     ).order_by("-id").first()
-    if cred is None or not cred.token_encrypted:
-        return None
-    return crypto.decrypt(cred.token_encrypted)
+    if cred is not None and cred.token_encrypted:
+        return crypto.decrypt(cred.token_encrypted)
+    if allow_environment_fallback:
+        return get_environment_token()
+    return None
+
+
+def credential_source(project):
+    """Expose readiness to the UI without exposing any credential value."""
+    cred = ApifyCredential.objects.filter(
+        project=project,
+        status=ApifyCredential.STATUS_ACTIVE,
+    ).exclude(token_encrypted="").order_by("-id").first()
+    if cred is not None:
+        return "project"
+    if get_environment_token():
+        return "environment"
+    return "missing"
 
 
 def revoke(updated_by, project):

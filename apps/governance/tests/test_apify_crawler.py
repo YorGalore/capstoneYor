@@ -1,4 +1,5 @@
 import urllib.error
+from datetime import date
 from unittest import mock
 
 from django.test import TestCase
@@ -10,37 +11,72 @@ class ActorInputTest(TestCase):
     def test_twitter_input_uses_all_keywords_with_recency_window(self):
         run_input = ac.build_actor_input("x", ["bansos", "pangan"], max_results=50)
         self.assertEqual(len(run_input["searchTerms"]), 2)
-        self.assertIn("bansos lang:in since:", run_input["searchTerms"][0])
+        self.assertIn("bansos lang:id since:", run_input["searchTerms"][0])
         self.assertIn("until:", run_input["searchTerms"][0])
         self.assertEqual(run_input["maxItems"], 50)
-        self.assertEqual(run_input["queryType"], "Top")
+        self.assertTrue(run_input["includeSearchTerms"])
 
-    def test_youtube_uses_first_keyword_only_shorts(self):
+    def test_youtube_uses_all_keywords_with_total_bound(self):
         run_input = ac.build_actor_input("youtube", ["subsidi", "bbm"], max_results=30)
-        self.assertEqual(run_input["query"], "subsidi")
-        self.assertEqual(run_input["type"], "shorts")
-        self.assertEqual(run_input["geo"], "ID")
+        self.assertEqual(run_input["searchQueries"], ["subsidi", "bbm"])
+        self.assertEqual(run_input["maxResults"], 15)
+        self.assertEqual(run_input["maxResultsShorts"], 0)
 
     def test_instagram_converts_keywords_to_hashtag_urls(self):
         run_input = ac.build_actor_input("instagram", ["harga pangan"], max_results=10)
         self.assertEqual(
-            run_input["startUrls"], ["https://www.instagram.com/explore/tags/hargapangan"]
+            run_input["directUrls"],
+            ["https://www.instagram.com/explore/tags/hargapangan/"],
         )
+        self.assertEqual(run_input["resultsLimit"], 10)
 
-    def test_tiktok_first_keyword_and_region(self):
+    def test_tiktok_uses_all_queries_and_bounded_result_count(self):
         run_input = ac.build_actor_input("tiktok", ["bansos"], max_results=10)
-        self.assertEqual(run_input["keyword"], "bansos")
-        self.assertEqual(run_input["region"], "ID")
+        self.assertEqual(run_input["searchQueries"], ["bansos"])
+        self.assertEqual(run_input["resultsPerPage"], 10)
+        self.assertEqual(run_input["videoSearchDateFilter"], "PAST_24_HOURS")
 
-    def test_facebook_first_keyword(self):
+    def test_facebook_uses_all_keywords(self):
         run_input = ac.build_actor_input("facebook", ["bansos"], max_results=5)
-        self.assertEqual(run_input["query"], "bansos")
-        self.assertEqual(run_input["maxResults"], 5)
+        self.assertEqual(run_input["query"], '"bansos"')
+        self.assertEqual(run_input["searchType"], "latest")
+        self.assertEqual(run_input["resultsCount"], 5)
+
+    def test_facebook_compacts_long_keyword_list_under_actor_limit(self):
+        run_input = ac.build_actor_input(
+            "facebook",
+            [
+                "Bupati Kulon Progo",
+                "Pemkab Kulon Progo",
+                "MBG Kulon Progo",
+                "SMPN 3 Wates",
+                "SPPG Karangwuni",
+            ],
+            max_results=25,
+        )
+        self.assertLessEqual(len(run_input["query"]), 100)
+        self.assertIn("Kulon Progo", run_input["query"])
+        self.assertIn("SMPN 3 Wates", run_input["query"])
 
     def test_default_max_results_per_platform(self):
-        self.assertEqual(ac.default_max_results("x"), 1000)
-        self.assertEqual(ac.default_max_results("facebook"), 20)
+        self.assertEqual(ac.default_max_results("x"), 100)
+        self.assertEqual(ac.default_max_results("facebook"), 50)
         self.assertEqual(ac.default_max_results("tiktok"), 100)
+
+    def test_history_window_is_sent_to_date_capable_actors(self):
+        start = date(2026, 7, 21)
+        end = date(2026, 7, 27)
+        twitter = ac.build_actor_input(
+            "x", ["MBG Kulon Progo"], 25, start_date=start, end_date=end
+        )
+        facebook = ac.build_actor_input(
+            "facebook", ["MBG Kulon Progo"], 25, start_date=start, end_date=end
+        )
+        self.assertIn("since:2026-07-21", twitter["searchTerms"][0])
+        self.assertIn("until:2026-07-28", twitter["searchTerms"][0])
+        self.assertEqual(twitter["end"], "2026-07-28")
+        self.assertEqual(facebook["startDate"], "2026-07-21")
+        self.assertEqual(facebook["endDate"], "2026-07-27")
 
 
 class ExtractionTest(TestCase):
@@ -79,6 +115,20 @@ class ExtractionTest(TestCase):
         self.assertEqual(out["reach"], 900)
         self.assertEqual(out["author"], "warga")
 
+    def test_historical_timestamp_is_normalized(self):
+        out = ac.extract_platform_content(
+            "facebook",
+            {
+                "url": "https://facebook.com/posts/1",
+                "message": "MBG Kulon Progo",
+                "timestamp": 1784595600,
+                "comments_count": 4,
+            },
+        )
+        self.assertIsNotNone(out["posted_at"])
+        self.assertEqual(out["content"], "MBG Kulon Progo")
+        self.assertEqual(out["engagement"]["comments"], 4)
+
 
 class CollectTest(TestCase):
     def test_collect_runs_actor_and_normalizes(self):
@@ -92,6 +142,31 @@ class CollectTest(TestCase):
         self.assertEqual(len(results), 1)  # url-less item dropped
         self.assertEqual(results[0]["platform"], "x")
         self.assertEqual(results[0]["matched_keyword"], "pangan")
+
+    def test_historical_collect_drops_rows_outside_window_or_without_date(self):
+        raw = [
+            {
+                "url": "https://x.com/u/in",
+                "text": "pangan",
+                "createdAt": "2026-07-24T03:00:00Z",
+            },
+            {
+                "url": "https://x.com/u/out",
+                "text": "pangan",
+                "createdAt": "2026-07-29T03:00:00Z",
+            },
+            {"url": "https://x.com/u/unknown", "text": "pangan"},
+        ]
+        with mock.patch.object(ac, "_run_and_fetch_items", return_value=raw):
+            results = ac.collect(
+                "x",
+                ["pangan"],
+                max_results=10,
+                token="tok",
+                start_date=date(2026, 7, 21),
+                end_date=date(2026, 7, 27),
+            )
+        self.assertEqual([row["url"] for row in results], ["https://x.com/u/in"])
 
 
 class ApifyNetworkBoundaryTest(TestCase):

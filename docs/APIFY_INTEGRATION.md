@@ -4,6 +4,19 @@
 **SDK:** `apify-client==1.8.0` (+ `apify-shared==1.3.0`)
 **Purpose:** Crawl TikTok, YouTube (Shorts), Instagram, Twitter/X, and Facebook for a set of keywords, normalize the results, and hand them off to the enrichment/ingestion stages of the KPM pipeline. News/media-online sources are **not** handled here — those go through `crawl4ai` in the separate News Crawler service.
 
+> **Django platform implementation (29 July 2026):** the live connector in
+> `apps/governance/apify_crawler.py` supersedes the legacy Actor table below for
+> this repository. It supports inclusive historical windows of at most 31 days,
+> per-platform result caps, API-level `maxItems` and `maxTotalChargeUsd` guards,
+> publication-time filtering, and linked comment collection. Credential
+> precedence is project-encrypted token → `APIFY_API_TOKEN` → `APIFY_KEY`; the
+> environment fallback is never copied into the database or shown in the UI.
+> Current configured post Actors are `apidojo/tweet-scraper`,
+> `apify/instagram-scraper`, `clockworks/tiktok-scraper`,
+> `streamers/youtube-scraper`, and `scraper_one/facebook-posts-search`.
+> The legacy microservice analysis remains below as historical architecture
+> documentation.
+
 ---
 
 ## 1. Where it sits in the pipeline

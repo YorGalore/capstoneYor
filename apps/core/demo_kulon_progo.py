@@ -38,6 +38,7 @@ from apps.governance.models import (
     PolicyAcknowledgment,
     PoliticalMonitoringPermission,
 )
+from apps.governance.apify_crawler import ACTOR_CONFIG
 from apps.governance.seed import seed_schedules
 
 from .models import AnalystProfile, Platform, Project, Province, Regency, Tenant
@@ -56,6 +57,20 @@ KEYWORDS = [
     "Ambar Purwoko",
     "Pemkab Kulon Progo",
     "Pemerintah Kabupaten Kulon Progo",
+    # Issue/event queries needed to reproduce the 21-27 July analytical report.
+    # Location qualifiers keep broad national topics such as MBG from flooding a
+    # district-level project with unrelated results.
+    "MBG Kulon Progo",
+    "Makan Bergizi Gratis Kulon Progo",
+    "keracunan MBG Kulon Progo",
+    "SMPN 3 Wates",
+    "SPPG Karangwuni",
+    "BGN Kulon Progo",
+    "Dinkes Kulon Progo",
+    "DPRD Kulon Progo",
+    "Sermo Run 2026",
+    "kenakalan pelajar Kulon Progo",
+    "BUKP Kulon Progo",
 ]
 
 
@@ -69,6 +84,12 @@ DOMAINS = [
     ("www.detik.com", "portal-listing", "https://www.detik.com/jogja/berita"),
     ("www.purworejo24.com", "portal-rss", "https://www.purworejo24.com/feed/"),
     ("kominfo.kulonprogokab.go.id", "portal-listing", "https://kominfo.kulonprogokab.go.id/publikasi/berita"),
+    ("yogyakarta.kompas.com", "portal-listing", "https://yogyakarta.kompas.com/"),
+    ("jogja.idntimes.com", "portal-listing", "https://jogja.idntimes.com/"),
+    ("radarjogja.jawapos.com", "portal-listing", "https://radarjogja.jawapos.com/kulonprogo/"),
+    ("www.bisnis.com", "portal-listing", "https://www.bisnis.com/"),
+    ("espos.id", "portal-listing", "https://espos.id/"),
+    ("kulonprogokab.go.id", "portal-listing", "https://kulonprogokab.go.id/"),
 ]
 
 LEGACY_DOMAIN_ALIASES = {"prolimannews.com", "vivajogja.com", "detik.com", "purworejo24.com", "kulonprogokab.go.id"}
@@ -80,6 +101,9 @@ PROGRAMS = [
     ("Sekolah Rakyat Kulon Progo", "Dinas Pendidikan", ["sekolah rakyat"]),
     ("Pengembangan BUMDes", "Dinas PMD Dalduk dan KB", ["bumdes", "potensi lokal"]),
     ("Ketahanan Pangan", "Dinas Pertanian dan Pangan", ["ketahanan pangan", "penanaman jagung"]),
+    ("Makan Bergizi Gratis", "Badan Gizi Nasional", ["makan bergizi gratis", "program mbg", "mbg"]),
+    ("Sermo Run 2026", "Dinas Pariwisata", ["sermo run", "sermorun", "sport tourism waduk sermo"]),
+    ("Deklarasi Cegah Kenakalan Pelajar", "Pemkab Kulon Progo", ["cegah kenakalan pelajar", "kejahatan jalanan", "deklarasi pelajar"]),
 ]
 
 
@@ -339,14 +363,15 @@ def _seed_governance(tenant, project, user):
     # publishers' live portals. They are fixture-owned, so replace them on reseed.
     MonitoredDomain.objects.filter(project=project, domain__in=LEGACY_DOMAIN_ALIASES).delete()
     for platform in Platform.objects.exclude(slug__in=["berita", "forum"]):
-        PlatformIntegration.objects.get_or_create(
+        actor_config = ACTOR_CONFIG.get(platform.slug, {})
+        PlatformIntegration.objects.update_or_create(
             project=project,
             platform=platform,
             defaults={
                 "method": platform.method,
-                "actor_id": "demo-contextual",
+                "actor_id": actor_config.get("actor_id", ""),
                 "is_active": True,
-                "status_note": "Konfigurasi demo; kredensial live belum dipasang",
+                "status_note": "",
             },
         )
 
@@ -417,6 +442,49 @@ def _seed_taxonomy():
             defaults={"keywords": keywords},
         )
         issues[key] = issue
+
+    health, _ = Category.objects.get_or_create(name="Kesehatan dan Keamanan Pangan")
+    health_sub, _ = SubCategory.objects.get_or_create(
+        category=health, name="Makan Bergizi Gratis"
+    )
+    Issue.objects.get_or_create(
+        subcategory=health_sub,
+        name="Dugaan Keracunan MBG SMPN 3 Wates",
+        defaults={"keywords": [
+            "keracunan mbg", "smpn 3 wates", "sppg karangwuni",
+            "mual muntah mbg", "klb mbg", "uji laboratorium mbg",
+        ]},
+    )
+
+    public_agenda, _ = Category.objects.get_or_create(name="Agenda Publik dan Reputasi")
+    youth_sub, _ = SubCategory.objects.get_or_create(
+        category=public_agenda, name="Kepemudaan"
+    )
+    Issue.objects.get_or_create(
+        subcategory=youth_sub,
+        name="Deklarasi Cegah Kenakalan Pelajar",
+        defaults={"keywords": [
+            "cegah kenakalan pelajar", "kejahatan jalanan", "deklarasi pelajar",
+        ]},
+    )
+    tourism_sub, _ = SubCategory.objects.get_or_create(
+        category=public_agenda, name="Pariwisata dan Olahraga"
+    )
+    Issue.objects.get_or_create(
+        subcategory=tourism_sub,
+        name="Sermo Run 2026",
+        defaults={"keywords": ["sermo run", "sermorun", "sport tourism waduk sermo"]},
+    )
+
+    economy, _ = Category.objects.get_or_create(name="Ekonomi Daerah")
+    finance_sub, _ = SubCategory.objects.get_or_create(
+        category=economy, name="Lembaga Keuangan Daerah"
+    )
+    Issue.objects.get_or_create(
+        subcategory=finance_sub,
+        name="Kepastian Dana Nasabah BUKP",
+        defaults={"keywords": ["bukp", "dana nasabah bukp", "simpanan nasabah bukp"]},
+    )
     return issues
 
 
@@ -426,6 +494,10 @@ def _seed_entities(project):
         ("Agung Setyawan", PoliticalActor.TYPE_OFFICIAL, ["agung setyawan", "bupati kulon progo"], []),
         ("Ambar Purwoko", PoliticalActor.TYPE_OFFICIAL, ["ambar purwoko", "wakil bupati kulon progo"], []),
         ("Pemerintah Kabupaten Kulon Progo", PoliticalActor.TYPE_ORGANIZATION, ["pemkab kulon progo", "pemerintah kabupaten kulon progo"], ["@pemkabkulonprogo"]),
+        ("Badan Gizi Nasional", PoliticalActor.TYPE_ORGANIZATION, ["badan gizi nasional", "bgn"], []),
+        ("DPRD Kulon Progo", PoliticalActor.TYPE_ORGANIZATION, ["dprd kulon progo", "ketua dprd kulon progo"], []),
+        ("Dinas Kesehatan Kulon Progo", PoliticalActor.TYPE_ORGANIZATION, ["dinkes kulon progo", "dinas kesehatan kulon progo"], []),
+        ("SPPG Karangwuni", PoliticalActor.TYPE_ORGANIZATION, ["sppg karangwuni", "dapur mbg karangwuni"], []),
     ]:
         actor, _ = PoliticalActor.objects.get_or_create(
             project=project,

@@ -1,8 +1,13 @@
 Django>=6.0,<6.1
+# Local development and management commands load .env without overriding
+# deployment-provided environment variables.
+python-dotenv>=1.0,<2
 # Fernet encryption for Runtime Settings secrets and the Apify token (governance/crypto.py)
 cryptography>=45,<47
 # XLSX export (analytics/exports.py)
 openpyxl>=3.1,<4
+# Server-side PDF generation for analytical media reports.
+reportlab>=4.2,<5
 
 # --- production serving ---
 # WSGI server. runserver is single-threaded, unaudited for production, and says so.

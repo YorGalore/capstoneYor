@@ -24,6 +24,10 @@ services:
       DJANGO_DEBUG: "0"
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
+      # Project credentials stored through the UI take precedence. These are deployment
+      # fallbacks only; Compose reads their values from the server's gitignored .env.
+      APIFY_API_TOKEN: ${APIFY_API_TOKEN:-}
+      APIFY_KEY: ${APIFY_KEY:-}
       # There is no TLS terminator in this compose file, so the https redirect and the
       # Secure cookie flags all have to come off together — otherwise the app is either
       # unreachable over http://localhost or silently unable to hold a session. Behind a
@@ -49,6 +53,8 @@ services:
       DJANGO_DEBUG: "0"
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       DJANGO_BEHIND_TLS: ${DJANGO_BEHIND_TLS:-0}
+      APIFY_API_TOKEN: ${APIFY_API_TOKEN:-}
+      APIFY_KEY: ${APIFY_KEY:-}
       # The web container owns migrations and seeding; the scheduler waits for the schema
       # rather than racing to apply it.
       RUN_MIGRATIONS: "0"

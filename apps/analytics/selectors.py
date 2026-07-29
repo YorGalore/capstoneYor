@@ -1,12 +1,16 @@
 import math
 from collections import OrderedDict
+from urllib.parse import urlsplit
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Avg, Count, Max, Min, Q, Sum
 from django.utils import timezone
 
-from apps.core.models import Province
+from apps.core.models import Platform, Province
 
-from .models import Alert, Author, Coalition, DailyBrief, Mention
+from .models import (
+    ActorSentimentAssessment, Alert, Author, Coalition, DailyBrief, GovernmentProgram,
+    Issue, Mention, PoliticalActor,
+)
 
 SENTIMENT_LABELS = OrderedDict([
     (Mention.SENTIMENT_POSITIVE, "Positif"),
@@ -691,47 +695,546 @@ def sosiograf_summary(project, days=30, max_nodes=20, width=760, height=560):
     }
 
 
-def laporan_summary(project, days=30):
-    """Report center (Laporan): finalized daily briefs as the archive of record,
-    plus a rolling recap of the reporting period for the periodic report."""
-    since = timezone.now() - timezone.timedelta(days=days)
-    qs = Mention.objects.filter(project=project, posted_at__gte=since)
-
-    total_mentions = qs.count()
-    sentiment_counts = {
-        row["sentiment"]: row["n"] for row in qs.values("sentiment").annotate(n=Count("id"))
+def _sentiment_stats(qs):
+    total = qs.count()
+    counts = {
+        row["sentiment"]: row["n"]
+        for row in qs.values("sentiment").annotate(n=Count("id"))
     }
-    sentiment_breakdown = []
+    breakdown = []
     for key, label in SENTIMENT_LABELS.items():
-        count = sentiment_counts.get(key, 0)
-        pct = round((count / total_mentions) * 100) if total_mentions else 0
-        sentiment_breakdown.append({"key": key, "label": label, "count": count, "pct": pct})
+        count = counts.get(key, 0)
+        breakdown.append({
+            "key": key,
+            "label": label,
+            "count": count,
+            "pct": round((count / total) * 100) if total else 0,
+        })
+    dominant = max(breakdown, key=lambda row: row["count"]) if total else {
+        "key": Mention.SENTIMENT_NEUTRAL, "label": "Netral", "count": 0, "pct": 0,
+    }
+    return {"total": total, "breakdown": breakdown, "dominant": dominant}
 
+
+def _daily_timeline_for_dates(qs, start_date, end_date):
+    days = (end_date - start_date).days + 1
+    buckets = OrderedDict(
+        (
+            start_date + timezone.timedelta(days=offset),
+            {"positive": 0, "neutral": 0, "negative": 0},
+        )
+        for offset in range(days)
+    )
+    for mention in qs.only("posted_at", "sentiment"):
+        day = timezone.localtime(mention.posted_at).date()
+        if day in buckets:
+            buckets[day][mention.sentiment] += 1
+    return list(buckets.values()), list(buckets.keys())
+
+
+def _channel_rows(qs):
+    rows = []
+    for key, label in Platform.CHANNEL_CHOICES:
+        channel_qs = qs.filter(platform__channel_type=key)
+        stats = _sentiment_stats(channel_qs)
+        if stats["total"] or key in (Platform.CHANNEL_NEWS, Platform.CHANNEL_SOCIAL):
+            rows.append({
+                "key": key,
+                "label": label,
+                "count": stats["total"],
+                "sentiment_breakdown": stats["breakdown"],
+                "dominant": stats["dominant"],
+            })
+    combined = _sentiment_stats(qs)
+    rows.append({
+        "key": "combined",
+        "label": "Gabungan",
+        "count": combined["total"],
+        "sentiment_breakdown": combined["breakdown"],
+        "dominant": combined["dominant"],
+    })
+    return rows
+
+
+def _top_evidence(qs, limit=3):
+    evidence = []
+    seen_urls = set()
+    candidates = qs.select_related("platform").order_by("-engagement_count", "-posted_at")
+    for mention in candidates[: max(limit * 8, 20)]:
+        snippet = (mention.content_snippet or "").strip()
+        # Core PDF fonts cannot render many emoji-only comments; a blank-looking
+        # evidence bullet is less informative than the next textual comment.
+        if not any(character.isalnum() for character in snippet):
+            continue
+        url = mention.source_url or ""
+        if url and url in seen_urls:
+            continue
+        if url:
+            seen_urls.add(url)
+        evidence.append({
+            "id": mention.id,
+            "snippet": snippet,
+            "source_url": url,
+            "clickable": mention.has_clickable_source,
+            "domain": urlsplit(url).hostname or "" if url else "",
+            "platform": mention.platform.display_name,
+            "posted_at": mention.posted_at,
+            "sentiment": mention.sentiment,
+            "engagement": mention.engagement_count,
+        })
+        if len(evidence) >= limit:
+            break
+    return evidence
+
+
+def _issue_rows(qs, total_mentions, limit=8):
+    aggregate_rows = list(
+        qs.filter(issue_label__isnull=False)
+        .values("issue_label__issue_id", "issue_label__issue__name")
+        .annotate(
+            count=Count("id"),
+            positive=Count("id", filter=Q(sentiment=Mention.SENTIMENT_POSITIVE)),
+            neutral=Count("id", filter=Q(sentiment=Mention.SENTIMENT_NEUTRAL)),
+            negative=Count("id", filter=Q(sentiment=Mention.SENTIMENT_NEGATIVE)),
+            first_seen=Min("posted_at"),
+            last_seen=Max("posted_at"),
+        )
+        .order_by("-count")[:limit]
+    )
+    issues = []
+    for row in aggregate_rows:
+        issue_qs = qs.filter(issue_label__issue_id=row["issue_label__issue_id"])
+        count = row["count"]
+        breakdown = [
+            {"key": key, "label": label, "count": row[key],
+             "pct": round((row[key] / count) * 100) if count else 0}
+            for key, label in SENTIMENT_LABELS.items()
+        ]
+        dominant = max(breakdown, key=lambda item: item["count"])
+        actor_rows = list(
+            PoliticalActor.objects.filter(mentions__in=issue_qs)
+            .annotate(n=Count("mentions", distinct=True))
+            .order_by("-n")
+            .values("name", "n")[:4]
+        )
+        issues.append({
+            "id": row["issue_label__issue_id"],
+            "name": row["issue_label__issue__name"],
+            "count": count,
+            "share_pct": round((count / total_mentions) * 100) if total_mentions else 0,
+            "sentiment_breakdown": breakdown,
+            "dominant": dominant,
+            "negative_pct": next(item["pct"] for item in breakdown if item["key"] == "negative"),
+            "positive_pct": next(item["pct"] for item in breakdown if item["key"] == "positive"),
+            "first_seen": row["first_seen"],
+            "last_seen": row["last_seen"],
+            "actors": actor_rows,
+            "evidence": _top_evidence(issue_qs),
+        })
+    return issues
+
+
+def _actor_rows(qs, project):
+    rows = []
+    for actor in PoliticalActor.objects.filter(project=project, is_active=True):
+        assessments = ActorSentimentAssessment.objects.filter(
+            actor=actor, mention__in=qs
+        )
+        actor_qs = qs.filter(actor_sentiments__in=assessments).distinct()
+        total = assessments.count()
+        counts = {
+            row["sentiment"]: row["n"]
+            for row in assessments.values("sentiment").annotate(n=Count("id"))
+        }
+        breakdown = [
+            {
+                "key": key,
+                "label": label,
+                "count": counts.get(key, 0),
+                "pct": round((counts.get(key, 0) / total) * 100) if total else 0,
+            }
+            for key, label in SENTIMENT_LABELS.items()
+        ]
+        dominant = max(breakdown, key=lambda row: row["count"]) if total else {
+            "key": Mention.SENTIMENT_NEUTRAL,
+            "label": "Netral",
+            "count": 0,
+            "pct": 0,
+        }
+        top_issue = (
+            actor_qs.filter(issue_label__isnull=False)
+            .values("issue_label__issue__name")
+            .annotate(n=Count("id"))
+            .order_by("-n")
+            .first()
+        )
+        rows.append({
+            "actor": actor,
+            "count": total,
+            "sentiment_breakdown": breakdown,
+            "dominant": dominant,
+            "top_issue": top_issue["issue_label__issue__name"] if top_issue else "",
+            "evidence": _top_evidence(actor_qs, limit=2),
+            "manual_count": assessments.filter(
+                source=ActorSentimentAssessment.SOURCE_MANUAL
+            ).count(),
+        })
+    rows.sort(key=lambda row: (-row["count"], row["actor"].name))
+    return rows
+
+
+def _source_inventory(qs, project):
+    domain_map = {}
+    cited_mentions = 0
+    unique_urls = set()
+    for row in qs.exclude(source_url__isnull=True).exclude(source_url="").values(
+        "source_url", "platform__display_name"
+    ):
+        url = row["source_url"]
+        host = (urlsplit(url).hostname or "").lower()
+        if not host or host == "demo.pantau.local":
+            continue
+        cited_mentions += 1
+        unique_urls.add(url)
+        item = domain_map.setdefault(
+            host, {"domain": host, "count": 0, "platforms": set(), "urls": []}
+        )
+        item["count"] += 1
+        item["platforms"].add(row["platform__display_name"])
+        if len(item["urls"]) < 3 and url not in item["urls"]:
+            item["urls"].append(url)
+
+    sources = sorted(domain_map.values(), key=lambda item: (-item["count"], item["domain"]))
+    for item in sources:
+        item["platforms"] = ", ".join(sorted(item["platforms"]))
+
+    from apps.governance.models import MonitoredDomain
+
+    configured = list(
+        MonitoredDomain.objects.filter(project=project, status=MonitoredDomain.STATUS_ACTIVE)
+        .order_by("domain")
+        .values("domain", "adapter", "feed_url")
+    )
+    observed_hosts = set(domain_map)
+    configured_hosts = {row["domain"].lower().removeprefix("www.") for row in configured}
+    for row in configured:
+        normalized = row["domain"].lower().removeprefix("www.")
+        row["observed"] = any(
+            host.removeprefix("www.") == normalized
+            or host.removeprefix("www.").endswith("." + normalized)
+            for host in observed_hosts
+        )
+    observed_not_configured = [
+        item for item in sources
+        if not any(
+            item["domain"].removeprefix("www.") == configured_host
+            or item["domain"].removeprefix("www.").endswith("." + configured_host)
+            for configured_host in configured_hosts
+        )
+    ]
+    return {
+        "sources": sources,
+        "configured": configured,
+        "observed_not_configured": observed_not_configured,
+        "cited_mentions": cited_mentions,
+        "unique_urls": len(unique_urls),
+        "coverage_pct": round((cited_mentions / qs.count()) * 100) if qs.count() else 0,
+    }
+
+
+def _potential_keywords(qs, project, issue_rows):
+    from apps.governance.models import MonitoringKeyword
+
+    active_terms = {
+        term.strip().lower()
+        for term in MonitoringKeyword.objects.filter(project=project, is_active=True)
+        .values_list("keyword", flat=True)
+        if term.strip()
+    }
+    candidates = {}
+
+    def add(kind, term, source, matches, reason):
+        clean = (term or "").strip()
+        normalized = clean.lower().lstrip("#@")
+        if not clean or normalized in {value.lstrip("#@") for value in active_terms}:
+            return
+        key = (kind, normalized)
+        current = candidates.get(key)
+        if current is None or matches > current["matches"]:
+            candidates[key] = {
+                "kind": kind,
+                "term": clean,
+                "source": source,
+                "matches": matches,
+                "reason": reason,
+                "priority": "Tinggi" if matches >= 10 else "Sedang" if matches else "Eksplorasi",
+            }
+
+    for actor in PoliticalActor.objects.filter(project=project, is_active=True):
+        matches = qs.filter(political_actors=actor).distinct().count()
+        for term in [*(actor.keywords or []), *(actor.handles or [])]:
+            add("Aktor", term, actor.name, matches, "Alias/akun aktor yang sudah muncul pada pemantauan.")
+
+    for program in GovernmentProgram.objects.filter(project=project, is_active=True):
+        matches = qs.filter(program=program).count()
+        for term in program.keywords or []:
+            add("Program", term, program.name, matches, "Istilah program untuk memperluas recall koleksi.")
+
+    issues_by_id = {issue["id"]: issue for issue in issue_rows}
+    for issue in Issue.objects.filter(id__in=issues_by_id):
+        matches = issues_by_id[issue.id]["count"]
+        for term in issue.keywords or []:
+            add("Topik", term, issue.name, matches, "Kata pemicu topik dominan pada periode laporan.")
+
+    return sorted(
+        candidates.values(),
+        key=lambda item: (-item["matches"], item["kind"], item["term"].lower()),
+    )[:24]
+
+
+def _report_recommendations(total_mentions, sentiment, channel_rows, actor_rows, issue_rows,
+                            source_inventory, taxonomy_coverage_pct):
+    recommendations = []
+    if not total_mentions:
+        return [{
+            "title": "Aktifkan dan verifikasi koleksi",
+            "detail": "Tidak ada sebutan pada rentang laporan. Periksa jadwal, kata kunci, dan kesehatan kolektor sebelum menarik kesimpulan.",
+            "basis": "0 sebutan teramati",
+        }]
+
+    negative = next(row for row in sentiment["breakdown"] if row["key"] == "negative")
+    if issue_rows:
+        issue = max(issue_rows, key=lambda item: (item["negative_pct"], item["count"]))
+        if issue["negative_pct"] >= 40:
+            recommendations.append({
+                "title": f"Prioritaskan respons untuk {issue['name']}",
+                "detail": "Siapkan pernyataan faktual dan empatik, tunjukkan tindakan yang sudah dilakukan, lalu perbarui bukti secara berkala.",
+                "basis": f"{issue['count']} sebutan; {issue['negative_pct']}% negatif",
+            })
+
+    news = next((row for row in channel_rows if row["key"] == Platform.CHANNEL_NEWS), None)
+    social = next((row for row in channel_rows if row["key"] == Platform.CHANNEL_SOCIAL), None)
+    if news and social and news["count"] and social["count"]:
+        news_neg = next(r["pct"] for r in news["sentiment_breakdown"] if r["key"] == "negative")
+        social_neg = next(r["pct"] for r in social["sentiment_breakdown"] if r["key"] == "negative")
+        if social_neg >= news_neg + 10:
+            recommendations.append({
+                "title": "Perkuat respons di media sosial",
+                "detail": "Prioritaskan social listening, FAQ singkat, dan respons cepat pada keluhan terverifikasi; jangan menganggap nada media online mewakili reaksi publik.",
+                "basis": f"Negatif media sosial {social_neg}% vs media online {news_neg}%",
+            })
+
+    active_actor_rows = [row for row in actor_rows if row["count"]]
+    if active_actor_rows:
+        actor = max(
+            active_actor_rows,
+            key=lambda item: next(
+                row["pct"] for row in item["sentiment_breakdown"] if row["key"] == "negative"
+            ),
+        )
+        actor_negative = next(
+            row["pct"] for row in actor["sentiment_breakdown"] if row["key"] == "negative"
+        )
+        if actor_negative >= 40:
+            recommendations.append({
+                "title": f"Lindungi reputasi {actor['actor'].name} dengan bukti langsung",
+                "detail": "Tentukan juru bicara, pesan inti, dan bukti pendukung per isu; tinjau sentimen khusus aktor sebelum publikasi.",
+                "basis": f"{actor['count']} sebutan terkait; {actor_negative}% negatif",
+            })
+
+    positive_issues = [row for row in issue_rows if row["positive_pct"] >= 40]
+    if positive_issues and negative["pct"] >= 35:
+        positive = max(positive_issues, key=lambda item: item["count"])
+        recommendations.append({
+            "title": f"Pertahankan agenda positif {positive['name']}",
+            "detail": "Publikasikan secara proporsional setelah kebutuhan komunikasi krisis terpenuhi agar tidak terbaca sebagai pengalihan isu.",
+            "basis": f"{positive['count']} sebutan; {positive['positive_pct']}% positif",
+        })
+
+    if source_inventory["coverage_pct"] < 70:
+        recommendations.append({
+            "title": "Naikkan keterlacakan sumber",
+            "detail": "Wajibkan URL kanonik pada ingestion dan jangan finalisasi klaim yang tidak dapat ditelusuri ke artikel/unggahan asal.",
+            "basis": f"Hanya {source_inventory['coverage_pct']}% sebutan memiliki URL sumber yang dapat diklik",
+        })
+    if taxonomy_coverage_pct < 80:
+        recommendations.append({
+            "title": "Tuntaskan pelabelan topik",
+            "detail": "Tinjau antrean taksonomi dan tambahkan alias topik agar isu dominan tidak tersebar sebagai tema bebas.",
+            "basis": f"Cakupan taksonomi {taxonomy_coverage_pct}%",
+        })
+
+    recommendations.append({
+        "title": "Wajibkan tinjauan analis sebelum PDF diedarkan",
+        "detail": "Periksa angka, sentimen per aktor, kronologi, kutipan, dan rekomendasi. PDF adalah draf analitis sampai ditinjau manusia.",
+        "basis": "Kontrol mutu dan akuntabilitas laporan",
+    })
+    return recommendations[:6]
+
+
+def laporan_summary(project, days=30, start_date=None, end_date=None):
+    """Evidence-backed periodic media analysis used by both the report center and
+    the server-generated PDF. Dates are inclusive, making a 21-27 July report
+    reproducible instead of tied to the day the analyst happens to open the page."""
+    end_date = end_date or timezone.localdate()
+    start_date = start_date or (end_date - timezone.timedelta(days=days - 1))
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
+    days = (end_date - start_date).days + 1
+
+    qs = Mention.objects.filter(
+        project=project,
+        posted_at__date__gte=start_date,
+        posted_at__date__lte=end_date,
+    )
+    sentiment = _sentiment_stats(qs)
+    total_mentions = sentiment["total"]
     platform_rows = []
-    for row in qs.values("platform__display_name").annotate(n=Count("id")).order_by("-n"):
+    for row in qs.values(
+        "platform__display_name", "platform__channel_type"
+    ).annotate(n=Count("id")).order_by("-n"):
         platform_rows.append({
             "name": row["platform__display_name"],
+            "channel_type": row["platform__channel_type"],
             "count": row["n"],
             "pct": round((row["n"] / total_mentions) * 100) if total_mentions else 0,
         })
 
-    top_themes = _dominant_themes(qs, limit=6)
-    timeline = _daily_timeline(qs, since, days)
+    timeline, dates = _daily_timeline_for_dates(qs, start_date, end_date)
+    issue_rows = _issue_rows(qs, total_mentions)
+    actor_rows = _actor_rows(qs, project)
+    channel_rows = _channel_rows(qs)
+    source_inventory = _source_inventory(qs, project)
+    labeled_count = qs.filter(issue_label__isnull=False).count()
+    taxonomy_coverage_pct = round((labeled_count / total_mentions) * 100) if total_mentions else 0
+    avg_confidence = qs.aggregate(value=Avg("sentiment_confidence"))["value"] or 0
+    manual_count = qs.filter(sentiment_model="manual").count()
+    collected_count = qs.filter(is_scraped=True).count()
+    seeded_count = total_mentions - collected_count
+    post_qs = qs.filter(content_type=Mention.CONTENT_POST)
+    comment_qs = qs.filter(content_type=Mention.CONTENT_COMMENT)
+    comment_sentiment = _sentiment_stats(comment_qs)
+    eligible_comment_parents = post_qs.filter(
+        platform__channel_type=Platform.CHANNEL_SOCIAL,
+        reported_comment_count__gt=0,
+    )
+    analyzed_parent_ids = set(
+        comment_qs.exclude(parent_id__isnull=True).values_list("parent_id", flat=True)
+    )
+    eligible_parent_count = eligible_comment_parents.count()
+    comment_parent_coverage_pct = (
+        round(
+            eligible_comment_parents.filter(id__in=analyzed_parent_ids).count()
+            / eligible_parent_count * 100
+        )
+        if eligible_parent_count else 0
+    )
+    comment_platform_rows = list(
+        comment_qs.values("platform__display_name")
+        .annotate(n=Count("id"))
+        .order_by("-n")
+    )
+    comment_analysis = {
+        "count": comment_sentiment["total"],
+        "parent_count": len(analyzed_parent_ids),
+        "eligible_parent_count": eligible_parent_count,
+        "parent_coverage_pct": comment_parent_coverage_pct,
+        "reported_comment_count": (
+            eligible_comment_parents.aggregate(total=Sum("reported_comment_count"))["total"] or 0
+        ),
+        "sentiment_breakdown": comment_sentiment["breakdown"],
+        "dominant": comment_sentiment["dominant"],
+        "platform_rows": comment_platform_rows,
+        "issue_rows": _issue_rows(comment_qs, comment_sentiment["total"], limit=5),
+        "evidence": _top_evidence(comment_qs, limit=5),
+    }
+    potential_keywords = _potential_keywords(qs, project, issue_rows)
+    recommendations = _report_recommendations(
+        total_mentions, sentiment, channel_rows, actor_rows, issue_rows,
+        source_inventory, taxonomy_coverage_pct,
+    )
+    if eligible_parent_count and comment_parent_coverage_pct < 70:
+        recommendations.insert(-1, {
+            "title": "Perluas sampel komentar publik",
+            "detail": "Koleksi isi komentar dari posting berengagement tinggi pada setiap platform, dengan batas biaya dan retensi yang terdokumentasi.",
+            "basis": (
+                f"Baru {comment_parent_coverage_pct}% posting yang memiliki komentar terlapor "
+                "mempunyai sampel komentar teranalisis"
+            ),
+        })
+        recommendations = recommendations[:6]
 
     briefs = list(DailyBrief.objects.filter(project=project).order_by("-brief_date")[:30])
-    final_count = sum(1 for b in briefs if b.status == DailyBrief.STATUS_FINAL)
-
+    final_count = sum(1 for brief in briefs if brief.status == DailyBrief.STATUS_FINAL)
     return {
         "days": days,
-        "period_start": since.date(),
-        "period_end": timezone.now().date(),
+        "period_start": start_date,
+        "period_end": end_date,
         "total_mentions": total_mentions,
         "total_reach": qs.aggregate(total=Sum("reach_estimate"))["total"] or 0,
         "unique_authors": qs.values("author_handle").distinct().count(),
-        "sentiment_breakdown": sentiment_breakdown,
+        "sentiment_breakdown": sentiment["breakdown"],
+        "dominant_sentiment": sentiment["dominant"],
+        "channel_rows": channel_rows,
         "platform_rows": platform_rows,
-        "top_themes": top_themes,
-        "timeline_chart": timeline_chart(timeline, width=1160, height=180),
+        "top_themes": _dominant_themes(qs, limit=6),
+        "issue_rows": issue_rows,
+        "actor_rows": actor_rows,
+        "comment_analysis": comment_analysis,
+        "source_inventory": source_inventory,
+        "potential_keywords": potential_keywords,
+        "recommendations": recommendations,
+        "timeline_chart": timeline_chart(timeline, width=1160, height=180, dates=dates),
+        "quality": {
+            "source_coverage_pct": source_inventory["coverage_pct"],
+            "taxonomy_coverage_pct": taxonomy_coverage_pct,
+            "avg_sentiment_confidence_pct": round(avg_confidence * 100),
+            "manual_sentiment_count": manual_count,
+            "cited_mentions": source_inventory["cited_mentions"],
+            "unique_urls": source_inventory["unique_urls"],
+            "post_count": post_qs.count(),
+            "comment_count": comment_sentiment["total"],
+            "comment_parent_coverage_pct": comment_parent_coverage_pct,
+            "collected_count": collected_count,
+            "seeded_count": seeded_count,
+        },
+        "methodology_notes": [
+            "Semua persentase dihitung dari sebutan yang benar-benar tersimpan pada rentang tanggal inklusif; tidak ada pembobotan sentimen sosial yang diasumsikan.",
+            "Media Online, Media Sosial, dan Sumber Lain dipisahkan melalui klasifikasi kanal pada setiap platform.",
+            "Komentar publik yang berhasil dikoleksi dianalisis sebagai unit tersendiri dan ditautkan ke posting induknya; jumlah komentar tidak dipakai sebagai pengganti isi komentar.",
+            "Sentimen aktor disimpan per pasangan sebutan-aktor, sehingga satu artikel dapat dinilai berbeda terhadap institusi dan pejabat yang disebut; nilai otomatis tetap wajib ditinjau.",
+            "Isu diprioritaskan dari taksonomi terstruktur, lalu ditautkan ke bukti sumber berengagement tertinggi.",
+            (
+                f"Provenansi korpus: {collected_count} sebutan hasil koleksi dan "
+                f"{seeded_count} sebutan fixture/demo."
+            ),
+        ],
+        "limitations": [
+            "Percakapan privat, konten yang dihapus, dan sumber yang tidak didukung kolektor tidak termasuk.",
+            "Proporsi menggambarkan korpus yang terkoleksi, bukan sensus seluruh opini publik.",
+            (
+                f"{100 - source_inventory['coverage_pct']}% sebutan tidak memiliki URL sumber yang "
+                "dapat diverifikasi; angka agregatnya tetap dihitung tetapi tidak layak dijadikan kutipan."
+            ),
+            (
+                f"{100 - taxonomy_coverage_pct}% sebutan belum memiliki label isu terstruktur dan "
+                "dapat mengurangi ketepatan pemeringkatan topik."
+            ),
+            (
+                f"Komentar telah dikoleksi dari {comment_parent_coverage_pct}% posting publik "
+                "yang melaporkan adanya komentar pada periode ini."
+                if eligible_parent_count
+                else "Tidak ada posting dengan komentar terlapor pada periode ini; sentimen komentar tidak dapat digeneralisasi."
+            ),
+            *(
+                [
+                    f"{seeded_count} sebutan fixture/demo masih berada pada proyek ini; "
+                    "PDF tidak boleh diperlakukan sebagai laporan produksi sebelum fixture "
+                    "dipisahkan dari korpus hasil koleksi."
+                ]
+                if seeded_count else []
+            ),
+        ],
         "briefs": briefs,
         "final_count": final_count,
         "draft_count": len(briefs) - final_count,

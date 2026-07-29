@@ -7,7 +7,9 @@ public/organizational actors — private individuals are never profiled (FR-29.3
 """
 from django.db.models import Count, Q
 
-from .models import Camp, GovernmentProgram, Mention, PoliticalActor
+from .models import (
+    ActorSentimentAssessment, Camp, GovernmentProgram, Mention, PoliticalActor,
+)
 
 
 def _matches(actor, text, handle):
@@ -30,6 +32,16 @@ def tag_mention(mention):
         return []
 
     mention.political_actors.set(matched)
+    for actor in matched:
+        ActorSentimentAssessment.objects.get_or_create(
+            mention=mention,
+            actor=actor,
+            defaults={
+                "sentiment": mention.sentiment,
+                "confidence": mention.sentiment_confidence,
+                "model": mention.sentiment_model,
+            },
+        )
     if not mention.is_political:
         mention.is_political = True
         mention.save(update_fields=["is_political"])

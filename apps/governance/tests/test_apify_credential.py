@@ -1,3 +1,4 @@
+import os
 from unittest import mock
 
 from django.test import TestCase
@@ -62,3 +63,28 @@ class ApifyCredentialTest(TestCase):
         apify.revoke("root", self.project)
         self.assertIsNone(apify.get_active_token(self.project))
         self.assertEqual(apify.get_active_token(other_project), "apify_api_projectB2222")
+
+    def test_environment_token_is_used_as_fallback(self):
+        with mock.patch.dict(
+            os.environ,
+            {"APIFY_KEY": "apify_api_environment1234", "APIFY_API_TOKEN": ""},
+        ):
+            self.assertEqual(
+                apify.get_active_token(self.project),
+                "apify_api_environment1234",
+            )
+            self.assertEqual(apify.credential_source(self.project), "environment")
+
+    def test_project_token_takes_precedence_over_environment(self):
+        with mock.patch.dict(
+            os.environ,
+            {"APIFY_KEY": "apify_api_environment1234", "APIFY_API_TOKEN": ""},
+        ), mock.patch.object(apify, "verify_token", return_value=True):
+            apify.store_token(
+                "apify_api_project5678", updated_by="root", project=self.project
+            )
+            self.assertEqual(
+                apify.get_active_token(self.project),
+                "apify_api_project5678",
+            )
+            self.assertEqual(apify.credential_source(self.project), "project")

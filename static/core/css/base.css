@@ -517,6 +517,56 @@ a:hover { color: #0A5C64; text-decoration: underline; }
 .pantau-grid-laporan { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .pantau-laporan-recap, .pantau-laporan-trend { grid-column: span 2; }
 .pantau-laporan-arsip { grid-column: span 2; }
+.pantau-laporan-wide { grid-column: span 2; }
+.pantau-laporan-presets { display: flex; gap: 6px; }
+.pantau-report-draft {
+  margin-bottom: 16px; padding: 11px 14px; border: 1px solid #E2B43C;
+  border-left-width: 4px; border-radius: 8px; background: #FFF9E8;
+  color: #614B13; font: 500 12px/1.45 'IBM Plex Sans', sans-serif;
+}
+.pantau-report-legend { display: flex; gap: 16px; margin-top: 8px; font: 500 11px 'IBM Plex Sans', sans-serif; }
+.pantau-report-legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+.pantau-report-legend .positive::before, .sentiment-positive { background: var(--positive); }
+.pantau-report-legend .neutral::before, .sentiment-neutral { background: #7C8A99; }
+.pantau-report-legend .negative::before, .sentiment-negative { background: var(--negative); }
+.pantau-report-table th { white-space: nowrap; }
+.pantau-report-total td { font-weight: 700; background: #EEF5F6; }
+.pantau-sentiment-positive { background: #EAF5F0; color: var(--positive); }
+.pantau-sentiment-neutral { background: #EEF2F6; color: #526273; }
+.pantau-sentiment-negative { background: #FBEDEC; color: var(--negative); }
+.pantau-report-quality { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.pantau-report-quality > div { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: #F8FAFC; }
+.pantau-report-quality strong { display: block; font: 600 22px Archivo, sans-serif; color: var(--navy); }
+.pantau-report-quality span { display: block; margin-top: 4px; color: var(--text-muted); font: 500 10px 'IBM Plex Sans', sans-serif; }
+.pantau-report-comment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.pantau-report-issue { padding: 14px 0; border-top: 1px solid var(--border); }
+.pantau-report-issue:first-of-type { border-top: 0; padding-top: 0; }
+.pantau-report-issue-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 9px; }
+.pantau-report-issue-head strong, .pantau-report-issue-head .mono-muted { display: block; }
+.pantau-report-evidence-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.pantau-report-evidence { display: flex; flex-direction: column; gap: 6px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: #FAFCFD; font: 400 11px/1.45 'IBM Plex Sans', sans-serif; }
+.pantau-report-evidence a { color: var(--teal); font-weight: 600; overflow-wrap: anywhere; }
+.pantau-report-recommendations { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pantau-report-recommendations > div { padding: 12px; border-left: 3px solid var(--teal); background: #F4F9FA; border-radius: 0 8px 8px 0; }
+.pantau-report-recommendations strong { color: var(--navy); font-size: 12px; }
+.pantau-report-recommendations p { margin: 5px 0; font-size: 11.5px; line-height: 1.5; }
+.pantau-report-method summary { cursor: pointer; margin-bottom: 0; }
+.pantau-report-method[open] summary { margin-bottom: 12px; }
+.pantau-report-method p { color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .pantau-report-comment-grid, .pantau-report-recommendations { grid-template-columns: 1fr; }
+  .pantau-report-evidence-grid { grid-template-columns: 1fr 1fr; }
+  .pantau-report-quality { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 640px) {
+  .pantau-grid-laporan { grid-template-columns: 1fr; }
+  .pantau-laporan-recap, .pantau-laporan-trend, .pantau-laporan-arsip, .pantau-laporan-wide { grid-column: span 1; }
+  .pantau-laporan-period { width: 100%; flex-wrap: wrap; }
+  .pantau-laporan-exports { width: 100%; flex-wrap: wrap; }
+  .pantau-report-evidence-grid { grid-template-columns: 1fr; }
+}
 
 /* ── Konfigurasi: aturan & entitas ─────────────────────────── */
 .pantau-rule-form { flex-wrap: wrap; }

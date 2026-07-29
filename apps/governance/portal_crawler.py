@@ -83,6 +83,30 @@ PORTALS = {
         "listing", "https://kominfo.kulonprogokab.go.id/publikasi/berita",
         ("https://kominfo.kulonprogokab.go.id/publikasi/detail/",),
     ),
+    "yogyakarta.kompas.com": PortalSpec(
+        "listing", "https://yogyakarta.kompas.com/",
+        ("https://yogyakarta.kompas.com/read/",),
+    ),
+    "jogja.idntimes.com": PortalSpec(
+        "listing", "https://jogja.idntimes.com/",
+        ("https://jogja.idntimes.com/",),
+    ),
+    "radarjogja.jawapos.com": PortalSpec(
+        "listing", "https://radarjogja.jawapos.com/kulonprogo/",
+        ("https://radarjogja.jawapos.com/",),
+    ),
+    "www.bisnis.com": PortalSpec(
+        "listing", "https://www.bisnis.com/",
+        ("https://www.bisnis.com/",),
+    ),
+    "espos.id": PortalSpec(
+        "listing", "https://espos.id/",
+        ("https://espos.id/",),
+    ),
+    "kulonprogokab.go.id": PortalSpec(
+        "listing", "https://kulonprogokab.go.id/",
+        ("https://kulonprogokab.go.id/",),
+    ),
 }
 
 

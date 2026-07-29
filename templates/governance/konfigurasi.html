@@ -26,6 +26,9 @@
         {% csrf_token %}
         <button type="submit" class="pantau-btn-outline pantau-btn-small">Cabut token</button>
       </form>
+    {% elif credential_source == "environment" %}
+      <div class="pantau-credential-box">Fallback environment tersedia</div>
+      <div class="pantau-credential-status">Menggunakan APIFY_API_TOKEN/APIFY_KEY dari environment</div>
     {% else %}
       <div class="pantau-credential-box">Belum ada token aktif untuk tenant ini</div>
     {% endif %}
@@ -46,6 +49,66 @@
         </div>
       {% endif %}
     {% endfor %}
+  </div>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Analisis Komentar Publik</div>
+    <span class="pantau-badge{% if comment_collection.enabled %} pantau-badge-positive{% endif %}">
+      {% if comment_collection.enabled %}Aktif{% else %}Nonaktif{% endif %}
+    </span>
+  </div>
+  <div class="pantau-hint">
+    Setelah posting relevan ditemukan, PANTAU dapat mengambil sampel komentar publik dari posting berengagement tertinggi. Setiap komentar disimpan sebagai sebutan tersendiri, ditautkan ke posting induk, lalu diberi sentimen, topik, dan aktor. Percakapan privat tidak diambil.
+  </div>
+  <form method="post" action="{% url 'governance:save_comment_collection' %}" class="pantau-add-form pantau-rule-form">
+    {% csrf_token %}
+    <label class="pantau-check">
+      <input type="checkbox" name="enabled" value="1" {% if comment_collection.enabled %}checked{% endif %}>
+      Koleksi isi komentar publik
+    </label>
+    <label class="mono-muted">
+      Post per platform/run
+      <input class="pantau-input" type="number" name="posts_per_run" min="1" max="50" value="{{ comment_collection.posts_per_run }}">
+    </label>
+    <label class="mono-muted">
+      Komentar per post
+      <input class="pantau-input" type="number" name="comments_per_post" min="1" max="500" value="{{ comment_collection.comments_per_post }}">
+    </label>
+    <button type="submit" class="pantau-btn-primary">Simpan komentar</button>
+  </form>
+  <div class="pantau-hint">
+    Koleksi komentar memakai actor Apify tambahan dan menambah biaya. Laporan selalu menampilkan cakupan post yang benar-benar memiliki komentar teranalisis agar sampel tidak disalahartikan sebagai seluruh opini publik.
+  </div>
+</div>
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Koleksi Historis Social Media</div>
+    <span class="pantau-badge">Backfill terbatas</span>
+  </div>
+  <div class="pantau-hint">
+    Ambil posting publik pada rentang tanggal tertentu melalui integrasi Apify aktif. Hasil disaring ulang berdasarkan tanggal publikasi, dideduplikasi, lalu komentar publik diambil bila Analisis Komentar Publik aktif.
+  </div>
+  <form method="post" action="{% url 'governance:run_history_collection' %}" class="pantau-add-form pantau-rule-form js-collection-form">
+    {% csrf_token %}
+    <label class="mono-muted">
+      Dari tanggal
+      <input class="pantau-input" type="date" name="history_start_date" required>
+    </label>
+    <label class="mono-muted">
+      Sampai tanggal
+      <input class="pantau-input" type="date" name="history_end_date" required>
+    </label>
+    <label class="mono-muted">
+      Maksimum hasil/platform
+      <input class="pantau-input" type="number" name="max_results_per_platform" min="1" max="500" value="100" required>
+    </label>
+    <button type="submit" class="pantau-btn-primary">Antrekan Backfill</button>
+  </form>
+  <div class="pantau-hint">
+    Maksimum 31 hari per backfill. Batas hasil wajib diisi untuk mencegah biaya Actor tak terbatas; konten privat, terhapus, dan tidak lagi tersedia tidak dapat dipulihkan.
   </div>
 </div>
 
@@ -150,7 +213,14 @@
       <tbody>
         {% for request_item in manual_requests %}
         <tr class="js-manual-request-row" data-request-id="{{ request_item.pk }}" data-request-type="{{ request_item.collection_type }}" data-request-status="{{ request_item.status }}">
-          <td>{{ request_item.get_collection_type_display }}</td><td class="js-request-status">{{ request_item.get_status_display }}</td>
+          <td>
+            {% if request_item.history_start_date %}
+              Social Media Historis<br>
+              <span class="mono-muted">{{ request_item.history_start_date|date:"d/m/Y" }}–{{ request_item.history_end_date|date:"d/m/Y" }}</span>
+            {% else %}
+              {{ request_item.get_collection_type_display }}
+            {% endif %}
+          </td><td class="js-request-status">{{ request_item.get_status_display }}</td>
           <td>{{ request_item.requested_by }}</td><td class="js-request-sources">{{ request_item.sources_processed }}</td>
           <td class="js-request-items">{{ request_item.items_found }}</td><td class="js-request-detail">{{ request_item.detail|default:"Menunggu worker" }}</td>
         </tr>

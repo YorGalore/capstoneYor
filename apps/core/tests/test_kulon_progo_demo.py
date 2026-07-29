@@ -20,6 +20,7 @@ from apps.core.demo_kulon_progo import (
     NARRATIVE_PERSPECTIVES,
     NARRATIVE_UNATTRIBUTED_COUNT,
     NEWS_ITEMS,
+    PROGRAMS,
     PROJECT_NAME,
     TENANT_NAME,
     seed_kulon_progo_demo,
@@ -64,8 +65,10 @@ class KulonProgoDemoSeedTest(TestCase):
         self.assertTrue(mentions.filter(content_snippet__icontains="Garongan").exists())
         self.assertFalse(mentions.filter(source_url__contains="demo.pantau.local").exists())
 
-        self.assertEqual(PoliticalActor.objects.filter(project=project).count(), 3)
-        self.assertEqual(GovernmentProgram.objects.filter(project=project).count(), 5)
+        self.assertEqual(PoliticalActor.objects.filter(project=project).count(), 7)
+        self.assertEqual(
+            GovernmentProgram.objects.filter(project=project).count(), len(PROGRAMS)
+        )
         self.assertTrue(Alert.objects.filter(project=project, status=Alert.STATUS_ACTIVE).exists())
 
     def test_social_buzz_and_coordination_cluster_enrich_the_demo(self):

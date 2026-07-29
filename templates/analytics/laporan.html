@@ -1,81 +1,262 @@
 {% extends "core/base_dashboard.html" %}
-{% block title %}Laporan{% endblock %}
+{% block title %}Laporan Analisis Media{% endblock %}
 {% block content %}
-<div class="pantau-page-title">Pusat Laporan</div>
+<div class="pantau-page-title">Laporan Analisis Media</div>
 {% if summary %}
 <div class="pantau-laporan-toolbar">
+  <div class="pantau-laporan-presets" aria-label="Preset periode">
+    <a class="pantau-btn-outline pantau-btn-small" href="?periode=7">7 hari</a>
+    <a class="pantau-btn-outline pantau-btn-small" href="?periode=30">30 hari</a>
+    <a class="pantau-btn-outline pantau-btn-small" href="?periode=90">90 hari</a>
+  </div>
   <form method="get" class="pantau-laporan-period">
-    <label class="mono-muted" for="periode">Periode rekap</label>
-    <select class="pantau-input" id="periode" name="periode" onchange="this.form.submit()">
-      <option value="7" {% if summary.days == 7 %}selected{% endif %}>7 hari terakhir</option>
-      <option value="30" {% if summary.days == 30 %}selected{% endif %}>30 hari terakhir</option>
-      <option value="90" {% if summary.days == 90 %}selected{% endif %}>90 hari terakhir</option>
-    </select>
+    <label class="mono-muted" for="from">Dari</label>
+    <input class="pantau-input" id="from" name="from" type="date" value="{{ summary.period_start|date:'Y-m-d' }}">
+    <label class="mono-muted" for="to">Sampai</label>
+    <input class="pantau-input" id="to" name="to" type="date" value="{{ summary.period_end|date:'Y-m-d' }}">
+    <button class="pantau-btn-outline" type="submit">Terapkan</button>
   </form>
   <div class="pantau-laporan-exports">
     {% if can_export %}
-    <a class="pantau-btn" href="{% url 'analytics:export_mentions' %}?format=csv">Unduh Data (CSV)</a>
-    <a class="pantau-btn" href="{% url 'analytics:export_mentions' %}?format=xlsx">Unduh Data (XLSX)</a>
+    <a class="pantau-btn" href="{% url 'analytics:export_mentions' %}?format=csv">Data CSV</a>
+    <a class="pantau-btn" href="{% url 'analytics:export_mentions' %}?format=xlsx">Data XLSX</a>
     {% endif %}
-    <button type="button" class="pantau-btn-outline" onclick="window.print()">🖨 Cetak laporan</button>
+    <a class="pantau-btn-primary" href="{% url 'analytics:laporan_pdf' %}?from={{ summary.period_start|date:'Y-m-d' }}&amp;to={{ summary.period_end|date:'Y-m-d' }}">Hasilkan PDF Analisis</a>
   </div>
 </div>
+
+<div class="pantau-report-draft">
+  <strong>Draf analitis — wajib tinjauan manusia.</strong>
+  PDF dibuat di dalam PANTAU dari angka, komentar, aktor, topik, dan URL bukti pada rentang yang sama. Klaim tanpa URL tetap memengaruhi agregat tetapi tidak layak dijadikan kutipan.
+</div>
+
 <div class="pantau-grid-laporan">
   <div class="pantau-card pantau-card-dark pantau-laporan-recap">
-    <div class="pantau-kpi-label light">Rekap periode {{ summary.period_start|date:"j M Y" }} – {{ summary.period_end|date:"j M Y" }}</div>
+    <div class="pantau-kpi-label light">Periode {{ summary.period_start|date:"j M Y" }} – {{ summary.period_end|date:"j M Y" }}</div>
     <div class="pantau-region-kpis">
-      <div><div class="pantau-kpi-value light">{{ summary.total_mentions }}</div><div class="pantau-kpi-label light">sebutan</div></div>
-      <div><div class="pantau-kpi-value light">{{ summary.total_reach }}</div><div class="pantau-kpi-label light">estimasi jangkauan</div></div>
-      <div><div class="pantau-kpi-value light">{{ summary.unique_authors }}</div><div class="pantau-kpi-label light">akun unik</div></div>
+      <div><div class="pantau-kpi-value light">{{ summary.total_mentions }}</div><div class="pantau-kpi-label light">unit analisis</div></div>
+      <div><div class="pantau-kpi-value light">{{ summary.quality.post_count }}</div><div class="pantau-kpi-label light">post/artikel</div></div>
+      <div><div class="pantau-kpi-value light">{{ summary.quality.comment_count }}</div><div class="pantau-kpi-label light">komentar</div></div>
+      <div><div class="pantau-kpi-value light">{{ summary.unique_authors }}</div><div class="pantau-kpi-label light">akun/penulis</div></div>
     </div>
   </div>
+
   <div class="pantau-card pantau-laporan-trend">
     <div class="pantau-card-title">Tren volume &amp; sentimen — {{ summary.days }} hari</div>
-    <svg width="100%" height="{{ summary.timeline_chart.height }}" viewBox="0 0 {{ summary.timeline_chart.width }} {{ summary.timeline_chart.height }}" preserveAspectRatio="none">
+    <svg width="100%" height="{{ summary.timeline_chart.height }}" viewBox="0 0 {{ summary.timeline_chart.width }} {{ summary.timeline_chart.height }}" preserveAspectRatio="none" aria-label="Tren sentimen harian">
       <polyline points="{{ summary.timeline_chart.positive_points }}" fill="none" stroke="#2E7D5B" stroke-width="2"></polyline>
       <polyline points="{{ summary.timeline_chart.neutral_points }}" fill="none" stroke="#7C8A99" stroke-width="2"></polyline>
       <polyline points="{{ summary.timeline_chart.negative_points }}" fill="none" stroke="#C6483F" stroke-width="2"></polyline>
     </svg>
+    <div class="pantau-report-legend"><span class="positive">Positif</span><span class="neutral">Netral</span><span class="negative">Negatif</span></div>
   </div>
-  <div class="pantau-card">
-    <div class="pantau-card-title">Komposisi sentimen</div>
-    {% for row in summary.sentiment_breakdown %}
-      <div class="pantau-source-row">
-        <span>{{ row.label }}</span>
-        <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ row.pct }}%"></div></div>
-        <span class="mono">{{ row.count }} · {{ row.pct }}%</span>
-      </div>
-    {% endfor %}
+
+  <div class="pantau-card pantau-laporan-wide">
+    <div class="pantau-card-title">Distribusi Sentimen: Media Online vs Media Sosial</div>
+    <div class="pantau-table-scroll">
+      <table class="pantau-table pantau-report-table">
+        <thead><tr><th>Kanal</th><th>Jumlah</th><th>Positif</th><th>Netral</th><th>Negatif</th></tr></thead>
+        <tbody>
+          {% for channel in summary.channel_rows %}
+          <tr class="{% if channel.key == 'combined' %}pantau-report-total{% endif %}">
+            <td>{{ channel.label }}</td>
+            <td>{{ channel.count }}</td>
+            {% for sentiment in channel.sentiment_breakdown %}
+            <td><span class="pantau-badge pantau-sentiment-{{ sentiment.key }}">{{ sentiment.pct }}%</span> <span class="mono-muted">({{ sentiment.count }})</span></td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
+
   <div class="pantau-card">
-    <div class="pantau-card-title">Sebaran platform</div>
+    <div class="pantau-card-title">Kualitas Bukti</div>
+    <div class="pantau-report-quality">
+      <div><strong>{{ summary.quality.source_coverage_pct }}%</strong><span>punya URL sumber</span></div>
+      <div><strong>{{ summary.quality.taxonomy_coverage_pct }}%</strong><span>berlabel topik</span></div>
+      <div><strong>{{ summary.quality.avg_sentiment_confidence_pct }}%</strong><span>keyakinan sentimen</span></div>
+      <div><strong>{{ summary.quality.unique_urls }}</strong><span>URL unik</span></div>
+      <div><strong>{{ summary.quality.collected_count }}</strong><span>hasil koleksi</span></div>
+      <div><strong>{{ summary.quality.seeded_count }}</strong><span>fixture/demo</span></div>
+    </div>
+  </div>
+
+  <div class="pantau-card">
+    <div class="pantau-card-title">Sebaran Platform</div>
     {% for row in summary.platform_rows %}
       <div class="pantau-source-row">
         <span>{{ row.name }}</span>
         <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ row.pct }}%"></div></div>
-        <span class="mono">{{ row.count }}</span>
+        <span class="mono">{{ row.count }} · {{ row.pct }}%</span>
       </div>
     {% empty %}
       <span class="mono-muted">Belum ada data pada periode ini.</span>
     {% endfor %}
   </div>
-  <div class="pantau-card">
-    <div class="pantau-card-title">Tema dominan</div>
-    <div class="narasi-theme-tags">
-      {% for theme in summary.top_themes %}
-        <span class="pantau-subissue-tag{% if forloop.counter <= 2 %} pantau-subissue-tag-primary{% endif %}">{{ theme.theme }} · {{ theme.pct }}%</span>
-      {% empty %}
-        <span class="mono-muted">Belum ada tema teridentifikasi.</span>
+
+  <div class="pantau-card pantau-laporan-wide">
+    <div class="pantau-card-header">
+      <div class="pantau-card-title">Analisis Komentar Publik</div>
+      <span class="pantau-badge{% if summary.comment_analysis.count %} pantau-badge-positive{% endif %}">
+        {{ summary.comment_analysis.count }} komentar dari {{ summary.comment_analysis.parent_count }} post
+      </span>
+    </div>
+    <div class="pantau-report-comment-grid">
+      <div>
+        <div class="pantau-report-quality">
+          <div><strong>{{ summary.comment_analysis.parent_coverage_pct }}%</strong><span>cakupan post berkomentar</span></div>
+          <div><strong>{{ summary.comment_analysis.reported_comment_count }}</strong><span>komentar dilaporkan platform</span></div>
+          <div><strong>{{ summary.comment_analysis.count }}</strong><span>isi komentar dianalisis</span></div>
+        </div>
+        {% for sentiment in summary.comment_analysis.sentiment_breakdown %}
+        <div class="pantau-source-row">
+          <span>{{ sentiment.label }}</span>
+          <div class="pantau-progress"><div class="pantau-progress-fill sentiment-{{ sentiment.key }}" style="width: {{ sentiment.pct }}%"></div></div>
+          <span class="mono">{{ sentiment.count }} · {{ sentiment.pct }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div>
+        <div class="pantau-card-title">Bukti komentar teratas</div>
+        {% for evidence in summary.comment_analysis.evidence %}
+        <div class="pantau-report-evidence">
+          <span class="pantau-badge pantau-sentiment-{{ evidence.sentiment }}">{{ evidence.sentiment }}</span>
+          <span>{{ evidence.snippet|truncatechars:220 }}</span>
+          {% if evidence.clickable %}<a href="{{ evidence.source_url }}" target="_blank" rel="noopener noreferrer">Buka konteks</a>{% endif %}
+        </div>
+        {% empty %}
+        <div class="pantau-neutrality-notice">
+          Belum ada isi komentar pada periode ini. PANTAU tidak menyimpulkan sentimen komentar hanya dari angka comment count. Aktifkan “Analisis Komentar Publik” di Konfigurasi.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="pantau-card pantau-laporan-wide">
+    <div class="pantau-card-title">Perbandingan Aktor / Objek Pantauan</div>
+    <div class="pantau-table-scroll">
+      <table class="pantau-table pantau-report-table">
+        <thead><tr><th>Aktor/Organisasi</th><th>Jumlah</th><th>Positif</th><th>Netral</th><th>Negatif</th><th>Topik Utama</th></tr></thead>
+        <tbody>
+          {% for row in summary.actor_rows %}
+          <tr>
+            <td><strong>{{ row.actor.name }}</strong><div class="mono-muted">{{ row.actor.get_actor_type_display }}</div></td>
+            <td>{{ row.count }}</td>
+            {% for sentiment in row.sentiment_breakdown %}
+            <td><span class="pantau-badge pantau-sentiment-{{ sentiment.key }}">{{ sentiment.pct }}%</span></td>
+            {% endfor %}
+            <td>{{ row.top_issue|default:"—" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6">Belum ada aktor/organisasi yang dikonfigurasi.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="pantau-hint">Sentimen disimpan per pasangan sebutan-aktor dan dapat dikoreksi pada Umpan Sebutan. Sebutan multi-aktor tetap harus ditinjau sebelum PDF diedarkan.</div>
+  </div>
+
+  <div class="pantau-card pantau-laporan-wide">
+    <div class="pantau-card-title">Ikhtisar Isu Utama dan Bukti</div>
+    {% for issue in summary.issue_rows %}
+    <article class="pantau-report-issue">
+      <div class="pantau-report-issue-head">
+        <div><strong>{{ issue.name }}</strong><span class="mono-muted">{{ issue.count }} sebutan · {{ issue.share_pct }}% korpus</span></div>
+        <span class="pantau-badge pantau-sentiment-{{ issue.dominant.key }}">{{ issue.dominant.label }} {{ issue.dominant.pct }}%</span>
+      </div>
+      <div class="pantau-sentiment-bar" aria-label="Komposisi sentimen {{ issue.name }}">
+        {% for sentiment in issue.sentiment_breakdown %}
+        <span class="sentiment-{{ sentiment.key }}" style="width: {{ sentiment.pct }}%" title="{{ sentiment.label }} {{ sentiment.pct }}%"></span>
+        {% endfor %}
+      </div>
+      {% if issue.actors %}
+      <div class="pantau-hint">Aktor terkait: {% for actor in issue.actors %}{{ actor.name }} ({{ actor.n }}){% if not forloop.last %}, {% endif %}{% endfor %}</div>
+      {% endif %}
+      <div class="pantau-report-evidence-grid">
+        {% for evidence in issue.evidence %}
+        <div class="pantau-report-evidence">
+          <div><span class="pantau-badge pantau-sentiment-{{ evidence.sentiment }}">{{ evidence.sentiment }}</span> <span class="mono-muted">{{ evidence.platform }} · {{ evidence.posted_at|date:"j M Y H:i" }}</span></div>
+          <span>{{ evidence.snippet|truncatechars:250 }}</span>
+          {% if evidence.clickable %}<a href="{{ evidence.source_url }}" target="_blank" rel="noopener noreferrer">{{ evidence.domain|default:"Buka sumber" }}</a>{% else %}<span class="mono-muted">URL sumber tidak tersedia</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+    {% empty %}
+    <span class="mono-muted">Belum ada topik terstruktur. Tinjau antrean Taksonomi.</span>
+    {% endfor %}
+  </div>
+
+  <div class="pantau-card pantau-laporan-wide">
+    <div class="pantau-card-title">Rekomendasi Strategi Komunikasi</div>
+    <div class="pantau-report-recommendations">
+      {% for item in summary.recommendations %}
+      <div>
+        <strong>{{ forloop.counter }}. {{ item.title }}</strong>
+        <p>{{ item.detail }}</p>
+        <span class="mono-muted">Dasar: {{ item.basis }}</span>
+      </div>
       {% endfor %}
     </div>
   </div>
+
+  <div class="pantau-card">
+    <div class="pantau-card-title">Daftar Sumber Teramati</div>
+    {% for source in summary.source_inventory.sources|slice:":15" %}
+    <div class="pantau-source-row">
+      <span>{{ source.domain }}</span><span class="mono-muted">{{ source.platforms }}</span><span class="mono">{{ source.count }}</span>
+    </div>
+    {% empty %}
+    <div class="pantau-neutrality-notice">Tidak ada URL kanonik yang dapat diverifikasi pada periode ini.</div>
+    {% endfor %}
+  </div>
+
+  <div class="pantau-card">
+    <div class="pantau-card-title">Kesenjangan Konfigurasi Sumber</div>
+    {% for source in summary.source_inventory.configured %}
+    <div class="pantau-source-row">
+      <span>{{ source.domain }}</span><span class="mono-muted">{{ source.adapter }}</span>
+      <span class="pantau-badge{% if source.observed %} pantau-badge-positive{% endif %}">{% if source.observed %}Teramati{% else %}Belum teramati{% endif %}</span>
+    </div>
+    {% empty %}
+    <span class="mono-muted">Belum ada domain berita aktif.</span>
+    {% endfor %}
+  </div>
+
+  <div class="pantau-card pantau-laporan-wide">
+    <div class="pantau-card-title">Kandidat Kata Kunci dari Aktor, Program, dan Topik</div>
+    <div class="pantau-table-scroll">
+      <table class="pantau-table pantau-report-table">
+        <thead><tr><th>Jenis</th><th>Kandidat</th><th>Berasal dari</th><th>Match periode</th><th>Prioritas</th><th>Alasan</th></tr></thead>
+        <tbody>
+          {% for item in summary.potential_keywords %}
+          <tr><td>{{ item.kind }}</td><td class="mono">{{ item.term }}</td><td>{{ item.source }}</td><td>{{ item.matches }}</td><td>{{ item.priority }}</td><td>{{ item.reason }}</td></tr>
+          {% empty %}
+          <tr><td colspan="6">Tidak ada kandidat baru dari konfigurasi aktif dan topik periode ini.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <details class="pantau-card pantau-laporan-wide pantau-report-method">
+    <summary class="pantau-card-title">Metodologi dan Batasan yang Masuk ke PDF</summary>
+    <div class="pantau-grid-2">
+      <div><strong>Metodologi</strong>{% for note in summary.methodology_notes %}<p>• {{ note }}</p>{% endfor %}</div>
+      <div><strong>Batasan</strong>{% for note in summary.limitations %}<p>• {{ note }}</p>{% endfor %}</div>
+    </div>
+  </details>
+
   <div class="pantau-card pantau-laporan-arsip">
     <div class="pantau-card-title">Arsip Sorotan <span class="mono-muted">— {{ summary.final_count }} final · {{ summary.draft_count }} belum final</span></div>
     {% for brief in summary.briefs %}
       <div class="pantau-region-row">
         <a href="{% url 'analytics:brief' %}?tanggal={{ brief.brief_date|date:'Y-m-d' }}">Sorotan {{ brief.brief_date|date:"l, j F Y" }}</a>
         <span class="pantau-badge{% if brief.is_locked %} pantau-badge-positive{% endif %}">{{ brief.get_status_display }}</span>
-        <a class="pantau-btn-outline pantau-btn-small" href="{% url 'analytics:brief_print' brief.pk %}" target="_blank" rel="noopener">🖨 Cetak</a>
+        <a class="pantau-btn-outline pantau-btn-small" href="{% url 'analytics:brief_print' brief.pk %}" target="_blank" rel="noopener">Cetak</a>
       </div>
     {% empty %}
       <span class="mono-muted">Belum ada sorotan. Buat dari halaman Sorotan.</span>
