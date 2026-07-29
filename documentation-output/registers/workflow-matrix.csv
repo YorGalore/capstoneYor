@@ -1,0 +1,141 @@
+module,workflow,all,analis,analyst,anon,peninjau,super_admin,super_admin+viewer,tenant_admin,"tenant_admin,analyst,viewer",viewer,overall_status
+auth,login-gagal-field-kosong,,,,Complete,,,,,,,Complete
+auth,login-gagal-password-salah,,,,Complete,,,,,,,Complete
+auth,login-gagal-user-tidak-ada,,,,Complete,,,,,,,Complete
+auth,login-valid,,,Complete with Friction,,,Complete with Friction,,Complete,,Complete with Friction,Complete with Friction
+auth,logout-dan-proteksi-halaman,,,,,,,,,,Complete,Complete
+auth,logout-tombol-kembali-browser,,,,,,,,,,Complete,Complete
+brief,Buat brief dengan field tanggal dikosongkan (negative case),,,,,,,,Complete,,,Complete
+brief,Finalisasi brief (sukses),,,,,,,,Complete,,,Complete
+brief,Finalisasi brief tanpa isu ditinjau (negative case),,,,,,,,Complete,,,Complete
+brief,Konsistensi label risiko dan banner draf pada versi cetak brief final,,,,,,,,Complete,,,Complete
+brief,Lihat versi cetak brief final,,,,,,,,Complete,,,Complete
+brief,Menyetujui seluruh isu dalam brief,,,,,,,,Complete,,,Complete
+brief,Percobaan finalisasi ganda (double-finalize) via POST langsung,,,,,,,,Complete,,,Complete
+brief,Probe tanpa otorisasi: qa.peninjau POST /brief/buat/,,,,,,,,,,Complete,Complete
+brief,Probe tanpa otorisasi: qa.peninjau POST finalisasi brief,,,,,,,,,,Complete,Complete
+brief,Probe tanpa otorisasi: qa.peninjau POST tinjau/setujui isu,,,,,,,,,,Not Testable,Not Testable
+brief,Refresh halaman brief setelah finalisasi,,,,,,,,Complete,,,Complete
+brief,"Screenshot responsif /brief/ pada 1440x900, 834x1112, 390x844",,,,,,,,Complete with Friction,,,Complete with Friction
+brief,Tampilan chip Risiko pada kartu isu brief,,,,,,,,Complete,,,Complete
+brief,Telusuri state machine brief (draft->final): apakah ada jalur reject/revisi kembali ke draft,,,,,,,,Complete,,,Complete
+brief,Tinjau/edit isu dalam brief,,,,,,,,Complete,,,Complete
+brief,Tinjauan detail responsif /brief/ pada 390x844 (mobile),,,,,,,,Complete,,,Complete
+dev-ops,akses-langsung-ditolak,,,,,,,,,Complete,,Complete
+dev-ops,simpan-runtime-setting-baru,,,,,,Complete with Friction,,,,,Complete with Friction
+dev-ops,simpan-token-apify-palsu,,,,,,Complete,,,,,Complete
+export,Cek ketersediaan ekspor granular (per-filter) di luar /ekspor/mention/,,,,,,,,Partially Complete,,,Partially Complete
+export,Ekspor mention format CSV,,,,,,,,Complete,,,Complete
+export,Ekspor mention format XLSX,,,,,,,,Complete,,,Complete
+export,Probe tanpa otorisasi: qa.peninjau ekspor mention,,,,,,,,,,Complete,Complete
+export,Verifikasi isi file CSV hasil ekspor,,,,,,,,Complete,,,Complete
+feed,Akses halaman Umpan Sebutan sebagai analis,,Blocked,,,,,,,,,Blocked
+feed,Filter umpan berdasarkan platform,,,,,,,,Complete,,,Complete
+feed,Koreksi sentimen dengan mention_id palsu/tidak ada,,,,,,,,Partially Complete,,,Partially Complete
+feed,Koreksi sentimen dengan nilai sentimen tidak valid (field kosong/di luar pilihan),,,,,,,,Complete,,,Complete
+feed,Koreksi sentimen mention (happy path end-to-end),,,,,,,,Complete,,,Complete
+feed,Lihat umpan sebutan (tampilan awal),,,,,,,,Complete,,,Complete
+feed,Navigasi 'back' browser setelah submit sukses,,,,,,,,Complete,,,Complete
+feed,Paginasi umpan sebutan,,,,,,,,Complete,,,Complete
+feed,Pencarian penulis dengan hasil nol,,,,,,,,Complete,,,Complete
+feed,Probe otorisasi: analis mencoba POST langsung ke koreksi-sentimen meski menu disembunyikan,,Complete,,,,,,,,,Complete
+feed,Probe otorisasi: viewer mencoba GET /umpan/ dan POST koreksi-sentimen,,,,,Complete,,,,,,Complete
+feed,Tangkapan layar responsif Umpan Sebutan @ 1440x900,,,,,,,,Complete,,,Complete
+feed,Tangkapan layar responsif Umpan Sebutan @ 390x844,,,,,,,,Complete,,,Complete
+feed,Tangkapan layar responsif Umpan Sebutan @ 834x1112,,,,,,,,Complete,,,Complete
+feed,Urutkan (sort) umpan sebutan,,,,,,,,Not Available,,,Not Available
+insiden,Buka detail insiden & tinjau lini masa,,,,,,,,Complete,,,Complete
+insiden,Lihat papan Insiden,,,,,,,,Complete,,,Complete
+insiden,Probe otorisasi: viewer mencoba menambah catatan pada insiden,,,,,Complete with Friction,,,,,,Complete with Friction
+insiden,Tambah catatan kosong pada insiden (negative case),,,,,,,,Complete,,,Complete
+insiden,Tambah catatan pada lini masa insiden (happy path),,,,,,,,Complete,,,Complete
+insiden,Ubah status insiden (transisi status - happy path),,,,,,,,Complete,,,Complete
+insiden,Ubah status insiden dengan incident_id palsu/tidak ada,,,,,,,,Complete,,,Complete
+konfigurasi,Melihat Riwayat Siklus Koleksi,,,,,,,,Complete,,,Complete
+konfigurasi,Melihat status Kesehatan Kolektor,,,,,,,,Complete,,,Complete
+konfigurasi,Memeriksa kartu Koleksi Data (kill switch),,,,,,,,Complete,,,Complete
+konfigurasi,Memicu koleksi manual (Berita & Social Media),,,,,,,,Complete with Friction,,,Complete with Friction
+konfigurasi,Menambahkan aturan peringatan baru (data valid),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan aturan peringatan dengan ambang di luar rentang (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan aturan peringatan dengan nama kosong (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan domain dengan field wajib kosong (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,"Menambahkan domain dengan format tidak valid (mengandung spasi, tanpa titik)",,,,,,,,Complete with Friction,,,Complete with Friction
+konfigurasi,Menambahkan domain duplikat dalam proyek yang sama (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan domain pantauan baru (data valid),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan kata kunci dengan field kosong (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan kata kunci duplikat (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan kata kunci pemantauan baru (data valid),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan kubu dengan nama duplikat (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan kubu dengan nama kosong (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan kubu politik baru (data valid),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan program dengan nama kosong (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,Menambahkan program pemerintah terlacak baru (data valid),,,,,,,,Complete,,,Complete
+konfigurasi,Mencoba memicu aksi POST (tambah kata kunci) langsung sebagai peran Peninjau (viewer) tanpa CSRF/UI,,,,,,,,,,Complete,Complete
+konfigurasi,Mencoba mengakses /konfigurasi/ langsung sebagai peran Analis,,,Complete,,,,,,,,Complete
+konfigurasi,Mencoba mengakses /konfigurasi/ langsung sebagai peran Peninjau (viewer),,,,,,,,,,Complete,Complete
+konfigurasi,Mendaftarkan aktor politik dengan nama kosong (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,Mendaftarkan aktor politik publik baru (data valid),,,,,,,,Complete,,,Complete
+konfigurasi,Mengaktifkan/menonaktifkan Platform Terpantau,,,,,,,,Complete,,,Complete
+konfigurasi,Menghapus domain pantauan,,,,,,,,Complete,,,Complete
+konfigurasi,Menghapus kubu politik,,,,,,,,Complete,,,Complete
+konfigurasi,Menghapus program pemerintah terlacak,,,,,,,,Complete,,,Complete
+konfigurasi,Mengubah kadensi penjadwalan menjadi 0 menit (negatif),,,,,,,,Complete,,,Complete
+konfigurasi,Mengubah kadensi penjadwalan pekerjaan koleksi,,,,,,,,Complete,,,Complete
+konfigurasi,Menguji koneksi domain pantauan yang sudah ada,,,,,,,,Complete,,,Complete
+konfigurasi,Menonaktifkan lalu menghapus aturan peringatan,,,,,,,,Complete,,,Complete
+konfigurasi,Menonaktifkan lalu menghapus kata kunci pemantauan,,,,,,,,Complete,,,Complete
+konfigurasi,Menonaktifkan/mengaktifkan aktor politik; memeriksa ketersediaan aksi hapus,,,,,,,,Complete with Friction,,,Complete with Friction
+konfigurasi,Menyimpan token Apify tenant (kredensial) dengan nilai palsu,,,,,,,,Complete,,,Complete
+konfigurasi,Uji tampilan responsif /konfigurasi/ (halaman panjang) pada 3 lebar layar,,,,,,,,Complete,,,Complete
+konfigurasi-izin,akses-langsung-ditolak,,,,,,,,,Complete,,Complete
+konfigurasi-izin,lihat-matriks,,,,,,Complete,,,,,Complete
+konfigurasi-izin,toggle-sel-non-reserved,,,,,,Complete,,,,,Complete
+konfigurasi-izin,uji-celah-penegakan-matriks,,,,,,,Complete,,,,Complete
+koordinasi,Membuka daftar klaster koordinasi,,,,,,,,Complete,,,Complete
+koordinasi,Memeriksa detail/evidence klaster,,,,,,,,Complete,,,Complete
+koordinasi,Memverifikasi efek matriks izin 'Tolak' pada akses /koordinasi/,,,,,,,,,,Complete with Friction,Complete with Friction
+koordinasi,Menandai klaster sebagai organik (false positive),,,,,,,,Complete,,,Complete
+koordinasi,Mencari/memfilter klaster koordinasi,,,,,,,,Not Available,,,Not Available
+koordinasi,Mencoba aksi eskalasi klaster sebagai peran Peninjau (viewer),,,,,,,,,,Complete with Friction,Complete with Friction
+koordinasi,Mengakses /koordinasi/ sebagai peran Analis,,,Complete,,,,,,,,Complete
+koordinasi,Mengakses /koordinasi/ sebagai peran Peninjau (viewer),,,,,,,,,,Complete,Complete
+koordinasi,Mengeskalasi klaster ke tinjauan analis senior,,,,,,,,Complete with Friction,,,Complete with Friction
+koordinasi,Uji tampilan responsif /koordinasi/ pada 3 lebar layar,,,,,,,,Complete,,,Complete
+laporan,Akses halaman Laporan,,,,,,,,Complete,,,Complete
+laporan,Cek tombol ekspor/cetak dari halaman Laporan,,,,,,,,Complete,,,Complete
+laporan,Cetak brief dari Arsip Sorotan pada Laporan,,,,,,,,Complete,,,Complete
+laporan,Filter rentang periode rekap (7/30/90 hari),,,,,,,,Complete,,,Complete
+narasi,Akses halaman Narasi Politik,,Blocked,,,Blocked,,,Complete,,,Blocked
+onboarding,akses-langsung-halaman-berhasil,,,,Complete with Friction,,,,,,,Complete with Friction
+onboarding,submit-duplikat,,,,Complete with Friction,,,,,,,Complete with Friction
+onboarding,submit-email-invalid,,,,Complete,,,,,,,Complete
+onboarding,submit-field-kosong,,,,Complete,,,,,,,Complete
+onboarding,submit-valid,,,,Complete,,,,,,,Complete
+onboarding,verifikasi-data-via-admin,,,,,,Blocked,,,,,Blocked
+pengawasan,lihat-dasbor,,,,,,Complete,,Complete,,,Complete
+pengawasan,lihat-dasbor-ditolak,,,Complete,,,,,,,Complete,Complete
+profil,lihat-profil,,,Complete,,,Complete,,Complete,,Complete,Complete
+rbac,probe-matriks-peran-x-halaman,Complete,,,,,,,,,,Complete
+regional,Akses halaman Regional,,Complete,,,Complete,,,Complete,,,Complete
+responsive,screenshot-multi-viewport,,,,Complete,,,,,,,Complete
+sosiograf,Akses halaman Sosiograf,,Complete,,,Complete,,,Complete,,,Complete
+taxonomy,Akses halaman Taksonomi Isu,,,,,,,,Complete,,,Complete
+taxonomy,Cek akses halaman Taksonomi Isu sebagai analyst,,,Complete,,,,,,,,Complete
+taxonomy,Cek akses halaman Taksonomi Isu sebagai viewer,,,,,,,,,,Complete,Complete
+taxonomy,Gabungkan (merge) dua isu,,,,,,,,Complete,,,Complete
+taxonomy,Gabungkan isu tanpa memilih source/target (negative case),,,,,,,,Complete,,,Complete
+taxonomy,Labeli konten pada antrean tinjauan manual,,,,,,,,Complete,,,Complete
+taxonomy,"Screenshot responsif /taksonomi/ pada 1440x900, 834x1112, 390x844",,,,,,,,Complete with Friction,,,Complete with Friction
+taxonomy,Tinjauan detail responsif /taksonomi/ pada 390x844 (mobile),,,,,,,,Complete,,,Complete
+taxonomy,Verifikasi persistensi label setelah reload,,,,,,,,Complete,,,Complete
+taxonomy,Verifikasi persistensi penggabungan isu + ketersediaan unmerge,,,,,,,,Complete,,,Complete
+war_room,Lihat War Room & isu aktif,,Complete,,,,,,,,,Complete
+war_room,Log aksi respons War Room (happy path end-to-end),,Complete with Friction,,,,,,,,,Complete with Friction
+war_room,Log aksi respons dengan deskripsi kosong (negative case),,Partially Complete,,,,,,,,,Partially Complete
+war_room,Log aksi respons dengan issue_id palsu/tidak ada,,Complete,,,,,,,,,Complete
+war_room,Navigasi 'back' browser setelah submit sukses,,Complete,,,,,,,,,Complete
+war_room,Probe otorisasi langsung (bypass UI): POST langsung ke war-room/<id>/aksi/ sebagai viewer,,,,,Complete with Friction,,,,,,Complete with Friction
+war_room,Probe otorisasi: viewer mencoba mencatat aksi respons War Room,,,,,Complete with Friction,,,,,,Complete with Friction
+war_room,Tangkapan layar responsif War Room @ 1440x900,,,,,,,,Complete,,,Complete
+war_room,Tangkapan layar responsif War Room @ 390x844,,,,,,,,Complete,,,Complete
+war_room,Tangkapan layar responsif War Room @ 834x1112,,,,,,,,Complete,,,Complete

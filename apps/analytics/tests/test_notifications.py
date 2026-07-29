@@ -1,11 +1,16 @@
+import json
+from unittest import mock
+
 from django.contrib.auth.models import User
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.analytics import alerting, authors, notifications
 from apps.analytics.models import (
-    Alert, AlertRule, Author, DailyBrief, DailyBriefIssue, Mention, NotificationDelivery,
+    Alert, AlertRule, Author, BrowserPushSubscription, DailyBrief, DailyBriefIssue,
+    Mention, NotificationDelivery,
 )
 from apps.core.models import AnalystProfile, Platform, Project, Tenant
 from apps.governance import scheduling
@@ -53,6 +58,29 @@ class AlertDeliveryTests(TestCase):
         self.assertEqual(delivery.status, NotificationDelivery.STATUS_SENT)
         self.assertEqual(delivery.kind, NotificationDelivery.KIND_ALERT)
 
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"
+    )
+    def test_console_email_backend_is_not_recorded_as_sent(self):
+        project, platform = _setup_project()
+        rule = AlertRule.objects.create(
+            project=project,
+            name="Email belum dikonfigurasi",
+            condition_summary="x",
+            channel=AlertRule.CHANNEL_EMAIL,
+            condition_type=AlertRule.CONDITION_VOLUME_SPIKE,
+            threshold=1,
+            window_minutes=60,
+        )
+        _mention(project, platform)
+
+        alerting.evaluate_rules(project)
+
+        delivery = NotificationDelivery.objects.get(alert__rule=rule)
+        self.assertEqual(delivery.status, NotificationDelivery.STATUS_SKIPPED)
+        self.assertIn("SMTP belum dikonfigurasi", delivery.detail)
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_webhook_rule_without_url_is_recorded_as_skipped(self):
         project, platform = _setup_project()
         rule = AlertRule.objects.create(
@@ -68,6 +96,104 @@ class AlertDeliveryTests(TestCase):
         delivery = NotificationDelivery.objects.get(alert__rule=rule)
         self.assertEqual(delivery.status, NotificationDelivery.STATUS_SKIPPED)
         self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(
+        WEBPUSH_VAPID_PUBLIC_KEY="public-test-key",
+        WEBPUSH_VAPID_PRIVATE_KEY="private-test-key",
+        WEBPUSH_VAPID_CONTACT="mailto:ops@example.test",
+    )
+    @mock.patch("pywebpush.webpush")
+    def test_push_rule_delivers_to_opted_in_tenant_browser(self, webpush):
+        project, platform = _setup_project()
+        user = User.objects.get(username="analis.uji")
+        BrowserPushSubscription.objects.create(
+            project=project,
+            user=user,
+            endpoint="https://push.example.test/subscription/one",
+            p256dh="public-client-key",
+            auth="client-auth",
+        )
+        rule = AlertRule.objects.create(
+            project=project,
+            name="Push nyata",
+            condition_summary="x",
+            channel=AlertRule.CHANNEL_PUSH,
+            condition_type=AlertRule.CONDITION_VOLUME_SPIKE,
+            threshold=1,
+            window_minutes=60,
+        )
+        _mention(project, platform)
+
+        alerting.evaluate_rules(project)
+
+        delivery = NotificationDelivery.objects.get(alert__rule=rule)
+        self.assertEqual(delivery.status, NotificationDelivery.STATUS_SENT)
+        self.assertIn("1/1 browser", delivery.detail)
+        webpush.assert_called_once()
+        self.assertEqual(
+            webpush.call_args.kwargs["subscription_info"]["endpoint"],
+            "https://push.example.test/subscription/one",
+        )
+
+
+class BrowserPushSubscriptionViewTests(TestCase):
+    def setUp(self):
+        self.project, _platform = _setup_project()
+        self.user = User.objects.get(username="analis.uji")
+        self.client.force_login(self.user)
+        self.payload = {
+            "endpoint": "https://push.example.test/subscription/browser-a",
+            "keys": {"p256dh": "public-client-key", "auth": "client-auth"},
+        }
+
+    def test_browser_can_opt_in_and_out(self):
+        response = self.client.post(
+            reverse("analytics:push_subscribe"),
+            data=json.dumps(self.payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        subscription = BrowserPushSubscription.objects.get(user=self.user)
+        self.assertTrue(subscription.is_active)
+        self.assertEqual(subscription.project, self.project)
+
+        response = self.client.post(
+            reverse("analytics:push_unsubscribe"),
+            data=json.dumps({"endpoint": self.payload["endpoint"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        subscription.refresh_from_db()
+        self.assertFalse(subscription.is_active)
+
+    def test_invalid_non_https_endpoint_is_rejected(self):
+        self.payload["endpoint"] = "http://push.example.test/subscription"
+        response = self.client.post(
+            reverse("analytics:push_subscribe"),
+            data=json.dumps(self.payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(BrowserPushSubscription.objects.exists())
+
+    def test_service_worker_is_public_and_root_scoped(self):
+        self.client.logout()
+        response = self.client.get(
+            reverse("analytics:push_service_worker"), secure=True
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Service-Worker-Allowed"], "/")
+        self.assertContains(response, 'self.addEventListener("push"')
+
+    @override_settings(
+        WEBPUSH_VAPID_PUBLIC_KEY="public-test-key",
+        WEBPUSH_VAPID_PRIVATE_KEY="private-test-key",
+        WEBPUSH_VAPID_CONTACT="mailto:ops@example.test",
+    )
+    def test_dashboard_exposes_opt_in_only_when_delivery_is_configured(self):
+        response = self.client.get(reverse("analytics:ringkasan"))
+        self.assertContains(response, "Aktifkan notifikasi")
+        self.assertContains(response, "public-test-key")
 
 
 class BriefDistributionTests(TestCase):

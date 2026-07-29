@@ -1,5 +1,6 @@
 from urllib.parse import urlsplit
 
+from django.conf import settings
 from django.db import models
 
 from apps.core.models import Platform, Project, Province, Regency
@@ -556,6 +557,42 @@ class NotificationDelivery(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()} via {self.channel} ({self.get_status_display()})"
+
+
+class BrowserPushSubscription(models.Model):
+    """One browser endpoint that opted in to tenant-scoped Web Push alerts."""
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="push_subscriptions"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pantau_push_subscriptions",
+    )
+    endpoint = models.URLField(max_length=1000, unique=True)
+    p256dh = models.TextField()
+    auth = models.TextField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    @property
+    def subscription_info(self):
+        return {
+            "endpoint": self.endpoint,
+            "keys": {"p256dh": self.p256dh, "auth": self.auth},
+        }
+
+    @property
+    def masked_endpoint(self):
+        return f"{self.endpoint[:45]}…" if len(self.endpoint) > 45 else self.endpoint
+
+    def __str__(self):
+        return f"{self.user} — {'aktif' if self.is_active else 'nonaktif'}"
 
 
 class DailyBriefRun(models.Model):

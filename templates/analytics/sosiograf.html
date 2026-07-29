@@ -6,12 +6,15 @@
 {% if summary %}
 <div class="pantau-grid-sosiograf">
   <div class="pantau-card pantau-sosiograf-card">
-    <div class="pantau-card-title">Jaringan Akun Berpengaruh <span class="mono-muted">— {{ summary.days }} hari terakhir · ukuran = jangkauan · garis = tema yang sama</span></div>
+    <div class="pantau-card-title">Jaringan Akun Berpengaruh <span class="mono-muted">— {{ summary.days }} hari terakhir · ukuran = jangkauan · garis = balasan nyata atau bukti klaster</span></div>
     {% localize off %}
     <svg class="pantau-sosiograf-svg" width="100%" viewBox="0 0 {{ summary.width }} {{ summary.height }}">
       {% for edge in summary.edges %}
         <line x1="{{ edge.x1 }}" y1="{{ edge.y1 }}" x2="{{ edge.x2 }}" y2="{{ edge.y2 }}"
-              class="pantau-sosiograf-edge{% if edge.coordinated %} coordinated{% endif %}"></line>
+              style="stroke-width: {{ edge.width }}px"
+              class="pantau-sosiograf-edge{% if edge.coordinated %} coordinated{% endif %}">
+          <title>{{ edge.evidence }}</title>
+        </line>
       {% endfor %}
       {% for node in summary.nodes %}
         <g class="pantau-sosiograf-node">

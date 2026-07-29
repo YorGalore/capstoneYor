@@ -88,17 +88,18 @@ class WarRoomSummaryTest(TestCase):
 
 
 class NarasiSummaryTest(TestCase):
-    def test_narasi_summary_splits_by_coalition(self):
+    def test_narasi_summary_uses_configured_actor_camps(self):
         tenant, project = seed_core()
         seed_analytics(project, mention_count=100)
         issue = PoliticalIssue.objects.get(title="Distribusi Pangan Wilayah Timur")
 
         summary = selectors.narasi_summary(issue)
         self.assertEqual(summary["issue"], issue)
-        self.assertEqual(len(summary["coalitions"]), 2)
-        total_share = sum(c["share_pct"] for c in summary["coalitions"])
-        self.assertGreater(total_share, 0)
-        self.assertIn("series", summary["overlay_chart"])
+        self.assertEqual(len(summary["camps"]), 2)
+        total_share = sum(c["share_pct"] for c in summary["camps"])
+        self.assertEqual(total_share, 100)
+        self.assertTrue(all(camp["actors"] for camp in summary["camps"]))
+        self.assertTrue(all(camp["overlay_points"] for camp in summary["camps"]))
 
     def test_narasi_summary_includes_dominant_themes(self):
         tenant, project = seed_core()
@@ -106,8 +107,8 @@ class NarasiSummaryTest(TestCase):
         issue = PoliticalIssue.objects.get(title="Distribusi Pangan Wilayah Timur")
 
         summary = selectors.narasi_summary(issue)
-        for coalition_data in summary["coalitions"]:
-            themes = coalition_data["dominant_themes"]
+        for camp_data in summary["camps"]:
+            themes = camp_data["dominant_themes"]
             self.assertTrue(themes, "expected non-empty dominant themes for seeded coalition")
             for entry in themes:
                 self.assertIn("theme", entry)
@@ -177,3 +178,79 @@ class RegionalSummaryTest(TestCase):
             self.assertIn("theme", entry)
             self.assertIn("pct", entry)
             self.assertTrue(entry["theme"])
+
+
+class SosiografSummaryTest(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="Instansi Sosiograf")
+        self.project = Project.objects.create(
+            tenant=self.tenant, name="Proyek Sosiograf"
+        )
+        self.platform = Platform.objects.create(
+            slug="sosio-x", display_name="Sosio X"
+        )
+        self.issue = PoliticalIssue.objects.create(
+            project=self.project,
+            title="Isu Jaringan",
+            status=PoliticalIssue.STATUS_ACTIVE,
+            opened_at=timezone.now(),
+            owner_label="Tim",
+        )
+
+    def _mention(self, handle, *, parent=None, theme="tema sama", reach=100):
+        return Mention.objects.create(
+            project=self.project,
+            platform=self.platform,
+            author_handle=handle,
+            content_snippet=f"konten {handle}",
+            theme=theme,
+            sentiment=Mention.SENTIMENT_NEUTRAL,
+            emotion=Mention.EMOTION_TRUST,
+            posted_at=timezone.now(),
+            reach_estimate=reach,
+            content_type=(
+                Mention.CONTENT_COMMENT if parent else Mention.CONTENT_POST
+            ),
+            parent=parent,
+        )
+
+    def test_edges_require_observed_interaction_not_shared_theme(self):
+        parent = self._mention("@induk", reach=300)
+        self._mention("@pembalas", parent=parent, reach=200)
+        self._mention("@tema_saja", reach=100)
+
+        summary = selectors.sosiograf_summary(self.project)
+
+        self.assertEqual(summary["edge_count"], 1)
+        self.assertIn("balasan/komentar", summary["edges"][0]["evidence"])
+        self.assertFalse(summary["edges"][0]["coordinated"])
+
+    def test_actionable_coordination_cluster_creates_grounded_edge(self):
+        from apps.coordination.models import ClusterAccount, CoordinationCluster
+
+        self._mention("@pusat", reach=300)
+        self._mention("@penguat", reach=200)
+        cluster = CoordinationCluster.objects.create(
+            issue=self.issue,
+            cluster_code="JARINGAN-1",
+            score=0.90,
+            status=CoordinationCluster.STATUS_ESCALATED,
+            account_count=2,
+            detected_at=timezone.now(),
+        )
+        ClusterAccount.objects.create(
+            cluster=cluster,
+            handle="@pusat",
+            role=ClusterAccount.ROLE_HUB,
+        )
+        ClusterAccount.objects.create(
+            cluster=cluster,
+            handle="@penguat",
+            role=ClusterAccount.ROLE_AMPLIFIER,
+        )
+
+        summary = selectors.sosiograf_summary(self.project)
+
+        self.assertEqual(summary["edge_count"], 1)
+        self.assertTrue(summary["edges"][0]["coordinated"])
+        self.assertIn("JARINGAN-1", summary["edges"][0]["evidence"])

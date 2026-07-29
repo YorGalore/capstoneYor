@@ -1,0 +1,35 @@
+[
+  {
+    "issue_id": "ISS-BTX-005",
+    "original_severity": "Low",
+    "repro_steps": "Login sebagai humas.kulonprogo, buka /brief/5/cetak/ untuk brief final tanggal 2026-07-20, periksa label risiko dan isi konten setiap isu.",
+    "new_actual": "Halaman cetak brief final menampilkan 'Risiko: Sedang' (label Indonesia), tidak ada label risiko bahasa Inggris mentah, dan tidak ada banner draf '[DRAF - DIHASILKAN AI, MENUNGGU TINJAUAN MANUSIA]' di dalam konten isu. Footer umum 'Konten dihasilkan dengan bantuan AI dan telah ditinjau...' tetap muncul (sesuai harapan).",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-BTX-005_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-BTX-004",
+    "original_severity": "Medium",
+    "repro_steps": "Login sebagai humas.kulonprogo, buka /brief/?tanggal=2026-07-20, periksa chip risiko pada kartu isu.",
+    "new_actual": "Chip risiko pada kartu isu menampilkan label Indonesia yang benar (contoh: 'Risiko: Sedang'). Tidak ditemukan teks dict Python mentah di halaman.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-BTX-004_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-BTX-001",
+    "original_severity": "Medium",
+    "repro_steps": "Login sebagai humas.kulonprogo (tenant_admin), buka /brief/?tanggal=2026-07-20 untuk brief final, cari tombol 'Buka kembali untuk revisi', submit form tersebut.",
+    "new_actual": "Tombol 'Buka kembali untuk revisi' ditemukan pada brief final dan berhasil disubmit (form disubmit langsung tanpa terhalang confirm()); setelah submit, chip status brief berubah dari 'Final — terkunci' menjadi 'Draf — menunggu tinjauan', dan tombol 'Finalisasi & kunci brief' muncul kembali. Dikonfirmasi juga langsung di database bahwa DailyBrief id=5 kini berstatus 'draft'.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-BTX-001_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-FW-001",
+    "original_severity": "Low",
+    "repro_steps": "Login sebagai qa.analis (analyst), GET /umpan/ dan periksa sidebar. Login sebagai qa.peninjau (viewer), GET /umpan/ (harus 200) lalu POST /umpan/<mention_id>/koreksi-sentimen/ (harus 403).",
+    "new_actual": "Analyst (qa.analis) GET /umpan/ -> masih 403 Forbidden; link sidebar 'Umpan Sebutan' masih berupa <span> nonaktif, bukan <a>. Viewer (qa.peninjau) GET /umpan/ -> juga masih 403. Root cause dikonfirmasi lewat database: kode sumber sudah diperbaiki (apps/core/permissions.py memasukkan 'feed' ke DASHBOARD_PAGES sehingga default akses analyst & viewer menjadi True), TETAPI tabel PagePermission pada database masih menyimpan baris eksplisit lama (page='feed', role='analyst', can_access=False; role='viewer', can_access=False) yang dibuat sebelum perbaikan kode dan tidak pernah dimutakhirkan — baris eksplisit ini mengalahkan default kode baru (lihat apps/core/permissions.py fungsi can_access: baris matriks yang ada selalu didahulukan atas default_can_access). Akibatnya perilaku nyata pada server yang berjalan tetap sama seperti bug awal (403) walau kode sudah benar. Pengujian POST /umpan/<mention_id>/koreksi-sentimen/ oleh viewer juga menghasilkan 403, tetapi ini tidak dapat dibedakan dari efek bug matriks izin karena GET saja sudah diblokir.",
+    "status": "STILL_BROKEN",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-FW-001_reverifikasi_belum-diperbaiki.png",
+    "catatan": "qa.analis dan qa.peninjau tidak ditemukan di database pengujian pada awalnya (hanya bagus.prakoso dan siti.rahmawati sebagai analyst di tenant Kemenko PMK yang ada); kedua akun dibuat ulang secara manual sesuai kredensial yang diminta (role analyst dan viewer, tenant Kabupaten Kulon Progo, password demo12345) agar pengujian dapat dijalankan."
+  }
+]

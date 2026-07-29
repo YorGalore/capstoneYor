@@ -2,14 +2,15 @@
 malformed output fall through to the next tier, always ending with the
 deterministic DummyProvider so a result is guaranteed.
 
-A real LLM provider (e.g. Claude) can be prepended as the primary tier once a key
-is configured via Runtime Settings — it plugs in behind the same Provider
-interface without changing callers. The demo default is lexicon → dummy.
+A configured OpenAI-compatible HTTP provider is the primary tier. The local
+lexicon and neutral terminal fallback keep collection available during outages
+and persist their model provenance explicitly.
 """
 import logging
 
 from .base import Classification
 from .dummy import DummyProvider
+from .http_provider import HttpNlpProvider
 from .lexicon import LexiconProvider
 
 logger = logging.getLogger(__name__)
@@ -44,8 +45,13 @@ def _is_valid(result):
 
 
 def default_pipeline():
-    """The demo default chain: deterministic lexicon, then degraded dummy."""
-    return Pipeline([LexiconProvider()])
+    """Configured HTTP model, then deterministic local degraded tiers."""
+    providers = []
+    remote = HttpNlpProvider.from_config()
+    if remote is not None:
+        providers.append(remote)
+    providers.append(LexiconProvider())
+    return Pipeline(providers)
 
 
 def classify(text):

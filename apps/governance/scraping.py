@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from apps.analytics import actors, taxonomy
 from apps.analytics.models import Author, Mention
-from apps.analytics.nlp import classify
+from apps.analytics.nlp import default_pipeline
 
 from . import portal_crawler
 
@@ -122,6 +122,7 @@ def run_scan(project, platform, domains, keywords):
     sources_scanned = 0
     errors = []
     gained_matches = {}
+    classifier = default_pipeline()
 
     for domain in domains:
         if not domain.feed_url:
@@ -156,7 +157,7 @@ def run_scan(project, platform, domains, keywords):
             if matched_keyword is None:
                 continue
 
-            classification = classify(haystack)
+            classification = classifier.classify(haystack)
             author, _ = Author.objects.get_or_create(
                 platform=platform,
                 handle=domain.domain,

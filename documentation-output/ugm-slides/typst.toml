@@ -1,0 +1,15 @@
+[package]
+name = "ugm-slides"
+version = "0.1.0"
+entrypoint = "lib.typ"
+authors = ["Universitas Gadjah Mada community"]
+license = "MIT"
+description = "UGM-branded presentation theme with heading-driven slides and section navigation, inspired by diatypst."
+keywords = ["slides", "presentation", "ugm", "university", "beamer"]
+categories = ["presentation"]
+exclude = ["example.typ", "example.pdf"]
+
+[template]
+path = "template"
+entrypoint = "main.typ"
+thumbnail = "thumbnail.png"

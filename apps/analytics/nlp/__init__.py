@@ -5,6 +5,6 @@ a tiered fallback chain (SRS §8.3): a configured primary/secondary model, then 
 deterministic degraded provider that needs no external model call — so the demo
 and tests never depend on a live LLM.
 """
-from .pipeline import classify
+from .pipeline import classify, default_pipeline
 
-__all__ = ["classify"]
+__all__ = ["classify", "default_pipeline"]

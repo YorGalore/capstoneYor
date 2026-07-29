@@ -25,11 +25,19 @@ class FeedViewTest(TestCase):
         self.super_admin = self._user("super", AnalystProfile.ROLE_SUPER_ADMIN, self.tenant_a)
         self.analyst = self._user("analis", AnalystProfile.ROLE_ANALYST, self.tenant_a)
 
-    def _mention(self, project, platform, handle, sentiment):
+    def _mention(self, project, platform, handle, sentiment, **overrides):
+        values = {
+            "project": project,
+            "platform": platform,
+            "author_handle": handle,
+            "content_snippet": "teks",
+            "sentiment": sentiment,
+            "emotion": Mention.EMOTION_TRUST,
+            "posted_at": timezone.now(),
+        }
+        values.update(overrides)
         return Mention.objects.create(
-            project=project, platform=platform, author_handle=handle,
-            content_snippet="teks", sentiment=sentiment, emotion=Mention.EMOTION_TRUST,
-            posted_at=timezone.now(),
+            **values,
         )
 
     def _user(self, name, role, tenant):
@@ -84,6 +92,57 @@ class FeedViewTest(TestCase):
         response = self.client.get(reverse("analytics:feed"), {"author": "pos_a"})
         self.assertContains(response, "@pos_a")
         self.assertNotContains(response, "@neg_a")
+
+    def test_feed_filters_by_inclusive_date_range(self):
+        old = self._mention(
+            self.project_a,
+            self.x,
+            "@old_a",
+            Mention.SENTIMENT_NEUTRAL,
+            posted_at=timezone.now() - timezone.timedelta(days=10),
+        )
+        today = timezone.localdate()
+        self.client.force_login(self.super_admin)
+
+        response = self.client.get(
+            reverse("analytics:feed"),
+            {"from": today.isoformat(), "to": today.isoformat()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, old.author_handle)
+        self.assertContains(response, "@pos_a")
+        self.assertContains(response, f'value="{today.isoformat()}"')
+
+    def test_feed_filters_by_content_and_type(self):
+        self._mention(
+            self.project_a,
+            self.x,
+            "@commenter",
+            Mention.SENTIMENT_NEUTRAL,
+            content_snippet="keluhan transportasi warga",
+            matched_keyword="transportasi",
+            content_type=Mention.CONTENT_COMMENT,
+        )
+        self.client.force_login(self.super_admin)
+
+        response = self.client.get(
+            reverse("analytics:feed"),
+            {"q": "transportasi", "content_type": Mention.CONTENT_COMMENT},
+        )
+
+        self.assertContains(response, "@commenter")
+        self.assertNotContains(response, "@pos_a")
+
+    def test_feed_export_links_preserve_active_filters(self):
+        self.client.force_login(self.super_admin)
+
+        response = self.client.get(
+            reverse("analytics:feed"),
+            {"platform": "x", "sentiment": Mention.SENTIMENT_POSITIVE},
+        )
+
+        self.assertContains(response, "platform=x&amp;sentiment=positive&amp;format=csv")
 
     def test_feed_does_not_link_to_legacy_demo_source(self):
         mention = Mention.objects.filter(project=self.project_a).first()

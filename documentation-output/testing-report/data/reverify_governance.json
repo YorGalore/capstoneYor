@@ -1,0 +1,50 @@
+[
+  {
+    "issue_id": "ONB-ISSUE-003",
+    "original_severity": "Medium",
+    "repro_steps": "Login sebagai dewi.anjani (super_admin), akses GET /mulai/permintaan/. Lalu login sebagai humas.kulonprogo (tenant_admin) dan akses GET /mulai/permintaan/ yang sama.",
+    "new_actual": "Sebagai super_admin: status HTTP 200, tabel ditemukan=True. Sebagai tenant_admin: status HTTP 403 (diharapkan 403).",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ONB-ISSUE-003_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "UX-ISSUE-001",
+    "original_severity": "Medium",
+    "repro_steps": "Login sebagai qa.peninjau (viewer), buka /ringkasan/, periksa HTML sidebar untuk item nav 'Konfigurasi' dan 'Pengawasan'. Bandingkan dengan humas.kulonprogo (tenant_admin) yang memiliki akses.",
+    "new_actual": "Viewer: Konfigurasi span-disabled=True, link-a=False; Pengawasan span-disabled=True, link-a=False. Tenant admin: Konfigurasi link-a=True; Pengawasan link-a=True.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\UX-ISSUE-001_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-KOORDINASI-001",
+    "original_severity": "Medium",
+    "repro_steps": "Login sebagai humas.kulonprogo, buka /koordinasi/, pilih cluster berstatus 'Ditandai' (Klaster-KP-01), klik tombol 'Kirim ke tinjauan analis senior' (eskalasi), lalu reload /koordinasi/ dan periksa badge status cluster tersebut.",
+    "new_actual": "Badge cluster Klaster-KP-01 sebelum eskalasi: 'Ditandai'. Setelah eskalasi dan reload halaman, badge cluster tersebut: 'Dieskalasi'.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-KOORDINASI-001_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-KONFIGURASI-005",
+    "original_severity": "Medium",
+    "repro_steps": "Login sebagai humas.kulonprogo, buka /konfigurasi/, cari tabel 'Aktor Politik Publik'. Jika kosong, tambahkan aktor uji via form '+ Daftarkan aktor'. Periksa apakah setiap baris memiliki tombol Hapus, lalu hapus aktor uji dan periksa apakah hilang setelah reload.",
+    "new_actual": "Tombol Hapus ditemukan pada baris aktor: True. Aktor uji ditambahkan: True. Setelah menghapus dan reload, aktor uji sudah tidak ada di tabel: True.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-KONFIGURASI-005_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-KONFIGURASI-004",
+    "original_severity": "Low",
+    "repro_steps": "Login sebagai humas.kulonprogo, buka /konfigurasi/, isi form 'Tambah domain' dengan nilai 'domain tanpa titik dan spasi' (mengandung spasi, tanpa TLD), lalu submit.",
+    "new_actual": "Setelah submit, apakah pesan error validasi terdeteksi: True. Apakah domain tersebut muncul di daftar domain setelah reload: False.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-KONFIGURASI-004_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "AUTH-ISSUE-001",
+    "original_severity": "Low",
+    "repro_steps": "Login sebagai dewi.anjani (super_admin), lihat area info pengguna di bagian bawah sidebar (nama/peran).",
+    "new_actual": "Teks peran yang ditampilkan pada sidebar: 'Analis Humas · Platform Super Admin'.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\AUTH-ISSUE-001_reverifikasi_diperbaiki.png"
+  }
+]

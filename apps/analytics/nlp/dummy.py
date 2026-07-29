@@ -5,7 +5,9 @@ from .base import Classification, Provider
 
 
 class DummyProvider(Provider):
-    model_version = "dummy-v1"
+    # Historical class name retained for compatibility; the persisted label is
+    # operationally explicit when this last-resort fallback is used.
+    model_version = "fallback-neutral-v1"
 
     def classify(self, text):
         return Classification(

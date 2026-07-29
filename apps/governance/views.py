@@ -816,11 +816,21 @@ def runtime_settings(request):
         project=project,
         status=ApifyCredential.STATUS_ACTIVE
     ).order_by("-id").first()
+    nlp_provider = None
+    nlp_error = ""
+    try:
+        from apps.analytics.nlp.http_provider import HttpNlpProvider
+
+        nlp_provider = HttpNlpProvider.from_config()
+    except (TypeError, ValueError) as exc:
+        nlp_error = str(exc)
     return render(request, "governance/runtime_settings.html", {
         "active_nav": "runtime_settings",
         "settings_rows": settings_rows,
         "reserved_keys": sorted(runtime.RESERVED_KEYS),
         "active_credential": active_credential,
+        "nlp_provider": nlp_provider,
+        "nlp_error": nlp_error,
     })
 
 
@@ -884,4 +894,38 @@ def save_runtime_setting(request):
         actor_label=_actor_label(request), action="Memperbarui Runtime Setting", target=key,
     )
     messages.success(request, f'Pengaturan "{key}" diperbarui.')
+    return redirect("governance:runtime_settings")
+
+
+@require_page("runtime_settings")
+@require_POST
+def test_nlp_connection(request):
+    from apps.analytics.nlp.http_provider import HttpNlpProvider
+
+    sample = (
+        request.POST.get("sample")
+        or "Program layanan publik berhasil membantu warga."
+    ).strip()[:1000]
+    try:
+        provider = HttpNlpProvider.from_config()
+        if provider is None:
+            raise ValueError(
+                "Konfigurasikan nlp.api_url dan nlp.model terlebih dahulu."
+            )
+        result = provider.classify(sample)
+    except Exception as exc:
+        messages.error(request, f"Uji NLP gagal: {exc}")
+        return redirect("governance:runtime_settings")
+    record_audit_entry(
+        actor_label=_actor_label(request),
+        action="Menguji koneksi provider NLP",
+        target=provider.model_version,
+    )
+    messages.success(
+        request,
+        (
+            f"Provider NLP aktif: {result.model_version}; "
+            f"sentimen={result.sentiment}, confidence={result.confidence:.2f}."
+        ),
+    )
     return redirect("governance:runtime_settings")

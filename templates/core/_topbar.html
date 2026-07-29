@@ -1,5 +1,22 @@
 <div class="pantau-topbar">
+  <label class="pantau-nav-open" for="pantau-nav-toggle" aria-label="Buka navigasi">☰</label>
   <div class="pantau-project-pill"><span class="dot"></span>{{ proyek }}</div>
   <div class="pantau-instansi">{{ instansi }}</div>
-  <div class="pantau-topbar-actions">{% block topbar_actions %}{% endblock %}</div>
+  <div class="pantau-topbar-actions">
+    {% if webpush_configured %}
+    <form id="pantau-push-form" onsubmit="return false">
+      {% csrf_token %}
+      <button
+        type="button"
+        id="pantau-push-toggle"
+        class="pantau-btn-outline pantau-btn-small"
+        data-public-key="{{ webpush_public_key }}"
+        data-worker-url="{% url 'analytics:push_service_worker' %}"
+        data-subscribe-url="{% url 'analytics:push_subscribe' %}"
+        data-unsubscribe-url="{% url 'analytics:push_unsubscribe' %}"
+      >Aktifkan notifikasi</button>
+    </form>
+    {% endif %}
+    {% block topbar_actions %}{% endblock %}
+  </div>
 </div>

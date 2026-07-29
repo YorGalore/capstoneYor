@@ -1,0 +1,250 @@
+================================================================================
+IMAGE PROMPTS - PELENGKAP UNTUK presentasi-kulonprogo-v2.typ
+Bagian baru: "Bagaimana PANTAU Bekerja di Balik Layar"
+================================================================================
+
+Tujuan:
+  File ini HANYA berisi 4 prompt gambar BARU untuk Bagian 2 yang ditambahkan
+  di presentasi-kulonprogo-v2.typ (landasan teori pengumpulan data dan teknik
+  analisis media sosial). Prompt untuk gambar lain sudah ada di
+  image-prompts.txt (fig_pertanyaan_pimpinan, fig_kebutuhan_memulai,
+  fig_penutup_kolaborasi) dan TIDAK diulang di sini.
+
+Folder keluaran:
+  documentation-output/presentasi-kulonprogo/figs/
+
+PERLU DIBUAT - empat gambar baru:
+  1. figs/fig_pengumpulan_data.png
+  2. figs/fig_pipeline_teks.png
+  3. figs/fig_deteksi_lonjakan.png
+  4. figs/fig_jaringan_klaster.png
+
+Referensi gaya (samakan dengan ilustrasi yang sudah ada di deck):
+  - Ilustrasi editorial-infografis yang detail dan padat komposisi, bukan
+    ikon flat/minimal, dan bukan diagram bisu tanpa label.
+  - Latar putih bersih dengan konteks lingkungan tipis berwarna biru pucat,
+    bayangan lembut untuk kedalaman.
+  - Linework tegas berwarna navy, aksen emas terbatas pada elemen fokus.
+  - Ukuran ideal: mendekati persegi/4:3, dirancang untuk duduk di SAMPING
+    teks slide dalam satu kolom grid — bukan infografis satu-slide penuh.
+  - Sematkan label teks Indonesia yang persis mengutip istilah pada slide
+    (bukan diagram ikon tanpa keterangan).
+  - Jangan menggunakan logo perusahaan atau platform sosial yang nyata.
+  - Tanpa watermark, bingkai dekoratif, atau mockup slide/aplikasi nyata.
+  - Jangan gunakan merah, hijau, ungu, atau oranye kuat — skema warna tetap
+    navy/emas/putih dengan teal-mint PANTAU hanya pada ubin kecil "P".
+
+
+================================================================================
+PROMPT 1 - save as: figs/fig_pengumpulan_data.png
+Slide: "Dua Jalur Pengumpulan Data"
+Ukuran: mendekati persegi/4:3, ideal 1400 x 1400 px
+================================================================================
+
+Create a detailed editorial vector infographic illustration for an Indonesian
+regional-government presentation about a public-monitoring system. Use a
+clean white background, confident navy linework, subtle pale-blue
+environmental shading, restrained soft shadows, and small gold focal
+accents. Match a polished institutional annual-report style: richly
+composed and informative, not a flat icon set, not photorealistic, and not
+a software mockup.
+
+Scene:
+Show two parallel data-collection pipelines converging into one central
+system. On the left, a pipeline begins at an abstract rounded
+social-app tile (a generic chat-bubble icon, no real platform logo) and
+flows through a small gateway shape labeled with the caption "API Resmi".
+On the right, a second pipeline begins at an abstract stack of newspaper /
+online-news-article icons (folded paper with text lines and a small
+headline mark, representing "portal berita daring") and flows through a
+spider/crawler-web icon labeled "Penelusuran Web". Both pipelines pass
+through a shared funnel-shaped filter labeled "Kata kunci & wilayah" before
+arriving at a small rounded server/database icon that carries one tiny
+teal-to-mint gradient tile with the letter "P" on it. Add a small shield or
+padlock icon near the funnel labeled "Data publik saja" to convey privacy
+and compliance. Keep the whole composition calm, orderly, and legible, with
+soft pale-blue circuit-like flow lines connecting the stages left to right.
+
+Render these exact Indonesian captions as large, legible text:
+  "API Resmi"
+  "Penelusuran Web"
+  "Portal Berita Daring"
+  "Kata kunci & wilayah"
+  "Data publik saja"
+
+Color palette:
+  - Deep UGM navy #01416B for outlines, icons, flow lines, and captions
+  - Gold #FDD402 for the filter funnel accent and small highlight marks
+  - Pale navy #E6EEF3 and light blue-grey tints for background context
+  - White #FFFFFF for the canvas and card interiors
+  - PANTAU teal #0E7C86 to mint #2FD4C4 only on the tiny "P" database tile
+
+Do not introduce strong red, green, purple, or orange. No photorealism, no
+real brand or social-media logos, no watermark, no illegible filler text,
+no extra fingers, and no large decorative title.
+
+
+================================================================================
+PROMPT 2 - save as: figs/fig_pipeline_teks.png
+Slide: "Dari Teks Warga menjadi Data Terstruktur"
+Ukuran: mendekati persegi/4:3, ideal 1400 x 1400 px
+================================================================================
+
+Create a detailed editorial vector infographic illustration for an Indonesian
+regional-government presentation about a public-monitoring system. Use a
+clean white background, confident navy linework, subtle pale-blue
+environmental shading, restrained soft shadows, and small gold focal
+accents. Match a polished institutional annual-report style: richly
+composed and informative, not a flat icon set, not photorealistic, and not
+a software mockup.
+
+Scene:
+Show a horizontal four-stage text-processing pipeline, left to right,
+connected by thin navy arrows with small gold checkpoints between stages.
+  Stage 1: a rough, informal speech-bubble containing a short, messy
+    hand-styled Indonesian sentence with visible strikethroughs/typo marks,
+    representing raw text.
+  Stage 2: a filter/sieve icon cleaning the text, with a few stray marks
+    falling away, labeled "Pembersihan teks".
+  Stage 3: a small round gauge or three-face meter (frown / neutral / smile)
+    labeled "Klasifikasi sentimen".
+  Stage 4: a small stack of neatly aligned cards merging into one clean
+    card labeled "Pengelompokan isu", with a tiny magnifying-glass or
+    checkmark icon representing operator review at the very end.
+
+Render these exact Indonesian captions as large, legible text:
+  "Teks mentah"
+  "Pembersihan teks"
+  "Klasifikasi sentimen"
+  "Pengelompokan isu"
+
+Color palette:
+  - Deep UGM navy #01416B for outlines, icons, arrows, and captions
+  - Gold #FDD402 for checkpoints, the sentiment gauge accent, and the final
+    checkmark
+  - Pale navy #E6EEF3 and light blue-grey tints for background context
+  - White #FFFFFF for the canvas and card interiors
+  - PANTAU teal #0E7C86 to mint #2FD4C4 only on a tiny "P" tile in a corner
+    of the final structured card
+
+Do not introduce strong red, green, purple, or orange. No photorealism, no
+real brand or social-media logos, no watermark, no illegible filler text,
+no extra fingers, and no large decorative title.
+
+
+================================================================================
+PROMPT 3 - save as: figs/fig_deteksi_lonjakan.png
+Slide: "Mendeteksi Lonjakan dan Menentukan Prioritas"
+Ukuran: mendekati persegi/4:3, ideal 1400 x 1400 px
+================================================================================
+
+Create a detailed editorial vector infographic illustration for an Indonesian
+regional-government presentation about a public-monitoring system. Use a
+clean white background, confident navy linework, subtle pale-blue
+environmental shading, restrained soft shadows, and small gold focal
+accents. Match a polished institutional annual-report style: richly
+composed and informative, not a flat icon set, not photorealistic, and not
+a software mockup.
+
+Scene:
+Draw a clean line-and-area chart on a simple time axis, mostly flat and low
+on the left, then rising sharply into a steep spike toward the right. Add a
+horizontal dashed gold threshold line partway up the chart; the exact point
+where the rising curve crosses the dashed line is marked with a small gold
+alert/exclamation badge. Below the chart, draw three small stacked bars of
+increasing height in graduated navy tones (lightest to darkest, left to
+right) representing escalating urgency tiers, each with a small text label
+underneath. To the side of the chart, add a small clipboard or ticket icon
+receiving an arrow from the alert badge, representing an automatically
+created incident candidate.
+
+Render these exact Indonesian captions as large, legible text:
+  "Ambang lonjakan"
+  "Sedang"
+  "Tinggi"
+  "Kritis"
+
+Color palette:
+  - Deep UGM navy #01416B for the chart line, axis, icons, and captions,
+    with graduated navy tints (lighten 40%/20%/0%) for the three tier bars
+  - Gold #FDD402 for the threshold line and the alert badge
+  - Pale navy #E6EEF3 and light blue-grey tints for background context/grid
+  - White #FFFFFF for the canvas
+  - PANTAU teal #0E7C86 to mint #2FD4C4 only on a tiny "P" tile in a corner
+
+Do not introduce strong red, green, purple, or orange (the escalating tiers
+must be shown through navy shade progression and text labels, not color-
+coding). No photorealism, no real brand logos, no watermark, no illegible
+filler text, no extra fingers, and no large decorative title.
+
+
+================================================================================
+PROMPT 4 - save as: figs/fig_jaringan_klaster.png
+Slide: "Mengenali Pola Jaringan: Organik atau Terkoordinasi?"
+Ukuran: mendekati persegi/4:3, ideal 1400 x 1400 px
+================================================================================
+
+Create a detailed editorial vector infographic illustration for an Indonesian
+regional-government presentation about a public-monitoring system. Use a
+clean white background, confident navy linework, subtle pale-blue
+environmental shading, restrained soft shadows, and small gold focal
+accents. Match a polished institutional annual-report style: richly
+composed and informative, not a flat icon set, not photorealistic, and not
+a software mockup.
+
+Scene:
+Split the composition into two contrasting node-link network diagrams side
+by side. On the left, draw a loose, irregular scatter of small navy dots
+(account nodes) connected by a few thin, sparse lines going in different
+directions, spread naturally across the space — representing organic,
+uncoordinated activity. On the right, draw a tight, symmetric cluster of
+navy dots of similar size, densely interconnected with straight gold-
+highlighted edges radiating from a shared center, clearly denser and more
+uniform than the left side. Add a small magnifying-glass icon hovering over
+the tight right-hand cluster, and a small ribbon or tag beneath the whole
+illustration.
+
+Render these exact Indonesian captions as large, legible text:
+  "Sebaran organik"
+  "Klaster terkoordinasi"
+  "Perlu tinjauan manusia"
+
+Color palette:
+  - Deep UGM navy #01416B for the organic-side nodes/edges, outlines, and
+    captions
+  - Gold #FDD402 for the coordinated-cluster edges and the magnifying-glass
+    accent
+  - Pale navy #E6EEF3 and light blue-grey tints for background context
+  - White #FFFFFF for the canvas
+  - PANTAU teal #0E7C86 to mint #2FD4C4 only on a tiny "P" tile in a corner
+
+Do not introduce strong red, green, purple, or orange. No photorealism, no
+real brand or social-media logos, no watermark, no illegible filler text,
+no extra fingers, and no large decorative title.
+
+
+================================================================================
+OUTPUT CHECKLIST
+================================================================================
+
+For each generated image:
+  1. Export as PNG using the exact filename specified in its prompt.
+  2. Keep the near-square/4:3 companion composition — it sits beside slide
+     text in a grid column, not as a full-slide banner.
+  3. Confirm that Indonesian captions are spelled correctly and remain
+     legible at presentation size.
+  4. Confirm that navy dominates, gold is limited to focal accents, and
+     teal/mint appears only on the small "P" tile.
+  5. Save the PNG directly inside the figs folder.
+
+Expected new files after generation:
+  - figs/fig_pengumpulan_data.png
+  - figs/fig_pipeline_teks.png
+  - figs/fig_deteksi_lonjakan.png
+  - figs/fig_jaringan_klaster.png
+
+Setelah gambar tersedia di figs/, presentasi-kulonprogo-v2.typ sudah
+mereferensikan keempat file ini langsung (grid teks 56% + gambar 44%) di
+empat slide baru pada Bagian 2, "Bagaimana PANTAU Bekerja di Balik Layar" —
+tidak perlu ada perubahan .typ tambahan setelah gambar diletakkan di folder.
+================================================================================

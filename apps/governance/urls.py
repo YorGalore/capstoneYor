@@ -39,4 +39,5 @@ urlpatterns = [
     path("dev-ops/apify/simpan/", views.save_apify_token, name="save_apify_token"),
     path("dev-ops/apify/cabut/", views.revoke_apify_token, name="revoke_apify_token"),
     path("dev-ops/setting/simpan/", views.save_runtime_setting, name="save_runtime_setting"),
+    path("dev-ops/nlp/uji/", views.test_nlp_connection, name="test_nlp_connection"),
 ]

@@ -17,7 +17,9 @@ from django.core.mail import send_mail
 
 from apps.core.models import AnalystProfile
 
-from .models import AlertRule, DailyBrief, NotificationDelivery
+from .models import (
+    AlertRule, BrowserPushSubscription, DailyBrief, NotificationDelivery,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,12 @@ def _send_email(subject, body, recipients):
     """Returns (status, detail)."""
     if not recipients:
         return NotificationDelivery.STATUS_SKIPPED, "Tidak ada penerima dengan alamat email."
+    backend = getattr(settings, "EMAIL_BACKEND", "")
+    if backend == "django.core.mail.backends.console.EmailBackend":
+        return (
+            NotificationDelivery.STATUS_SKIPPED,
+            "Backend email masih console; SMTP belum dikonfigurasi.",
+        )
     try:
         send_mail(
             subject, body,
@@ -84,6 +92,71 @@ def _send_webhook(payload):
         return NotificationDelivery.STATUS_FAILED, str(exc), url
 
 
+def _send_push(project, payload):
+    """Deliver standards-based Web Push to browsers that explicitly opted in."""
+    private_key = getattr(settings, "WEBPUSH_VAPID_PRIVATE_KEY", "")
+    contact = getattr(settings, "WEBPUSH_VAPID_CONTACT", "")
+    subscriptions = list(
+        BrowserPushSubscription.objects.filter(
+            project=project, user__is_active=True, is_active=True
+        ).select_related("user")
+    )
+    recipients = [subscription.masked_endpoint for subscription in subscriptions]
+    if not subscriptions:
+        return (
+            NotificationDelivery.STATUS_SKIPPED,
+            "Belum ada browser pengguna yang mengaktifkan notifikasi.",
+            recipients,
+        )
+    if not private_key or not contact:
+        return (
+            NotificationDelivery.STATUS_SKIPPED,
+            "WEBPUSH_VAPID_PRIVATE_KEY/CONTACT belum dikonfigurasi.",
+            recipients,
+        )
+
+    try:
+        from pywebpush import WebPushException, webpush
+    except ImportError:
+        return (
+            NotificationDelivery.STATUS_FAILED,
+            "Dependensi pywebpush belum terpasang.",
+            recipients,
+        )
+
+    sent = 0
+    failures = []
+    for subscription in subscriptions:
+        try:
+            webpush(
+                subscription_info=subscription.subscription_info,
+                data=json.dumps(payload, ensure_ascii=False),
+                vapid_private_key=private_key,
+                vapid_claims={"sub": contact},
+                ttl=300,
+            )
+            sent += 1
+        except WebPushException as exc:
+            response = getattr(exc, "response", None)
+            if response is not None and response.status_code in (404, 410):
+                subscription.is_active = False
+                subscription.save(update_fields=["is_active", "updated_at"])
+            failures.append(str(exc))
+        except Exception as exc:
+            failures.append(str(exc))
+
+    if sent:
+        detail = f"{sent}/{len(subscriptions)} browser menerima notifikasi."
+        if failures:
+            detail += f" {len(failures)} gagal."
+        return NotificationDelivery.STATUS_SENT, detail, recipients
+    return (
+        NotificationDelivery.STATUS_FAILED,
+        (failures[0] if failures else "Semua pengiriman Web Push gagal.")[:500],
+        recipients,
+    )
+
+
 def deliver_alert(alert):
     """Deliver one triggered Alert over its rule's channel. Never raises."""
     project = alert.project
@@ -118,11 +191,24 @@ def deliver_alert(alert):
             [url] if url else [], status, detail, alert=alert,
         )
 
-    # Push has no delivery integration yet — recorded, not silently dropped.
+    if channel == AlertRule.CHANNEL_PUSH:
+        status, detail, recipients = _send_push(project, {
+            "kind": "alert",
+            "title": subject,
+            "body": alert.detail,
+            "severity": alert.severity,
+            "url": "/insiden/",
+            "triggered_at": alert.triggered_at.isoformat(),
+        })
+        return _record(
+            project, NotificationDelivery.KIND_ALERT, channel, subject,
+            recipients, status, detail, alert=alert,
+        )
+
     return _record(
         project, NotificationDelivery.KIND_ALERT, channel, subject, [],
-        NotificationDelivery.STATUS_SKIPPED,
-        "Kanal push belum memiliki integrasi pengiriman.", alert=alert,
+        NotificationDelivery.STATUS_FAILED,
+        f"Kanal notifikasi tidak dikenal: {channel}", alert=alert,
     )
 
 

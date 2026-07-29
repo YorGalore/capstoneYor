@@ -5,6 +5,9 @@ from . import views
 app_name = "analytics"
 
 urlpatterns = [
+    path("service-worker.js", views.push_service_worker, name="push_service_worker"),
+    path("notifikasi/push/aktifkan/", views.push_subscribe, name="push_subscribe"),
+    path("notifikasi/push/nonaktifkan/", views.push_unsubscribe, name="push_unsubscribe"),
     path("ringkasan/", views.ringkasan, name="ringkasan"),
     path("umpan/", views.feed, name="feed"),
     path("umpan/<int:mention_id>/koreksi-sentimen/", views.correct_sentiment, name="correct_sentiment"),

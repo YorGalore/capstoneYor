@@ -1,0 +1,134 @@
+PANTAU — Landing Page Image Prompts
+=====================================
+
+Tujuan: gambar-gambar berikut akan ditempel ke landing page (templates/core/landing.html,
+static/core/css/landing.css) sebagai elemen visual, bukan sebagai foto sungguhan orang/instansi.
+Semua prompt dirancang supaya BLEND IN dengan bahasa desain situs yang sudah ada (lihat "STYLE GUIDE"),
+bukan tampil sebagai stock-photo generik yang menonjol.
+
+STYLE GUIDE (wajib dipakai di setiap prompt generation)
+--------------------------------------------------------
+- Mood: data intelligence / command-center, tenang, presisi, terpercaya — bukan playful, bukan corporate stock-photo klise.
+- Palet warna WAJIB: deep navy ink (#091d30, #122d43), teal (#0b8d8d), mint/teal terang (#31d6bd),
+  warm off-white paper (#f5f5f0). Aksen putih untuk highlight. Hindari warna selain palet ini
+  (tidak ada merah/oranye mencolok, tidak ada gradient pelangi).
+- Tipografi di UI nyata: Archivo (heading, geometris, tegas) dan IBM Plex Sans (body). Jika gambar
+  memuat elemen teks/label UI dummy, gunakan sans-serif geometris sejenis — TAPI sebisa mungkin
+  hindari teks yang harus terbaca (biar aman dipakai di berbagai ukuran).
+- Bentuk visual: garis tipis (hairline), grid/peta abstrak, node-and-edge network graph, chart/line
+  sederhana, radar/heatmap wilayah Indonesia, sudut tajam bukan bulat (border-radius kecil, situs ini
+  memakai radius 3–9px saja), banyak whitespace/negative space.
+- Tekstur: flat design dengan sedikit depth (soft glow/blur radial ala .glow di CSS, subtle grain
+  opsional), BUKAN 3D render mengkilap, BUKAN ilustrasi kartun, BUKAN foto orang kantoran generik.
+  Referensi rasa visual: dashboard fintech/enterprise SaaS modern gelap (mis. Linear, Vercel, Stripe
+  dashboard-style abstract art), disesuaikan ke tema social listening/media monitoring Indonesia.
+  Boleh menyinggung motif Indonesia secara halus (kontur peta kepulauan, batik-line sangat minimal)
+  tapi tetap abstrak, jangan dekoratif berlebihan.
+- Framing: selalu beri ruang kosong (negative space) di salah satu sisi karena gambar akan
+  ditumpuk dengan teks/tombol lewat CSS. Jangan taruh elemen penting persis di tengah kalau
+  gambar akan dipakai sebagai background section.
+- Aspek rasio & resolusi disebutkan per prompt di bawah. Ekspor sebagai PNG (butuh transparansi)
+  atau JPG (gambar solid tanpa transparansi), sesuai catatan tiap item.
+- Setelah digenerate, simpan file ke: static/core/img/<nama-file-di-bawah>
+
+---
+
+1) hero-bg.jpg
+Section: .hero (background halus di belakang headline, opacity rendah via CSS overlay)
+Rasio: 16:9, minimal 2400x1350px, JPG
+Prompt:
+"Abstract dark navy (#091d30) command-center background for a social media intelligence dashboard,
+subtle glowing teal (#0b8d8d) and mint (#31d6bd) network graph of connected nodes representing
+social conversations, thin hairline data-grid lines fading into soft radial glow at center-right,
+faint topographic contour lines suggesting an archipelago map in the far background, extreme
+negative space on the left third for text overlay, minimal flat vector-illustration style with soft
+blur depth (no 3D render, no glossy UI mockups, no people, no logos, no readable text), enterprise
+SaaS dashboard aesthetic, wide cinematic 16:9 composition, clean and calm, high resolution."
+
+---
+
+2) dashboard-glow.png
+Section: .dashboard-stage .glow (radial accent layered behind the HTML/CSS dashboard mockup)
+Rasio: 1:1, minimal 1600x1600px, PNG dengan background transparan
+Prompt:
+"Soft radial glow abstract graphic, teal (#0b8d8d) to mint (#31d6bd) gradient light bloom radiating
+from center against a fully transparent background, extremely minimal, no shapes or objects other
+than the light gradient itself, smooth soft-focus edges, subtle grain, no text, no logo, meant to
+sit behind a UI dashboard screenshot as an ambient light effect, PNG with transparency."
+
+---
+
+3) solusi-brand.jpg
+Section: .solution-grid article (kartu "UNTUK BRAND & ENTERPRISE")
+Rasio: 4:3, minimal 1600x1200px, JPG
+Prompt:
+"Abstract dark navy (#091d30/#122d43) illustration representing brand reputation monitoring: a
+minimal line-art radar/share-of-voice chart glowing in mint (#31d6bd) and teal (#0b8d8d), a few
+scattered small circular nodes representing social mentions with faint connecting hairlines, subtle
+upward sentiment trend line, generous empty space in upper-left for heading text overlay, flat
+vector style with soft glow depth, no people, no brand logos, no readable text, calm enterprise
+SaaS aesthetic, subtle grain texture, high resolution."
+
+---
+
+4) solusi-pemerintah.jpg
+Section: .solution-grid article (kartu "UNTUK PEMERINTAH & INSTANSI PUBLIK")
+Rasio: 4:3, minimal 1600x1200px, JPG
+Prompt:
+"Abstract dark navy (#091d30/#122d43) illustration representing public-sector policy listening: a
+minimal glowing line-art map of Indonesian archipelago contours in teal (#0b8d8d) and mint
+(#31d6bd), faint dotted intensity markers over a few regional points (like heatmap dots, not
+labeled), thin hairline grid overlay suggesting governance/data structure, generous empty space in
+upper-left for heading text overlay, flat vector style with soft glow depth, no people, no
+government emblems/logos, no readable text, calm and neutral, subtle grain texture, high
+resolution."
+
+---
+
+5) artikel-pattern.jpg
+Section: default/fallback thumbnail untuk .article-card (opsional, dipakai jika artikel belum
+punya gambar sendiri; ditempatkan di atas judul kartu)
+Rasio: 3:2, minimal 1500x1000px, JPG
+Prompt:
+"Abstract minimal background pattern of thin teal (#0b8d8d) hairlines forming a loose irregular
+network/graph over warm off-white paper (#f5f5f0) background, a few small mint (#31d6bd) accent
+dots at node intersections, very subtle and quiet composition suitable as a card background behind
+dark text, flat vector style, no gradient noise, no people, no readable text, editorial/analytical
+mood, subtle grain, high resolution."
+
+---
+
+6) final-cta-texture.jpg
+Section: .final-cta (tekstur halus di background, opsional, opacity rendah)
+Rasio: 21:9, minimal 2400x1000px, JPG
+Prompt:
+"Extremely subtle abstract texture on warm off-white paper (#f5f5f0) background: faint thin teal
+(#0b8d8d) hairline grid fading toward the edges, one or two very light mint (#31d6bd) glow accents
+near the corners, almost invisible at low opacity, meant purely as a quiet background texture behind
+centered headline text, no strong shapes, no people, no readable text, minimal and calm, high
+resolution."
+
+---
+
+7) og-share.jpg
+Kegunaan: Open Graph / social share image (meta og:image, belum ada di landing.html — bisa
+ditambahkan setelah gambar jadi)
+Rasio: 1.91:1 (misal 1200x630px), JPG
+Prompt:
+"Dark navy (#091d30) social-share card background for 'PANTAU — Intelligence untuk percakapan
+publik': abstract glowing teal (#0b8d8d) and mint (#31d6bd) network graph and a faint minimal line
+chart trending upward, composition weighted to the right side with clean empty space on the left
+for logo and title text to be added afterward, flat vector style with soft glow depth, no people, no
+readable text baked into the image, enterprise SaaS aesthetic, high resolution, crisp at small
+thumbnail size."
+
+---
+
+CATATAN INTEGRASI
+------------------
+- Simpan semua file hasil generate ke: static/core/img/
+- Setelah gambar tersedia, beri tahu saya nama file yang dipakai supaya saya bisa menyambungkan ke
+  landing.html / landing.css (background-image, <img>, atau og:image meta tag).
+- Jika hasil generate meleset dari palet warna (terlalu terang/gelap atau warna di luar
+  navy-teal-mint-paper), minta revisi dengan menegaskan ulang kode warna hex di atas — kebanyakan
+  tools image-gen lebih akurat kalau hex code disebut eksplisit di prompt.

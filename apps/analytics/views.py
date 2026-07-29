@@ -1,11 +1,16 @@
+import json
+from urllib.parse import urlsplit
+
 from django.contrib import messages
+from django.contrib.auth.decorators import login_not_required, login_required
 from django.core.paginator import Paginator
-from django.http import Http404, HttpResponse, StreamingHttpResponse
+from django.db.models import Q
+from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from apps.core.models import AnalystProfile, Platform
 from apps.core.permissions import (
@@ -17,8 +22,8 @@ from apps.governance.neutrality import NEUTRALITY_NOTICE, require_political_moni
 from apps.governance.services import record_audit_entry
 from . import briefs, exports, incidents, media_report_pdf, selectors, taxonomy
 from .models import (
-    ActorSentimentAssessment, DailyBrief, DailyBriefIssue, Issue, IssueMergeHistory,
-    LabelCorrection, Mention, PoliticalIssue, ResponseAction,
+    ActorSentimentAssessment, BrowserPushSubscription, DailyBrief, DailyBriefIssue,
+    Issue, IssueMergeHistory, LabelCorrection, Mention, PoliticalIssue, ResponseAction,
 )
 
 
@@ -34,14 +39,85 @@ def _export_max_rows():
         return exports.MAX_ROWS_DEFAULT
 
 
+def _filtered_mentions(queryset, params):
+    """Apply one filter contract to both the feed and data exports."""
+    filters = {
+        "platform": (params.get("platform") or "").strip(),
+        "sentiment": (params.get("sentiment") or "").strip(),
+        "author": (params.get("author") or "").strip(),
+        "query": (params.get("q") or "").strip(),
+        "content_type": (params.get("content_type") or "").strip(),
+        "date_from": (params.get("from") or "").strip(),
+        "date_to": (params.get("to") or "").strip(),
+    }
+
+    if filters["platform"]:
+        queryset = queryset.filter(platform__slug=filters["platform"])
+    valid_sentiments = {key for key, _label in Mention.SENTIMENT_CHOICES}
+    if filters["sentiment"] in valid_sentiments:
+        queryset = queryset.filter(sentiment=filters["sentiment"])
+    elif filters["sentiment"]:
+        filters["sentiment"] = ""
+    if filters["author"]:
+        queryset = queryset.filter(author_handle__icontains=filters["author"])
+    if filters["query"]:
+        queryset = queryset.filter(
+            Q(content_snippet__icontains=filters["query"])
+            | Q(matched_keyword__icontains=filters["query"])
+        )
+    valid_content_types = {key for key, _label in Mention.CONTENT_CHOICES}
+    if filters["content_type"] in valid_content_types:
+        queryset = queryset.filter(content_type=filters["content_type"])
+    elif filters["content_type"]:
+        filters["content_type"] = ""
+
+    date_from = parse_date(filters["date_from"])
+    date_to = parse_date(filters["date_to"])
+    if filters["date_from"] and date_from is None:
+        filters["date_from"] = ""
+    if filters["date_to"] and date_to is None:
+        filters["date_to"] = ""
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+        filters["date_from"] = date_from.isoformat()
+        filters["date_to"] = date_to.isoformat()
+    if date_from:
+        queryset = queryset.filter(posted_at__date__gte=date_from)
+    if date_to:
+        queryset = queryset.filter(posted_at__date__lte=date_to)
+
+    return queryset, filters
+
+
+def _filter_query_string(filters):
+    from urllib.parse import urlencode
+
+    query = {
+        "platform": filters["platform"],
+        "sentiment": filters["sentiment"],
+        "author": filters["author"],
+        "q": filters["query"],
+        "content_type": filters["content_type"],
+        "from": filters["date_from"],
+        "to": filters["date_to"],
+    }
+    return urlencode({key: value for key, value in query.items() if value})
+
+
 @require_page("export")
 def export_mentions(request):
     fmt = request.GET.get("format", "csv").lower()
     queryset = scope_to_tenant(
         Mention.objects.select_related("platform"), request
     )
+    queryset, filters = _filtered_mentions(queryset, request.GET)
     rows = exports.iter_export_rows(queryset, max_rows=_export_max_rows())
     stamp = timezone.now().strftime("%Y%m%d-%H%M")
+    record_audit_entry(
+        actor_label=request.user.get_full_name() or request.user.username,
+        action=f"Mengekspor sebutan {fmt.upper()}",
+        target=_filter_query_string(filters) or "tanpa filter",
+    )
 
     if fmt == "xlsx":
         content = exports.rows_to_xlsx(rows)
@@ -67,24 +143,20 @@ def feed(request):
         request,
     ).order_by("-posted_at")
 
-    platform = request.GET.get("platform") or ""
-    sentiment = request.GET.get("sentiment") or ""
-    author = request.GET.get("author") or ""
-    if platform:
-        mentions = mentions.filter(platform__slug=platform)
-    if sentiment:
-        mentions = mentions.filter(sentiment=sentiment)
-    if author:
-        mentions = mentions.filter(author_handle__icontains=author)
+    mentions, filters = _filtered_mentions(mentions, request.GET)
 
     paginator = Paginator(mentions, 25)
     page = paginator.get_page(request.GET.get("page"))
+    filter_query = _filter_query_string(filters)
     return render(request, "analytics/feed.html", {
         "active_nav": "feed",
         "page_obj": page,
         "platforms": Platform.objects.order_by("display_name"),
         "sentiment_choices": Mention.SENTIMENT_CHOICES,
-        "filters": {"platform": platform, "sentiment": sentiment, "author": author},
+        "content_type_choices": Mention.CONTENT_CHOICES,
+        "filters": filters,
+        "filter_query": filter_query,
+        "export_query": f"{filter_query}&" if filter_query else "",
     })
 
 
@@ -682,3 +754,69 @@ def insiden_refresh(request):
         touched = incidents.refresh_candidates(project)
         messages.success(request, f"{len(touched)} kandidat insiden diperbarui.")
     return redirect("analytics:insiden")
+
+
+@login_not_required
+@require_GET
+def push_service_worker(request):
+    """Serve the worker at the origin root so it can cover every dashboard URL."""
+    response = render(
+        request,
+        "core/push_service_worker.js",
+        content_type="application/javascript",
+    )
+    response["Service-Worker-Allowed"] = "/"
+    response["Cache-Control"] = "no-cache"
+    return response
+
+
+@login_required
+@require_POST
+def push_subscribe(request):
+    project = get_active_project(request)
+    if project is None:
+        return JsonResponse({"error": "Proyek aktif tidak ditemukan."}, status=404)
+    try:
+        payload = json.loads(request.body or b"{}")
+    except (TypeError, json.JSONDecodeError):
+        return JsonResponse({"error": "Payload JSON tidak valid."}, status=400)
+    endpoint = str(payload.get("endpoint") or "").strip()
+    keys = payload.get("keys") or {}
+    p256dh = str(keys.get("p256dh") or "").strip()
+    auth = str(keys.get("auth") or "").strip()
+    parsed = urlsplit(endpoint)
+    if parsed.scheme != "https" or not parsed.hostname:
+        return JsonResponse({"error": "Endpoint push HTTPS tidak valid."}, status=400)
+    if not p256dh or not auth or len(endpoint) > 1000:
+        return JsonResponse({"error": "Kunci subscription tidak lengkap."}, status=400)
+
+    subscription = BrowserPushSubscription.objects.filter(endpoint=endpoint).first()
+    if subscription is not None and subscription.user_id != request.user.id:
+        return JsonResponse({"error": "Endpoint sudah terdaftar."}, status=409)
+    if subscription is None:
+        subscription = BrowserPushSubscription(endpoint=endpoint)
+    subscription.project = project
+    subscription.user = request.user
+    subscription.p256dh = p256dh
+    subscription.auth = auth
+    subscription.is_active = True
+    subscription.save()
+    return JsonResponse({"status": "subscribed"})
+
+
+@login_required
+@require_POST
+def push_unsubscribe(request):
+    project = get_active_project(request)
+    try:
+        payload = json.loads(request.body or b"{}")
+    except (TypeError, json.JSONDecodeError):
+        return JsonResponse({"error": "Payload JSON tidak valid."}, status=400)
+    endpoint = str(payload.get("endpoint") or "").strip()
+    queryset = BrowserPushSubscription.objects.filter(
+        project=project, user=request.user, is_active=True
+    )
+    if endpoint:
+        queryset = queryset.filter(endpoint=endpoint)
+    queryset.update(is_active=False)
+    return JsonResponse({"status": "unsubscribed"})

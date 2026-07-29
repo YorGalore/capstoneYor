@@ -18,8 +18,8 @@
   </form>
   <div class="pantau-laporan-exports">
     {% if can_export %}
-    <a class="pantau-btn" href="{% url 'analytics:export_mentions' %}?format=csv">Data CSV</a>
-    <a class="pantau-btn" href="{% url 'analytics:export_mentions' %}?format=xlsx">Data XLSX</a>
+    <a class="pantau-btn" href="{% url 'analytics:export_mentions' %}?format=csv&amp;from={{ summary.period_start|date:'Y-m-d' }}&amp;to={{ summary.period_end|date:'Y-m-d' }}">Data CSV</a>
+    <a class="pantau-btn" href="{% url 'analytics:export_mentions' %}?format=xlsx&amp;from={{ summary.period_start|date:'Y-m-d' }}&amp;to={{ summary.period_end|date:'Y-m-d' }}">Data XLSX</a>
     {% endif %}
     <a class="pantau-btn-primary" href="{% url 'analytics:laporan_pdf' %}?from={{ summary.period_start|date:'Y-m-d' }}&amp;to={{ summary.period_end|date:'Y-m-d' }}">Hasilkan PDF Analisis</a>
   </div>

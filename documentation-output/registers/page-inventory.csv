@@ -1,0 +1,25 @@
+route,page_title_id,module,requires_login,notes
+/healthz/,(tidak ada judul - JSON status check),infra,no,"Mengembalikan JSON `{""status"": ""ok"", ""database"": ""ok""}` dengan HTTP 200; bukan halaman HTML, tidak ada UI."
+/admin/,Administrasi situs,infra,yes (staff),"Django admin bawaan, terpisah dari layout PANTAU. Login super_admin dapat mengakses; layar login Django sendiri muncul jika belum autentikasi ke admin."
+/,Pahami apa yang publik katakan. Rasakan. Gerakkan.,public,no,"Landing page publik (marketing). Diakses hanya saat logout; saat sudah login sebagai dewi.anjani, `/` redirect ke `/ringkasan/`."
+/mulai/,"Mulai dari kebutuhan, bukan kerumitan.",public,no,Formulir onboarding/permintaan demo publik.
+/mulai/berhasil/,Terima kasih. Mari mulai memetakan sinyal.,public,no,Halaman konfirmasi setelah submit formulir onboarding; dapat diakses langsung via URL tanpa submit form sebelumnya.
+/artikel/media-monitoring-untuk-pemerintah/,Media monitoring untuk pemerintah: mendengar aspirasi merancang kebijakan berbasis data,public,no,"Contoh halaman detail artikel (slug dinamis). Landing page memuat 6 artikel dengan slug berbeda-beda, semua pola URL sama: /artikel/<slug>/."
+/profil/,Profil,core,yes,Halaman profil pengguna yang sedang login.
+/ringkasan/,Ringkasan,analytics,yes,"Landing page setelah login (LOGIN_REDIRECT_URL). Tidak ada elemen <h1> terlihat; judul dari <title> dan label navigasi aktif."
+/umpan/,Umpan Sebutan,analytics,yes,Feed sebutan/mention media sosial dan berita.
+/war-room/,War Room,analytics,yes,Dasbor isu aktif untuk respons cepat.
+/narasi/,Perbandingan Narasi,analytics,yes,Analisis perbandingan narasi/isu politik.
+/regional/,Regional,analytics,yes,Distribusi narasi berdasarkan wilayah.
+/sosiograf/,Sosiograf,analytics,yes,Sosiograf interaksi (analisis jaringan aktor).
+/laporan/,Laporan,analytics,yes,Pusat laporan analitik.
+/ekspor/mention/,(unduh CSV - tidak ada halaman),analytics,yes,"Endpoint unduhan file (Content-Disposition attachment), memicu download CSV langsung, bukan halaman HTML yang dapat di-screenshot."
+/brief/,Sorotan Eksekutif,analytics,yes,Sorotan/brief eksekutif harian.
+/taksonomi/,Taksonomi Isu,analytics,yes,"Halaman tunggal (single-page) untuk kelola taksonomi isu; sub-aksi (label, gabung isu, dll) adalah endpoint POST, bukan halaman terpisah yang bisa dinavigasi via GET."
+/insiden/,Insiden,analytics,yes,"Halaman ringkasan insiden dengan dua bagian: ""Insiden Terkonfirmasi"" dan ""Kandidat"" (keduanya kosong/0 di data uji). Detail insiden ada di /insiden/<id>/ tapi tidak dapat diuji karena belum ada data insiden."
+/insiden/<id>/,Detail Insiden (belum teruji - tidak ada data),analytics,yes,"Route ada di kode (apps/analytics/urls.py) tapi tidak dapat diverifikasi karena 0 insiden di database uji. Tidak di-screenshot."
+/koordinasi/,Deteksi Perilaku Tidak Otentik Terkoordinasi,koordinasi,yes,Deteksi koordinasi/aktivitas tidak otentik.
+/konfigurasi/,Konsol Konfigurasi,governance,yes,"Halaman tunggal panjang berisi banyak kartu (Platform Terpantau, Kredensial Apify, Kata Kunci, Domain, Trigger Koleksi Manual, Aturan Peringatan, Kubu, Aktor Politik, Program Pemerintah, Kesehatan Kolektor, Penjadwalan, Riwayat Siklus Koleksi). Semua sub-aksi adalah endpoint POST pada URL yang sama, bukan sub-halaman GET terpisah."
+/pengawasan/,Dasbor Pengawasan,governance,yes,Dasbor pengawasan/monitoring operasional.
+/konfigurasi/izin/,Matriks Izin Halaman,governance,yes (super_admin only),Matriks pengaturan izin akses halaman per peran.
+/dev-ops/,Pengaturan Dev/Ops,governance,yes (super_admin only),"Halaman tunggal berisi kartu ""Kredensial Apify"" dan ""Runtime Settings""."

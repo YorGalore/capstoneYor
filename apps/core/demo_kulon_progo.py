@@ -15,8 +15,10 @@ from django.utils import timezone
 
 from apps.analytics import briefs, incidents
 from apps.analytics.models import (
+    ActorSentimentAssessment,
     Alert,
     AlertRule,
+    Camp,
     Category,
     Coalition,
     DailyBrief,
@@ -158,6 +160,7 @@ NARRATIVE_PERSPECTIVES = [
     {
         "slug": "kulon-progo-penanganan",
         "name": "Narasi Penanganan & Klarifikasi",
+        "actor_name": "Pemerintah Kabupaten Kulon Progo",
         "stance": Coalition.STANCE_PETAHANA,
         "color": "#0E7C86",
         "count": 48,
@@ -183,6 +186,7 @@ NARRATIVE_PERSPECTIVES = [
     {
         "slug": "kulon-progo-akuntabilitas",
         "name": "Narasi Kritik & Akuntabilitas",
+        "actor_name": "DPRD Kulon Progo",
         "stance": Coalition.STANCE_PENANTANG,
         "color": "#B2601F",
         "count": 36,
@@ -198,11 +202,11 @@ NARRATIVE_PERSPECTIVES = [
             ("pengawasan layanan kalurahan", 0.15),
         ],
         "snippets": [
-            "Warga meminta pemeriksaan dugaan pungli Garongan segera dituntaskan dengan tenggat yang jelas.",
-            "Hasil pemeriksaan perlu dibuka kepada publik agar proses penanganan dapat diawasi bersama.",
-            "Pelapor dan saksi harus memperoleh perlindungan supaya warga tidak takut menyampaikan bukti.",
-            "Pengawasan layanan di tingkat kalurahan perlu diperkuat agar keluhan serupa tidak berulang.",
-            "Masyarakat menunggu penjelasan tentang tahapan pemeriksaan dan tindak lanjut yang sudah dilakukan.",
+            "DPRD Kulon Progo meminta pemeriksaan dugaan pungli Garongan segera dituntaskan dengan tenggat yang jelas.",
+            "DPRD Kulon Progo meminta hasil pemeriksaan dibuka agar proses penanganan dapat diawasi bersama.",
+            "DPRD Kulon Progo menekankan perlindungan pelapor dan saksi agar warga tidak takut menyampaikan bukti.",
+            "DPRD Kulon Progo mendorong pengawasan layanan kalurahan diperkuat agar keluhan serupa tidak berulang.",
+            "DPRD Kulon Progo meminta penjelasan tahapan pemeriksaan dan tindak lanjut yang sudah dilakukan.",
         ],
     },
 ]
@@ -828,11 +832,6 @@ def _seed_narrative_mentions(project, province, regency, issue):
     The fake fixture must not expose fake external links. Its provenance is
     carried by ``sentiment_model`` and ``external_id`` instead.
     """
-    if Mention.objects.filter(
-        project=project, sentiment_model="demo-narrative-v1"
-    ).exists():
-        return
-
     rng = random.Random(NARRATIVE_SEED)
     now = timezone.now()
     platforms = list(Platform.objects.exclude(slug="berita"))
@@ -842,6 +841,7 @@ def _seed_narrative_mentions(project, province, regency, issue):
         Mention.SENTIMENT_NEGATIVE: Mention.EMOTION_ANGER,
     }
     narrative_mentions = []
+    configured_perspectives = []
 
     for perspective in NARRATIVE_PERSPECTIVES:
         coalition, _ = Coalition.objects.update_or_create(
@@ -852,8 +852,64 @@ def _seed_narrative_mentions(project, province, regency, issue):
                 "color": perspective["color"],
             },
         )
-        for index in range(perspective["count"]):
-            sentiment = _weighted_choice(rng, perspective["sentiments"])
+        camp, _ = Camp.objects.update_or_create(
+            project=project,
+            name=perspective["name"],
+            defaults={"color": perspective["color"]},
+        )
+        actor = PoliticalActor.objects.get(
+            project=project, name=perspective["actor_name"]
+        )
+        if actor.camp_id != camp.pk:
+            actor.camp = camp
+            actor.save(update_fields=["camp"])
+        configured_perspectives.append((perspective, actor))
+
+        prefix = f"demo-kp-narasi-{perspective['slug']}-"
+        if not Mention.objects.filter(project=project, external_id__startswith=prefix).exists():
+            for index in range(perspective["count"]):
+                sentiment = _weighted_choice(rng, perspective["sentiments"])
+                narrative_mentions.append(
+                    Mention(
+                        project=project,
+                        platform=rng.choice(platforms),
+                        province=province,
+                        regency=regency,
+                        author_handle=rng.choice(SOCIAL_HANDLES),
+                        external_id=f"{prefix}{index + 1:03d}",
+                        content_snippet=rng.choice(perspective["snippets"]),
+                        theme=_weighted_choice(rng, perspective["themes"]),
+                        sentiment=sentiment,
+                        sentiment_confidence=round(rng.uniform(0.72, 0.96), 2),
+                        sentiment_model="demo-narrative-v1",
+                        emotion=emotion_by_sentiment[sentiment],
+                        emotion_labels=[emotion_by_sentiment[sentiment]],
+                        posted_at=now - timedelta(
+                            days=rng.uniform(0, 30), hours=rng.uniform(0, 24)
+                        ),
+                        engagement_count=rng.randint(8, 1_200),
+                        reach_estimate=rng.randint(300, 75_000),
+                        is_political=True,
+                        coalition=coalition,
+                        issue=issue,
+                        matched_keyword="dugaan pungli Garongan",
+                        is_scraped=False,
+                    )
+                )
+
+    unattributed_prefix = "demo-kp-narasi-tidak-teratribusi-"
+    if not Mention.objects.filter(
+        project=project, external_id__startswith=unattributed_prefix
+    ).exists():
+        for index in range(NARRATIVE_UNATTRIBUTED_COUNT):
+            sentiment = _weighted_choice(
+                rng,
+                [
+                    (Mention.SENTIMENT_POSITIVE, 0.15),
+                    (Mention.SENTIMENT_NEUTRAL, 0.55),
+                    (Mention.SENTIMENT_NEGATIVE, 0.30),
+                ],
+            )
             narrative_mentions.append(
                 Mention(
                     project=project,
@@ -861,67 +917,60 @@ def _seed_narrative_mentions(project, province, regency, issue):
                     province=province,
                     regency=regency,
                     author_handle=rng.choice(SOCIAL_HANDLES),
-                    external_id=f"demo-kp-narasi-{perspective['slug']}-{index + 1:03d}",
-                    content_snippet=rng.choice(perspective["snippets"]),
-                    theme=_weighted_choice(rng, perspective["themes"]),
+                    external_id=f"{unattributed_prefix}{index + 1:03d}",
+                    content_snippet=(
+                        "Percakapan warga membahas penanganan laporan Garongan, "
+                        "namun posisinya belum cukup jelas untuk diatribusikan."
+                    ),
+                    theme="percakapan campuran",
                     sentiment=sentiment,
-                    sentiment_confidence=round(rng.uniform(0.72, 0.96), 2),
+                    sentiment_confidence=round(rng.uniform(0.64, 0.82), 2),
                     sentiment_model="demo-narrative-v1",
                     emotion=emotion_by_sentiment[sentiment],
                     emotion_labels=[emotion_by_sentiment[sentiment]],
                     posted_at=now - timedelta(
                         days=rng.uniform(0, 30), hours=rng.uniform(0, 24)
                     ),
-                    engagement_count=rng.randint(8, 1_200),
-                    reach_estimate=rng.randint(300, 75_000),
+                    engagement_count=rng.randint(5, 500),
+                    reach_estimate=rng.randint(200, 25_000),
                     is_political=True,
-                    coalition=coalition,
                     issue=issue,
                     matched_keyword="dugaan pungli Garongan",
                     is_scraped=False,
                 )
             )
 
-    for index in range(NARRATIVE_UNATTRIBUTED_COUNT):
-        sentiment = _weighted_choice(
-            rng,
-            [
-                (Mention.SENTIMENT_POSITIVE, 0.15),
-                (Mention.SENTIMENT_NEUTRAL, 0.55),
-                (Mention.SENTIMENT_NEGATIVE, 0.30),
-            ],
-        )
-        narrative_mentions.append(
-            Mention(
-                project=project,
-                platform=rng.choice(platforms),
-                province=province,
-                regency=regency,
-                author_handle=rng.choice(SOCIAL_HANDLES),
-                external_id=f"demo-kp-narasi-tidak-teratribusi-{index + 1:03d}",
-                content_snippet=(
-                    "Percakapan warga membahas penanganan laporan Garongan, "
-                    "namun posisinya belum cukup jelas untuk diatribusikan."
-                ),
-                theme="percakapan campuran",
-                sentiment=sentiment,
-                sentiment_confidence=round(rng.uniform(0.64, 0.82), 2),
-                sentiment_model="demo-narrative-v1",
-                emotion=emotion_by_sentiment[sentiment],
-                emotion_labels=[emotion_by_sentiment[sentiment]],
-                posted_at=now - timedelta(
-                    days=rng.uniform(0, 30), hours=rng.uniform(0, 24)
-                ),
-                engagement_count=rng.randint(5, 500),
-                reach_estimate=rng.randint(200, 25_000),
-                is_political=True,
-                issue=issue,
-                matched_keyword="dugaan pungli Garongan",
-                is_scraped=False,
-            )
-        )
+    if narrative_mentions:
+        Mention.objects.bulk_create(narrative_mentions)
 
-    Mention.objects.bulk_create(narrative_mentions)
+    # Link the seeded evidence through the same actor/camp and assessment
+    # relations used by live ingestion. This also upgrades existing demo rows
+    # created by older fixture revisions.
+    through_model = Mention.political_actors.through
+    actor_links = []
+    assessments = []
+    for perspective, actor in configured_perspectives:
+        mentions = Mention.objects.filter(
+            project=project,
+            external_id__startswith=f"demo-kp-narasi-{perspective['slug']}-",
+        )
+        for mention in mentions:
+            actor_links.append(
+                through_model(mention_id=mention.pk, politicalactor_id=actor.pk)
+            )
+            assessments.append(
+                ActorSentimentAssessment(
+                    mention=mention,
+                    actor=actor,
+                    sentiment=mention.sentiment,
+                    confidence=mention.sentiment_confidence,
+                    model=mention.sentiment_model,
+                )
+            )
+    through_model.objects.bulk_create(actor_links, ignore_conflicts=True)
+    ActorSentimentAssessment.objects.bulk_create(
+        assessments, ignore_conflicts=True
+    )
 
 
 def _seed_reviewable_brief(project):

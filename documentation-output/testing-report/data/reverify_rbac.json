@@ -1,0 +1,50 @@
+[
+  {
+    "issue_id": "ISS-KOORDINASI-003",
+    "original_severity": "Critical",
+    "repro_steps": "Login sebagai dewi.anjani (super_admin), buka /konfigurasi/izin/, atur sel 'Deteksi Koordinasi' x 'Peninjau' menjadi 'Tolak', simpan. Logout, login sebagai qa.peninjau. GET langsung ke /koordinasi/.",
+    "new_actual": "GET /koordinasi/ mengembalikan status 403 setelah izin diatur ke Tolak untuk peran Peninjau.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-KOORDINASI-003_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "RBAC-ISSUE-001",
+    "original_severity": "High",
+    "repro_steps": "Login sebagai dewi.anjani, buka /konfigurasi/izin/, atur sel 'Regional' x 'Peninjau' menjadi 'Tolak', simpan. Login sebagai qa.peninjau, GET langsung ke /regional/. Juga dilakukan spot check yang sama (atur Tolak lalu GET) pada /ringkasan/, /war-room/, /narasi/.",
+    "new_actual": "GET /regional/ = 403. Spot check tambahan: /ringkasan/ = 403, /war-room/ = 403, /narasi/ = 403 (semua diharapkan 403 setelah izin diatur Tolak).",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\RBAC-ISSUE-001_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-FW-002",
+    "original_severity": "Critical",
+    "repro_steps": "Login sebagai qa.peninjau, buka /war-room/ dan temukan isu politik dengan issue_id=2 milik tenant Kabupaten Kulon Progo, lalu POST ke /war-room/2/aksi/ dengan field action_type=klarifikasi dan description.",
+    "new_actual": "POST ke /war-room/2/aksi/ mengembalikan status 403. Tidak ada entri baru yang muncul di linimasa War Room setelah percobaan.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-FW-002_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-BTX-002",
+    "original_severity": "High",
+    "repro_steps": "Login sebagai qa.peninjau, POST langsung ke /brief/buat/ dengan field tanggal.",
+    "new_actual": "POST /brief/buat/ mengembalikan status 403.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-BTX-002_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-KOORDINASI-002",
+    "original_severity": "High",
+    "repro_steps": "Login sebagai qa.peninjau, buka /koordinasi/ dan temukan cluster_code='Klaster-07' pada data uji, lalu POST ke /koordinasi/Klaster-07/eskalasi/ dan secara terpisah ke /koordinasi/Klaster-07/tandai-organik/.",
+    "new_actual": "POST ke /koordinasi/Klaster-07/eskalasi/ mengembalikan status 403. POST ke /koordinasi/Klaster-07/tandai-organik/ juga mengembalikan status 403.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-KOORDINASI-002_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-FW-003",
+    "original_severity": "High",
+    "repro_steps": "Login sebagai qa.peninjau, ambil incident_id=1 dari /insiden/, POST ke /insiden/1/catat/ dengan field description.",
+    "new_actual": "POST mengembalikan status 403. Catatan baru TIDAK muncul di linimasa insiden.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-FW-003_reverifikasi_diperbaiki.png"
+  }
+]

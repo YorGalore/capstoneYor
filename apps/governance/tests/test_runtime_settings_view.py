@@ -65,3 +65,32 @@ class RuntimeSettingsViewTest(TestCase):
             {"key": "collection.default_cadence", "value": "hourly", "is_secret": ""},
         )
         self.assertEqual(RuntimeSetting.objects.get(key="collection.default_cadence").value, "hourly")
+
+    def test_real_nlp_provider_can_be_tested_from_dev_ops(self):
+        from apps.analytics.nlp.base import Classification
+        from apps.analytics.nlp.http_provider import HttpNlpProvider
+
+        provider = mock.Mock(model_version="http:model-nyata")
+        provider.classify.return_value = Classification(
+            sentiment="positive",
+            confidence=0.87,
+            emotions=["joy"],
+            model_version="http:model-nyata",
+        )
+        self.client.force_login(self.super_admin)
+        with mock.patch.object(
+            HttpNlpProvider, "from_config", return_value=provider
+        ):
+            response = self.client.post(
+                reverse("governance:test_nlp_connection"),
+                {"sample": "layanan berhasil"},
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Provider NLP aktif")
+        self.assertTrue(
+            AuditLogEntry.objects.filter(
+                action="Menguji koneksi provider NLP"
+            ).exists()
+        )

@@ -27,6 +27,8 @@ class NavigationSmokeTest(TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pahami apa yang publik")
+        self.assertNotContains(response, "48.291")
+        self.assertNotContains(response, "● LIVE")
 
     def test_all_screen_routes_resolve(self):
         from django.utils import timezone
@@ -77,6 +79,13 @@ class SidebarDisabledLinkTest(TestCase):
             response, '<span class="pantau-nav-item disabled" title="Akses dibatasi">Pengawasan</span>',
             html=True,
         )
+
+    def test_dashboard_includes_accessible_mobile_navigation_controls(self):
+        self.client.force_login(self.viewer)
+        response = self.client.get(reverse("analytics:ringkasan"))
+        self.assertContains(response, 'id="pantau-nav-toggle"')
+        self.assertContains(response, 'for="pantau-nav-toggle"')
+        self.assertContains(response, 'aria-label="Buka navigasi"')
 
     def test_tenant_admin_sees_active_konfigurasi_and_pengawasan_links(self):
         tenant_admin = get_user_model().objects.create(username="admin.sidebar")

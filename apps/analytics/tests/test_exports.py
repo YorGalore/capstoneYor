@@ -82,6 +82,37 @@ class ExportViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("spreadsheetml", response["Content-Type"])
 
+    def test_csv_export_applies_the_same_filters_as_the_feed(self):
+        Mention.objects.create(
+            project=self.project_a,
+            platform=self.platform,
+            author_handle="@matching",
+            content_snippet="keluhan transportasi",
+            matched_keyword="transportasi",
+            sentiment=Mention.SENTIMENT_NEGATIVE,
+            emotion=Mention.EMOTION_ANGER,
+            content_type=Mention.CONTENT_COMMENT,
+            posted_at=timezone.now(),
+        )
+        self.client.force_login(self.user_a)
+
+        response = self.client.get(
+            "/ekspor/mention/",
+            {
+                "format": "csv",
+                "sentiment": Mention.SENTIMENT_NEGATIVE,
+                "q": "transportasi",
+                "content_type": Mention.CONTENT_COMMENT,
+                "from": timezone.localdate().isoformat(),
+                "to": timezone.localdate().isoformat(),
+            },
+        )
+        body = b"".join(response.streaming_content).decode("utf-8")
+
+        self.assertIn("@matching", body)
+        self.assertNotIn("@only_a", body)
+        self.assertNotIn("@only_b", body)
+
     def test_viewer_role_denied_export(self):
         viewer = User.objects.create(username="viewer1")
         AnalystProfile.objects.update_or_create(

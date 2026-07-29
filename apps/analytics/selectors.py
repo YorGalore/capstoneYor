@@ -8,7 +8,7 @@ from django.utils import timezone
 from apps.core.models import Platform, Province
 
 from .models import (
-    ActorSentimentAssessment, Alert, Author, Coalition, DailyBrief, GovernmentProgram,
+    ActorSentimentAssessment, Alert, Author, Camp, DailyBrief, GovernmentProgram,
     Issue, Mention, PoliticalActor,
 )
 
@@ -376,49 +376,119 @@ def _geo_hotspots(issue, limit=6):
 
 
 def narasi_summary(issue):
-    # Coalition is a shared reference model, but a narrative page must only show
-    # perspectives that actually have political mentions on this tenant's issue.
-    coalitions = Coalition.objects.filter(
-        mentions__issue=issue, mentions__is_political=True
-    ).distinct()
-    total_political = Mention.objects.filter(issue=issue, is_political=True).count()
-    total_attributed = Mention.objects.filter(
-        issue=issue, is_political=True, coalition__isnull=False
-    ).count()
+    """Compare the tenant's configured camps using live actor tagging.
+
+    The old dashboard read ``Mention.coalition``, a seed-era field disconnected
+    from the actor/camp configuration screen and live ingestion. This selector
+    deliberately uses ``PoliticalActor.camp`` and the actor assessments created
+    at ingestion, so changing tenant configuration changes the analysis.
+    """
+    project = issue.project
+    camps = list(Camp.objects.filter(project=project).prefetch_related("actors"))
+    issue_mentions = Mention.objects.filter(issue=issue, is_political=True)
+    total_political = issue_mentions.count()
+    attributed_ids = issue_mentions.filter(
+        political_actors__camp__project=project
+    ).values_list("pk", flat=True).distinct()
+    total_attributed = attributed_ids.count()
     unattributed_pct = (
         round(((total_political - total_attributed) / total_political) * 100)
         if total_political else 0
     )
 
-    coalition_data = []
-    for coalition in coalitions:
-        qs = Mention.objects.filter(issue=issue, coalition=coalition)
+    camp_data = []
+    camp_querysets = {}
+    for camp in camps:
+        qs = issue_mentions.filter(political_actors__camp=camp).distinct()
+        camp_querysets[camp.pk] = qs
         count = qs.count()
-        # The bar also includes the unattributed grey segment, so every segment
-        # must use the same denominator or its total width can exceed 100%.
-        share_pct = round((count / total_political) * 100) if total_political else 0
-        sentiment_counts = {row["sentiment"]: row["n"] for row in qs.values("sentiment").annotate(n=Count("id"))}
+        assessments = ActorSentimentAssessment.objects.filter(
+            mention__issue=issue,
+            actor__project=project,
+            actor__camp=camp,
+        )
+        assessment_total = assessments.count()
+        sentiment_counts = {
+            row["sentiment"]: row["n"]
+            for row in assessments.values("sentiment").annotate(n=Count("id"))
+        }
+        if not assessment_total:
+            assessment_total = count
+            sentiment_counts = {
+                row["sentiment"]: row["n"]
+                for row in qs.values("sentiment").annotate(n=Count("id"))
+            }
         sentiment_breakdown = []
         for key, label in SENTIMENT_LABELS.items():
             c = sentiment_counts.get(key, 0)
-            pct = round((c / count) * 100) if count else 0
+            pct = round((c / assessment_total) * 100) if assessment_total else 0
             sentiment_breakdown.append({"key": key, "label": label, "pct": pct})
-        coalition_data.append({
-            "coalition": coalition,
+        actor_rows = list(
+            PoliticalActor.objects.filter(project=project, camp=camp, is_active=True)
+            .annotate(
+                mention_count=Count(
+                    "mentions",
+                    filter=Q(mentions__issue=issue),
+                    distinct=True,
+                )
+            )
+            .order_by("-mention_count", "name")
+        )
+        camp_data.append({
+            "camp": camp,
             "count": count,
-            "share_pct": share_pct,
+            "assessment_count": assessment_total,
             "sentiment_breakdown": sentiment_breakdown,
             "dominant_themes": _dominant_themes(qs),
-            "trend_chart": _coalition_trend(qs),
+            "trend_chart": _series_trend(qs),
+            "actors": actor_rows,
         })
+
+    # A mention can reference actors from multiple camps. Share of Voice is
+    # therefore normalized over camp attributions, rather than pretending the
+    # camps are mutually exclusive and allowing the bar to exceed 100%.
+    attribution_total = sum(item["count"] for item in camp_data)
+    for item in camp_data:
+        item["share_pct"] = (
+            round(item["count"] / attribution_total * 100)
+            if attribution_total else 0
+        )
+    _add_shared_scale_overlay(camp_data, camp_querysets)
 
     return {
         "issue": issue,
+        "total_political": total_political,
         "total_attributed": total_attributed,
         "unattributed_pct": unattributed_pct,
-        "coalitions": coalition_data,
-        "overlay_chart": _overlay_trend(coalitions, issue),
+        "camps": camp_data,
+        "configured_actor_count": PoliticalActor.objects.filter(
+            project=project, is_active=True
+        ).count(),
+        "overlay_chart": {"width": 1160, "height": 150},
     }
+
+
+def _add_shared_scale_overlay(camp_data, camp_querysets, days=30, width=1160, height=150):
+    """Attach trend points using one y-axis for every camp."""
+    since = timezone.now() - timezone.timedelta(days=days)
+    daily_by_camp = {}
+    for item in camp_data:
+        camp = item["camp"]
+        daily = [0] * days
+        for mention in camp_querysets[camp.pk].filter(posted_at__gte=since).only("posted_at"):
+            offset = (mention.posted_at - since).days
+            if 0 <= offset < days:
+                daily[offset] += 1
+        daily_by_camp[camp.pk] = daily
+
+    max_value = max(
+        (max(values) for values in daily_by_camp.values() if values),
+        default=1,
+    ) or 1
+    for item in camp_data:
+        item["overlay_points"] = _scale_points(
+            daily_by_camp[item["camp"].pk], width, height, max_value
+        )
 
 
 def _dominant_themes(qs, limit=4):
@@ -434,7 +504,7 @@ def _dominant_themes(qs, limit=4):
     return [{"theme": row["theme"], "pct": round((row["n"] / total) * 100)} for row in rows]
 
 
-def _coalition_trend(qs, days=30, width=560, height=90):
+def _series_trend(qs, days=30, width=560, height=90):
     since = timezone.now() - timezone.timedelta(days=days)
     daily = [0] * days
     for mention in qs.filter(posted_at__gte=since).only("posted_at"):
@@ -443,22 +513,6 @@ def _coalition_trend(qs, days=30, width=560, height=90):
             daily[offset] += 1
     max_value = max(daily) or 1
     return {"points": _scale_points(daily, width, height, max_value), "width": width, "height": height}
-
-
-def _overlay_trend(coalitions, issue, days=30, width=1160, height=150):
-    since = timezone.now() - timezone.timedelta(days=days)
-    series = {}
-    for coalition in coalitions:
-        daily = [0] * days
-        for mention in Mention.objects.filter(
-            issue=issue, coalition=coalition, posted_at__gte=since
-        ).only("posted_at"):
-            offset = (mention.posted_at - since).days
-            if 0 <= offset < days:
-                daily[offset] += 1
-        max_value = max(daily) or 1
-        series[coalition.slug] = _scale_points(daily, width, height, max_value)
-    return {"series": series, "width": width, "height": height}
 
 
 _ID_MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
@@ -566,9 +620,9 @@ def regional_summary(project, selected_province=None):
 
 def sosiograf_summary(project, days=30, max_nodes=20, width=760, height=560):
     """Interaction sociograph (Sosiograf): the most influential authors of the
-    last ``days`` days as graph nodes, linked when they push the same theme.
-    Accounts that belong to a flagged coordination cluster are marked so the
-    analyst can see amplification structure at a glance.
+    last ``days`` days as graph nodes. Edges are only created from observed
+    reply/comment relationships or a reviewed coordination-detection cluster;
+    thematic similarity alone is not presented as an interaction.
 
     The layout is computed server-side (deterministic circular layout grouped
     by theme) so the page needs no JS graph library.
@@ -605,13 +659,26 @@ def sosiograf_summary(project, days=30, max_nodes=20, width=760, height=560):
     for row in theme_rows:
         theme_by_author.setdefault(row["author_handle"], row["theme"])
 
-    # Accounts sitting inside a flagged coordination cluster.
+    # Accounts sitting inside a currently actionable coordination cluster.
     from apps.coordination.models import ClusterAccount, CoordinationCluster
 
+    actionable_statuses = [
+        CoordinationCluster.STATUS_FLAGGED,
+        CoordinationCluster.STATUS_ESCALATED,
+    ]
+    clusters = list(
+        CoordinationCluster.objects.filter(
+            issue__project=project,
+            status__in=actionable_statuses,
+            accounts__handle__in=handles,
+        )
+        .prefetch_related("accounts")
+        .distinct()
+    )
     coordinated = set(
         ClusterAccount.objects.filter(
             cluster__issue__project=project,
-            cluster__status=CoordinationCluster.STATUS_FLAGGED,
+            cluster__status__in=actionable_statuses,
             handle__in=handles,
         ).values_list("handle", flat=True)
     )
@@ -663,14 +730,89 @@ def sosiograf_summary(project, days=30, max_nodes=20, width=760, height=560):
             "coordinated": row["author_handle"] in coordinated,
         })
 
+    # Build real observed relationships. A reply is an explicit interaction.
+    # A coordination edge is grounded in the detection module's persisted,
+    # human-reviewable cluster evidence.
+    node_by_handle = {node["handle"]: node for node in nodes}
+    edge_map = {}
+
+    def add_edge(handle_a, handle_b, *, replies=0, cluster_code=""):
+        if (
+            not handle_a
+            or not handle_b
+            or handle_a == handle_b
+            or handle_a not in node_by_handle
+            or handle_b not in node_by_handle
+        ):
+            return
+        pair = tuple(sorted((handle_a, handle_b)))
+        edge = edge_map.setdefault(
+            pair,
+            {"replies": 0, "cluster_codes": set()},
+        )
+        edge["replies"] += replies
+        if cluster_code:
+            edge["cluster_codes"].add(cluster_code)
+
+    reply_rows = (
+        qs.filter(
+            parent__isnull=False,
+            author_handle__in=handles,
+            parent__author_handle__in=handles,
+        )
+        .values("author_handle", "parent__author_handle")
+        .annotate(n=Count("id"))
+    )
+    for row in reply_rows:
+        add_edge(
+            row["author_handle"],
+            row["parent__author_handle"],
+            replies=row["n"],
+        )
+
+    for cluster in clusters:
+        accounts = [
+            account for account in cluster.accounts.all()
+            if account.handle in node_by_handle
+        ]
+        hubs = [
+            account for account in accounts
+            if account.role == ClusterAccount.ROLE_HUB
+        ]
+        if hubs:
+            for hub in hubs:
+                for account in accounts:
+                    add_edge(hub.handle, account.handle, cluster_code=cluster.cluster_code)
+        else:
+            for index, account in enumerate(accounts):
+                for peer in accounts[index + 1:]:
+                    add_edge(
+                        account.handle,
+                        peer.handle,
+                        cluster_code=cluster.cluster_code,
+                    )
+
     edges = []
-    for i, a in enumerate(nodes):
-        for b in nodes[i + 1:]:
-            if a["theme"] and a["theme"] == b["theme"]:
-                edges.append({
-                    "x1": a["x"], "y1": a["y"], "x2": b["x"], "y2": b["y"],
-                    "coordinated": a["coordinated"] and b["coordinated"],
-                })
+    for (handle_a, handle_b), evidence in edge_map.items():
+        a = node_by_handle[handle_a]
+        b = node_by_handle[handle_b]
+        labels = []
+        if evidence["replies"]:
+            labels.append(f"{evidence['replies']} balasan/komentar")
+        if evidence["cluster_codes"]:
+            labels.append(
+                "bukti klaster " + ", ".join(sorted(evidence["cluster_codes"]))
+            )
+        weight = evidence["replies"] + len(evidence["cluster_codes"])
+        edges.append({
+            "x1": a["x"],
+            "y1": a["y"],
+            "x2": b["x"],
+            "y2": b["y"],
+            "coordinated": bool(evidence["cluster_codes"]),
+            "width": round(min(4.5, 1 + math.log1p(weight)), 2),
+            "evidence": " · ".join(labels),
+        })
 
     theme_counts = {}
     for node in nodes:

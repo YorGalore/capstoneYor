@@ -1,0 +1,34 @@
+[
+  {
+    "issue_id": "ONB-ISSUE-001",
+    "original_severity": "Low",
+    "repro_steps": "Buka konteks browser baru (tanpa cookie/sesi apa pun), lalu akses langsung GET /mulai/berhasil/ tanpa pernah mengunjungi /mulai/ atau mengirim formulir.",
+    "new_actual": "URL akhir setelah navigasi berpindah ke http://127.0.0.1:8010/mulai/ (redirect terjadi). Teks 'PERMINTAAN DITERIMA' tidak lagi tampil di halaman. Karena tidak ada bukti sesi bahwa pengguna baru saja mengirim formulir, aplikasi kini mengalihkan pengunjung kembali ke /mulai/ alih-alih menampilkan pesan sukses publik yang menyesatkan.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ONB-ISSUE-001_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ONB-ISSUE-002",
+    "original_severity": "Low",
+    "repro_steps": "Dalam satu konteks browser (cookie/sesi dipertahankan), buka /mulai/ dan kirim formulir dua kali berturut-turut dengan payload identik: organization_type=brand, organization_name='Uji Duplikat Verifikasi', contact_name='Penguji', work_email='uji.duplikat@example.id', phone='0812', role='Analis', monitoring_goal='uji', consent=on. Verifikasi jumlah baris OnboardingRequest untuk organization_name+work_email tersebut.",
+    "new_actual": "Submission pertama -> redirect ke /mulai/berhasil/ (terlihat sukses). Submission kedua dengan payload identik -> juga redirect ke /mulai/berhasil/ tanpa pesan error (sesuai ekspektasi, tidak menampilkan error ke pengguna). Verifikasi via Django admin (/admin/core/onboardingrequest/) sebagai dewi.anjani awalnya gagal karena akun tersebut menerima 403 Forbidden saat mengakses /admin/ (masalah akses admin terpisah, dicatat sebagai temuan lain, bukan bagian dari pengujian duplikasi ini). Sebagai verifikasi alternatif, data OnboardingRequest pada database salinan test diperiksa langsung: hanya ADA SATU baris dengan organization_name='Uji Duplikat Verifikasi' dan work_email='uji.duplikat@example.id' meskipun formulir dikirim dua kali dengan payload identik. Duplikasi tidak lagi terjadi.",
+    "status": "FIXED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ONB-ISSUE-002_reverifikasi_diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-BTX-006",
+    "original_severity": "High",
+    "repro_steps": "Login sebagai humas.kulonprogo (tenant_admin). Atur viewport browser ke 390x844 (mobile). Buka /brief/ dan /taksonomi/. Ambil screenshot full-page kedua halaman dan periksa apakah sidebar kiri masih memakan kolom lebar tetap, atau sudah berubah menjadi menu hamburger/off-canvas.",
+    "new_actual": "Login berhasil. Pada viewport mobile 390x844, elemen sidebar (selector '[class*=\"sidebar\"]') pada halaman /brief/ maupun /taksonomi/ masih tampil dengan lebar tetap 208px (posisi CSS sticky, display flex, tidak disembunyikan). Tidak ditemukan elemen hamburger/off-canvas menu di halaman manapun. Dengan lebar layar hanya 390px, sidebar 208px memakan lebih dari separuh lebar layar, sehingga konten tabel taksonomi (termasuk tombol Labeli) tetap terdesak dan sulit dijangkau. Ini SESUAI DUGAAN: masalah responsivitas sidebar pada mobile belum diperbaiki.",
+    "status": "STILL_BROKEN",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-BTX-006_reverifikasi_belum-diperbaiki.png"
+  },
+  {
+    "issue_id": "ISS-BTX-003",
+    "original_severity": "Enhancement",
+    "repro_steps": "Login sebagai humas.kulonprogo. Buka /umpan/ (feed), terapkan filter sentimen (?sentiment=negative). Cari tombol/tautan ekspor atau unduh pada halaman tersebut, lalu periksa apakah URL tombol tersebut menyertakan parameter filter sentiment, atau hanya mengarah ke /ekspor/mention/ tanpa filter.",
+    "new_actual": "Pada halaman /umpan/?sentiment=negative tidak ditemukan tombol/tautan ekspor sama sekali — halaman feed.html hanya berisi tombol filter 'Saring', tombol 'Koreksi' per baris, dan navigasi paginasi; tidak ada tautan ke /ekspor/mention/. Tombol ekspor hanya tersedia di halaman /ringkasan/ dan /laporan/, keduanya berupa tautan statis '<a href=\"{% url 'analytics:export_mentions' %}?format=csv\">' / '?format=xlsx' tanpa parameter filter apa pun. Pemeriksaan kode sumber view export_mentions (apps/analytics/views.py) mengonfirmasi bahwa view tersebut membangun queryset baru dari scope_to_tenant tanpa pernah membaca parameter GET seperti sentiment/platform/author dari request — filter apa pun yang diterapkan pengguna di /umpan/ diabaikan sepenuhnya saat ekspor. Dengan kata lain, ekspor terfilter memang belum ada di mana pun dalam aplikasi; ekspor tetap berupa unduhan mentah/tidak terfilter. Ini SESUAI DUGAAN: peningkatan ini memang sengaja ditangguhkan (deferred), bukan diperbaiki.",
+    "status": "DEFERRED",
+    "screenshot": "C:\\Users\\Guntur\\Documents\\PROJECT\\SOCIAL MEDIA MONITORING\\documentation-output\\testing-report\\screenshots\\ISS-BTX-003_reverifikasi_ditangguhkan.png"
+  }
+]

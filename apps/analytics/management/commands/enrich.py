@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand
 
 from apps.analytics import taxonomy
 from apps.analytics.models import Mention
-from apps.analytics.nlp import classify
+from apps.analytics.nlp import default_pipeline
 
 
 class Command(BaseCommand):
@@ -19,8 +19,9 @@ class Command(BaseCommand):
         qs = Mention.objects.all() if options["all"] else Mention.objects.filter(sentiment_model="")
         updated = 0
         labeled = 0
+        classifier = default_pipeline()
         for mention in qs.iterator(chunk_size=200):
-            result = classify(mention.content_snippet)
+            result = classifier.classify(mention.content_snippet)
             mention.sentiment = result.sentiment
             mention.sentiment_confidence = result.confidence
             mention.sentiment_model = result.model_version

@@ -9,12 +9,9 @@
       <h1 class="feed-title">Umpan Sebutan</h1>
       <p class="feed-lead">Percakapan publik terbaru dari media sosial dan berita daring, siap ditinjau dalam satu aliran kerja.</p>
     </div>
-    <div class="feed-live" aria-label="Status aliran data">
-      <span class="feed-live-dot"></span>
-      <span>
-        <strong>Aliran aktif</strong>
-        <small>Urutan terbaru</small>
-      </span>
+    <div>
+      <a class="pantau-btn-outline pantau-btn-small" href="{% url 'analytics:export_mentions' %}?{{ export_query }}format=csv">Ekspor hasil CSV</a>
+      <a class="pantau-btn-outline pantau-btn-small" href="{% url 'analytics:export_mentions' %}?{{ export_query }}format=xlsx">Ekspor hasil XLSX</a>
     </div>
   </header>
 
@@ -53,13 +50,34 @@
         <span>Penulis</span>
         <input class="pantau-input" type="search" name="author" value="{{ filters.author }}" placeholder="Cari nama atau @handle">
       </label>
+      <label class="feed-field feed-field-search">
+        <span>Isi / kata kunci</span>
+        <input class="pantau-input" type="search" name="q" value="{{ filters.query }}" placeholder="Cari isi sebutan">
+      </label>
+      <label class="feed-field">
+        <span>Jenis konten</span>
+        <select class="pantau-input" name="content_type">
+          <option value="">Semua jenis</option>
+          {% for key, label in content_type_choices %}
+          <option value="{{ key }}" {% if filters.content_type == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="feed-field">
+        <span>Dari tanggal</span>
+        <input class="pantau-input" type="date" name="from" value="{{ filters.date_from }}">
+      </label>
+      <label class="feed-field">
+        <span>Sampai tanggal</span>
+        <input class="pantau-input" type="date" name="to" value="{{ filters.date_to }}">
+      </label>
       <button type="submit" class="feed-filter-submit">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path>
         </svg>
         Terapkan
       </button>
-      {% if filters.platform or filters.sentiment or filters.author %}
+      {% if filter_query %}
       <a class="feed-filter-reset" href="{% url 'analytics:feed' %}">Hapus filter</a>
       {% endif %}
     </form>
@@ -71,7 +89,7 @@
         <h2 id="feed-results-title">Percakapan terbaru</h2>
         <p>
           <strong>{{ page_obj.paginator.count }}</strong> sebutan ditemukan
-          {% if filters.platform or filters.sentiment or filters.author %}<span class="feed-filter-active">Filter aktif</span>{% endif %}
+          {% if filter_query %}<span class="feed-filter-active">Filter aktif</span>{% endif %}
         </p>
       </div>
       <div class="feed-sort-note">
@@ -180,10 +198,10 @@
       <span>Halaman <strong>{{ page_obj.number }}</strong> dari {{ page_obj.paginator.num_pages }}</span>
       <div>
         {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}&amp;platform={{ filters.platform }}&amp;sentiment={{ filters.sentiment }}&amp;author={{ filters.author|urlencode }}">← Sebelumnya</a>
+        <a href="?page={{ page_obj.previous_page_number }}{% if filter_query %}&amp;{{ filter_query }}{% endif %}">← Sebelumnya</a>
         {% endif %}
         {% if page_obj.has_next %}
-        <a class="is-primary" href="?page={{ page_obj.next_page_number }}&amp;platform={{ filters.platform }}&amp;sentiment={{ filters.sentiment }}&amp;author={{ filters.author|urlencode }}">Berikutnya →</a>
+        <a class="is-primary" href="?page={{ page_obj.next_page_number }}{% if filter_query %}&amp;{{ filter_query }}{% endif %}">Berikutnya →</a>
         {% endif %}
       </div>
     </nav>

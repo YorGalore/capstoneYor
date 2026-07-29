@@ -1,9 +1,11 @@
 from django.contrib import admin
 
 from .models import (
-    ActorSentimentAssessment, Alert, AlertRule, Author, Camp, Category, Coalition, DailyBrief, DailyBriefIssue,
-    DailyBriefRun, GovernmentProgram, Issue, IssueLabel, IssueMergeHistory, LabelCorrection,
-    Mention, PoliticalActor, PoliticalIssue, ResponseAction, SubCategory,
+    ActorSentimentAssessment, Alert, AlertRule, Author, BrowserPushSubscription,
+    Camp, Category, Coalition, DailyBrief, DailyBriefIssue, DailyBriefRun,
+    GovernmentProgram, Issue, IssueLabel, IssueMergeHistory, LabelCorrection,
+    Mention, NotificationDelivery, PoliticalActor, PoliticalIssue, ResponseAction,
+    SubCategory,
 )
 
 admin.site.register(Coalition)
@@ -63,3 +65,23 @@ class DailyBriefAdmin(admin.ModelAdmin):
 
 
 admin.site.register(DailyBriefIssue)
+
+
+@admin.register(BrowserPushSubscription)
+class BrowserPushSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ("user", "project", "is_active", "updated_at")
+    list_filter = ("project", "is_active")
+    readonly_fields = ("endpoint", "p256dh", "auth", "created_at", "updated_at")
+
+
+@admin.register(NotificationDelivery)
+class NotificationDeliveryAdmin(admin.ModelAdmin):
+    list_display = ("subject", "project", "channel", "status", "created_at")
+    list_filter = ("project", "channel", "status")
+    readonly_fields = (
+        "project", "kind", "channel", "subject", "recipients", "status",
+        "detail", "alert", "brief", "created_at",
+    )
+
+    def has_add_permission(self, request):
+        return False

@@ -131,6 +131,19 @@ EMAIL_HOST_PASSWORD = os.environ.get("DJANGO_EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env.get_bool("DJANGO_EMAIL_USE_TLS", default=True)
 DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "pantau@localhost")
 
+# Optional OpenAI-compatible NLP service. Runtime Settings with matching
+# ``nlp.*`` keys take precedence, so operators can rotate models without deploy.
+NLP_API_URL = os.environ.get("NLP_API_URL", "")
+NLP_API_KEY = os.environ.get("NLP_API_KEY", "")
+NLP_MODEL = os.environ.get("NLP_MODEL", "")
+NLP_TIMEOUT_SECONDS = int(os.environ.get("NLP_TIMEOUT_SECONDS", "30"))
+
+# Browser Web Push. Generate one VAPID key pair for the deployment; the public
+# key is sent to opted-in browsers and the private key stays server-side.
+WEBPUSH_VAPID_PUBLIC_KEY = os.environ.get("WEBPUSH_VAPID_PUBLIC_KEY", "")
+WEBPUSH_VAPID_PRIVATE_KEY = os.environ.get("WEBPUSH_VAPID_PRIVATE_KEY", "")
+WEBPUSH_VAPID_CONTACT = os.environ.get("WEBPUSH_VAPID_CONTACT", "")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

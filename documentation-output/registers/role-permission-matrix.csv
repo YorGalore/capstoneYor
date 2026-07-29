@@ -1,0 +1,69 @@
+﻿page,role,expected_access,actual_access,match,reserved,notes
+ringkasan,super_admin,allow,allow,yes,no,
+feed,super_admin,allow,allow,yes,no,
+narasi,super_admin,allow,allow,yes,no,Narasi juga digerbangi izin Pemantauan Politik terpisah (FR-29.1); dewi.anjani memiliki izin ini.
+war_room,super_admin,allow,allow,yes,no,
+regional,super_admin,allow,allow,yes,no,
+sosiograf,super_admin,allow,allow,yes,no,
+laporan,super_admin,allow,allow,yes,no,
+export,super_admin,allow,allow,yes,no,"Diverifikasi via HTTP request langsung (unduhan CSV, status 200)."
+brief,super_admin,allow,allow,yes,no,
+taxonomy,super_admin,allow,allow,yes,no,
+insiden,super_admin,allow,allow,yes,no,
+koordinasi,super_admin,allow,allow,yes,no,
+konfigurasi,super_admin,allow,allow,yes,no,
+pengawasan,super_admin,allow,allow,yes,no,
+permission_matrix,super_admin,allow,allow,yes,yes,Sel super_admin selalu dikunci (reserved) di matriks.
+runtime_settings,super_admin,allow,allow,yes,yes,Sel super_admin selalu dikunci (reserved) di matriks.
+profil,super_admin,allow,allow,yes,no,Di luar matriks izin halaman; selalu dapat diakses saat sudah login.
+ringkasan,tenant_admin,allow,allow,yes,no,
+feed,tenant_admin,allow,allow,yes,no,
+narasi,tenant_admin,allow,allow,yes,no,Narasi juga digerbangi izin Pemantauan Politik terpisah (FR-29.1); humas.kulonprogo memiliki izin ini.
+war_room,tenant_admin,allow,allow,yes,no,
+regional,tenant_admin,allow,allow,yes,no,
+sosiograf,tenant_admin,allow,allow,yes,no,
+laporan,tenant_admin,allow,allow,yes,no,
+export,tenant_admin,allow,allow,yes,no,"Diverifikasi via HTTP request langsung (unduhan CSV, status 200)."
+brief,tenant_admin,allow,allow,yes,no,
+taxonomy,tenant_admin,allow,allow,yes,no,
+insiden,tenant_admin,allow,allow,yes,no,
+koordinasi,tenant_admin,allow,allow,yes,no,
+konfigurasi,tenant_admin,allow,allow,yes,no,
+pengawasan,tenant_admin,allow,allow,yes,no,
+permission_matrix,tenant_admin,deny,deny,yes,yes,SUPER_ADMIN_ONLY_PAGES; 403 Forbidden dikonfirmasi.
+runtime_settings,tenant_admin,deny,deny,yes,yes,SUPER_ADMIN_ONLY_PAGES; 403 Forbidden dikonfirmasi.
+profil,tenant_admin,allow,allow,yes,no,Di luar matriks izin halaman; selalu dapat diakses saat sudah login.
+ringkasan,analyst,allow,allow,yes,no,Tidak ada @require_page pada view ini (lihat catatan celah dekorator).
+feed,analyst,deny,deny,yes,no,
+narasi,analyst,allow,deny,no,no,"MISMATCH vs default_can_access murni, TAPI bukan bug matriks-peran: digerbangi izin Pemantauan Politik terpisah (FR-29.1) yang belum diberikan ke qa.analis (lihat /profil/: Tidak diizinkan). Bekerja sesuai desain."
+war_room,analyst,allow,allow,yes,no,Tidak ada @require_page pada view ini (lihat catatan celah dekorator).
+regional,analyst,allow,allow,yes,no,Tidak ada @require_page pada view ini (lihat catatan celah dekorator).
+sosiograf,analyst,allow,allow,yes,no,
+laporan,analyst,allow,allow,yes,no,
+export,analyst,allow,allow,yes,no,"Diverifikasi via HTTP request langsung (unduhan CSV, status 200)."
+brief,analyst,allow,allow,yes,no,
+taxonomy,analyst,deny,deny,yes,no,
+insiden,analyst,allow,allow,yes,no,
+koordinasi,analyst,allow,allow,yes,no,Tidak ada @require_page pada view ini (lihat catatan celah dekorator).
+konfigurasi,analyst,deny,deny,yes,no,
+pengawasan,analyst,deny,deny,yes,no,
+permission_matrix,analyst,deny,deny,yes,yes,SUPER_ADMIN_ONLY_PAGES; 403 Forbidden dikonfirmasi.
+runtime_settings,analyst,deny,deny,yes,yes,SUPER_ADMIN_ONLY_PAGES; 403 Forbidden dikonfirmasi.
+profil,analyst,allow,allow,yes,no,Di luar matriks izin halaman; selalu dapat diakses saat sudah login.
+ringkasan,viewer,allow,allow,yes,no,Tidak ada @require_page pada view ini (lihat catatan celah dekorator).
+feed,viewer,deny,deny,yes,no,
+narasi,viewer,allow,deny,no,no,"MISMATCH vs default_can_access murni, TAPI bukan bug matriks-peran: digerbangi izin Pemantauan Politik terpisah (FR-29.1) yang belum diberikan ke qa.peninjau. Bekerja sesuai desain."
+war_room,viewer,allow,allow,yes,no,Tidak ada @require_page pada view ini (lihat catatan celah dekorator).
+regional,viewer,allow,allow,yes,no,Tidak ada @require_page pada view ini; DIUJI LANGSUNG dengan mendenda sel matriks Peninjau x Regional -> halaman TETAP dapat diakses (status 200) walau matriks menyatakan Tolak. Lihat issue RBAC-001.
+sosiograf,viewer,allow,allow,yes,no,
+laporan,viewer,allow,allow,yes,no,
+export,viewer,deny,deny,yes,no,Diverifikasi via HTTP request langsung (403 Forbidden).
+brief,viewer,allow,allow,yes,no,
+taxonomy,viewer,deny,deny,yes,no,
+insiden,viewer,allow,allow,yes,no,
+koordinasi,viewer,allow,allow,yes,no,Tidak ada @require_page pada view ini (lihat catatan celah dekorator).
+konfigurasi,viewer,deny,deny,yes,no,
+pengawasan,viewer,deny,deny,yes,no,
+permission_matrix,viewer,deny,deny,yes,yes,SUPER_ADMIN_ONLY_PAGES; 403 Forbidden dikonfirmasi.
+runtime_settings,viewer,deny,deny,yes,yes,SUPER_ADMIN_ONLY_PAGES; 403 Forbidden dikonfirmasi.
+profil,viewer,allow,allow,yes,no,Di luar matriks izin halaman; selalu dapat diakses saat sudah login.

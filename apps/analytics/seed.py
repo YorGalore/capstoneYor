@@ -6,8 +6,8 @@ from django.utils import timezone
 from apps.core.models import Platform, Province
 
 from .models import (
-    Alert, AlertRule, Camp, Category, Coalition, GovernmentProgram, Issue, Mention,
-    PoliticalActor, PoliticalIssue, SubCategory,
+    ActorSentimentAssessment, Alert, AlertRule, Camp, Category, Coalition,
+    GovernmentProgram, Issue, Mention, PoliticalActor, PoliticalIssue, SubCategory,
 )
 
 RNG_SEED = 20260710
@@ -220,6 +220,7 @@ def _seed_political_issue(project, rng, now):
     provinces = list(Province.objects.all())
     province_weights = [(p, p.population_online) for p in provinces]
     political_mentions = []
+    political_actors = []
     coalition_sentiment_weights = (
         (coalition_a, [
             (Mention.SENTIMENT_POSITIVE, 0.58),
@@ -233,6 +234,10 @@ def _seed_political_issue(project, rng, now):
         ]),
     )
     for coalition, sentiment_weights in coalition_sentiment_weights:
+        camp = Camp.objects.get(project=project, name=coalition.name)
+        actor = PoliticalActor.objects.filter(
+            project=project, camp=camp, is_active=True
+        ).first()
         theme_weights = COALITION_THEME_WEIGHTS[coalition.slug]
         for _ in range(700):
             sentiment = _weighted_choice(rng, sentiment_weights)
@@ -252,7 +257,25 @@ def _seed_political_issue(project, rng, now):
                 coalition=coalition,
                 issue=issue,
             ))
+            political_actors.append(actor)
     Mention.objects.bulk_create(political_mentions)
+    through = Mention.political_actors.through
+    through.objects.bulk_create([
+        through(mention_id=mention.pk, politicalactor_id=actor.pk)
+        for mention, actor in zip(political_mentions, political_actors)
+        if actor is not None
+    ])
+    ActorSentimentAssessment.objects.bulk_create([
+        ActorSentimentAssessment(
+            mention=mention,
+            actor=actor,
+            sentiment=mention.sentiment,
+            confidence=0.0,
+            model="demo-seed",
+        )
+        for mention, actor in zip(political_mentions, political_actors)
+        if actor is not None
+    ])
 
 
 def _seed_alerts(project, now):

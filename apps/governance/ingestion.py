@@ -9,7 +9,7 @@ from django.db import transaction
 
 from apps.analytics import actors, taxonomy
 from apps.analytics.models import Author, Mention
-from apps.analytics.nlp import classify
+from apps.analytics.nlp import default_pipeline
 
 
 def _author_for(platform, handle):
@@ -25,6 +25,7 @@ def ingest_items(project, platform, items):
     """Persist a batch of normalized items. Returns a summary dict."""
     created = 0
     duplicates = 0
+    classifier = default_pipeline()
     for item in items:
         external_id = item.get("external_id")
         if external_id and Mention.objects.filter(external_id=external_id).exists():
@@ -32,7 +33,7 @@ def ingest_items(project, platform, items):
             continue
 
         content = item.get("content", "") or ""
-        result = classify(content)
+        result = classifier.classify(content)
         author = _author_for(platform, item.get("author"))
         parent = None
         parent_external_id = item.get("parent_external_id")

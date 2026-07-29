@@ -1,0 +1,224 @@
+================================================================================
+IMAGE PROMPTS - TAMBAHAN ILUSTRASI PRESENTASI PANTAU KULON PROGO
+================================================================================
+
+Tujuan:
+  Melengkapi ilustrasi presentasi PANTAU tanpa membuat ulang gambar yang sudah
+  tersedia. Setiap blok prompt di bawah berdiri sendiri dan dapat langsung
+  disalin ke generator gambar.
+
+Folder keluaran:
+  documentation-output/presentasi-kulonprogo/figs/
+
+Status hasil pengecekan folder figs:
+  SUDAH ADA - jangan dibuat ulang:
+    - figs/fig_warga_bersuara.png
+    - figs/fig_sumber_data.png
+    - figs/fig_prinsip_kepercayaan.png
+
+  TANGKAPAN LAYAR PRODUK - bukan ilustrasi yang perlu dibuat ulang:
+    - figs/umpan_negatif.png
+    - figs/insiden_board.png
+    - figs/insiden_board_setelah.png
+    - figs/insiden_detail.png
+    - figs/insiden_detail_crop.png
+    - figs/insiden_timeline.png
+    - figs/insiden_timeline_crop.png
+    - figs/brief_harian.png
+    - figs/brief_cetak.png
+    - figs/brief_cetak_crop.png
+    - figs/koordinasi.png
+
+  PERLU DIBUAT - tiga tambahan:
+    1. figs/fig_pertanyaan_pimpinan.png
+    2. figs/fig_kebutuhan_memulai.png
+    3. figs/fig_penutup_kolaborasi.png
+
+Referensi gaya dari tiga ilustrasi yang sudah ada:
+  - Ilustrasi editorial-infografis yang detail, bukan ikon minimal.
+  - Latar putih bersih dengan konteks lingkungan tipis berwarna biru pucat.
+  - Linework tegas berwarna navy, bayangan lembut, dan aksen emas terbatas.
+  - Komposisi institusional, modern, ramah, dan cocok untuk presentasi pemerintah.
+  - Teks Indonesia harus nyata, singkat, dan mudah dibaca.
+  - Jangan menggunakan logo perusahaan atau platform sosial yang nyata.
+  - Tanpa watermark, bingkai dekoratif, atau mockup slide.
+
+
+================================================================================
+PROMPT 1 - save as: figs/fig_pertanyaan_pimpinan.png
+Slide: "Tiga Pertanyaan Pimpinan Setiap Pagi"
+Ukuran: 4:3 landscape, ideal 1536 x 1152 px
+================================================================================
+
+Create a detailed editorial vector infographic illustration for an Indonesian
+regional-government presentation. Use a clean white background, confident navy
+linework, subtle pale-blue environmental details, restrained soft shadows, and
+small gold focal accents. Match a polished institutional annual-report style:
+richly composed and informative, but not photorealistic, not a flat icon set,
+and not a slide mockup.
+
+Scene:
+An Indonesian regional-government leader wearing an elegant navy-and-white
+batik shirt begins an early-morning briefing at a tidy desk. The leader is
+looking attentively at a tablet. Include a small cup of coffee, a desk clock
+showing early morning, a folder of briefing papers, and a softly drawn Kulon
+Progo small-town landscape in the background: low hills, rice fields, public
+buildings, and a warm rising sun. The setting should feel calm, responsible,
+and ready for action.
+
+From the tablet, three clearly separated rounded question cards rise in a
+gentle upward flow. Give each card a navy outline, white interior, a small
+gold number badge, and one simple supporting symbol:
+  1. a pulse or alert symbol for the current situation;
+  2. a severity gauge for seriousness;
+  3. a handoff/checklist symbol for action and responsibility.
+
+Render these exact Indonesian captions as large, legible text:
+  "Apa yang sedang terjadi?"
+  "Seberapa serius?"
+  "Apa yang harus dilakukan?"
+  "Siapa yang menangani?"
+
+Place the third and fourth captions together inside the third card, with a
+clear line break. On the tablet, show only an abstract monitoring dashboard
+with small charts, issue cards, and one tiny rounded tile containing the letter
+"P". Do not show a real software interface or any real company logo.
+
+Color palette:
+  - Deep UGM navy #01416B for outlines, batik details, text, and interface lines
+  - Gold #FDD402 for the sunrise, number badges, and limited focal highlights
+  - Pale navy #E6EEF3 and light blue-grey tints for background context/shading
+  - White #FFFFFF for the canvas and card interiors
+  - PANTAU teal #0E7C86 to mint #2FD4C4 only on the tiny "P" dashboard tile
+
+Do not introduce strong red, green, purple, or orange. No photorealism, no
+brand logos, no social-media logos, no watermark, no illegible filler text,
+no extra fingers, and no large decorative title.
+
+
+================================================================================
+PROMPT 2 - save as: figs/fig_kebutuhan_memulai.png
+Slide: "Yang Dibutuhkan untuk Memulai"
+Ukuran: 4:3 landscape, ideal 1536 x 1152 px
+================================================================================
+
+Create a detailed editorial vector infographic illustration for an Indonesian
+regional-government presentation. Use a clean white background, confident navy
+linework, subtle pale-blue environmental details, restrained soft shadows, and
+small gold focal accents. Match a polished institutional annual-report style:
+richly composed and informative, but not photorealistic, not a flat icon set,
+and not a slide mockup.
+
+Scene:
+Show a reassuring, practical onboarding workspace for launching the PANTAU
+monitoring system. Two Indonesian Diskominfo operators, one woman and one man,
+sit together at a tidy workstation during training. One points at a monitor
+while the other checks a short setup sheet. Their expressions are focused and
+confident. The composition should communicate that the system is manageable,
+lightweight, and can be operational quickly.
+
+Arrange four connected visual stations from left to right, linked by thin navy
+flow lines with small gold checkpoints:
+  1. "TIM" - the two operators at the workstation;
+  2. "KONFIGURASI" - a checklist card;
+  3. "INFRASTRUKTUR" - one compact, modest server unit, not a large data center;
+  4. "WAKTU" - a calendar showing a short two-to-three-week setup period.
+
+Render these exact Indonesian captions as large, legible text:
+  "1-2 operator"
+  "pelatihan 2 hari"
+  "Konfigurasi"
+  "Daftar OPD"
+  "Kata kunci"
+  "Wilayah"
+  "server ringan"
+  "2-3 minggu"
+
+The monitor should contain an abstract monitoring dashboard with a few issue
+cards and small charts. Put a tiny rounded tile with the letter "P" in one
+corner. Keep the server intentionally small and simple. Use gold check marks on
+the checklist and highlight a short range of dates on the calendar. Avoid a
+busy corporate office or an oversized high-tech server room.
+
+Color palette:
+  - Deep UGM navy #01416B for outlines, people, server, headings, and flow lines
+  - Gold #FDD402 for check marks, milestones, and the calendar highlight
+  - Pale navy #E6EEF3 and light blue-grey tints for background context/shading
+  - White #FFFFFF for the canvas and card interiors
+  - PANTAU teal #0E7C86 to mint #2FD4C4 only on the tiny "P" dashboard tile
+
+Do not introduce strong red, green, purple, or orange. No photorealism, no
+brand logos, no watermark, no illegible filler text, no extra fingers, and no
+large decorative title.
+
+
+================================================================================
+PROMPT 3 - save as: figs/fig_penutup_kolaborasi.png
+Slide: "Terima Kasih"
+Ukuran: 4:3 landscape, ideal 1536 x 1152 px
+================================================================================
+
+Create a warm, detailed editorial vector illustration for the closing slide of
+an Indonesian university-and-government presentation. Use a clean white
+background, confident navy linework, subtle pale-blue environmental details,
+restrained soft shadows, and a bright but limited gold focal accent. Match a
+polished institutional annual-report style: richly composed, optimistic, and
+human, but not photorealistic, not a flat icon set, and not a slide mockup.
+
+Scene:
+At the center, an Indonesian university researcher and a Kulon Progo regional
+government official stand side by side at a shared table. They are collaborating
+as equal partners, looking at a monitoring dashboard on a screen between them.
+Show natural professional gestures: one person points to an emerging issue on
+the screen while the other holds a short action note. Add a subtle group of
+local public-service representatives in the midground and a softly illustrated
+Kulon Progo landscape behind them: Menoreh hills, rice fields, a road, public
+buildings, and residents going about daily life.
+
+Create a clear visual metaphor for faster government response:
+  - A bright gold signal line begins at several small citizen speech bubbles,
+    reaches the monitoring screen, and then continues rapidly to a gold action
+    check mark near the government team.
+  - Behind it, a wider pale-navy ripple representing a spreading public issue
+    is still moving more slowly.
+  - The gold signal must visibly arrive first.
+
+Render this exact Indonesian phrase once, clearly and prominently on a small
+navy-and-white ribbon integrated into the illustration:
+  "mendengar lebih cepat daripada isu menyebar"
+
+On the dashboard screen, show abstract charts, issue cards, and one tiny rounded
+tile containing the letter "P". Do not use actual application screenshots,
+real institutional seals, or real company logos. The final mood should convey
+trust, public service, partnership, readiness, and forward movement rather than
+a commercial sales pitch.
+
+Color palette:
+  - Deep UGM navy #01416B for figures, outlines, text, and the slower issue ripple
+  - Gold #FDD402 for the fast signal, action check mark, and focal highlights
+  - Pale navy #E6EEF3 and light blue-grey tints for landscape/context/shading
+  - White #FFFFFF for the canvas and negative space
+  - PANTAU teal #0E7C86 to mint #2FD4C4 only on the tiny "P" dashboard tile
+
+Do not introduce strong red, green, purple, or orange. No photorealism, no
+brand logos, no watermark, no illegible filler text, no extra fingers, no
+handshake close-up, and no large decorative title.
+
+
+================================================================================
+OUTPUT CHECKLIST
+================================================================================
+
+For each generated image:
+  1. Export as PNG using the exact filename specified in its prompt.
+  2. Keep the 4:3 landscape composition with important content away from edges.
+  3. Confirm that Indonesian captions are spelled correctly and remain legible.
+  4. Confirm that navy dominates, gold is limited, and teal appears only on the
+     small PANTAU dashboard tile.
+  5. Save the PNG directly inside the figs folder.
+
+Expected new files after generation:
+  - figs/fig_pertanyaan_pimpinan.png
+  - figs/fig_kebutuhan_memulai.png
+  - figs/fig_penutup_kolaborasi.png
+================================================================================
