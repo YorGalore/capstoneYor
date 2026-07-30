@@ -1837,3 +1837,15 @@ a:hover { color: #0A5C64; text-decoration: underline; }
   display: flex; gap: 16px; font-size: 12px; color: var(--text-muted);
   white-space: nowrap;
 }
+
+.feed-driver { margin-bottom: 8px; font-size: 12px; }
+.feed-driver-name {
+  display: inline-block; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid var(--border); border-left-width: 3px; font-weight: 600;
+}
+.feed-comment-intel { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.feed-toxicity { font-weight: 600; }
+.feed-toxicity.tox-bersih { color: var(--positive); }
+.feed-toxicity.tox-kasar { color: var(--warning); }
+.feed-toxicity.tox-toksik { color: var(--negative); }
+.feed-stance { color: var(--text-muted); }

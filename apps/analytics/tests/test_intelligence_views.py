@@ -102,6 +102,35 @@ class EvidenceDrilldownViewTest(IntelligenceViewTestBase):
         response = self.client.get(f"{reverse('analytics:feed')}?{ref.to_query()}")
         self.assertContains(response, "sebutan pendukung")
 
+    def test_drilldown_shows_targets_reasons_and_confidence_per_mention(self):
+        """The drill-down has to answer all of "who is blamed", "why", and "how
+        sure" — a list of matching posts alone is still a black box."""
+        mention = self.mention("jalan berlubang dibiarkan", target=self.own)
+        drivers.label(mention)
+
+        response = self.client.get(reverse("analytics:feed"))
+        self.assertContains(response, "Sasaran kritik")
+        self.assertContains(response, "Alasan keluhan")
+        self.assertContains(response, "Pemkab Kulon Progo")
+        self.assertContains(response, "Infrastruktur jalan")
+
+    def test_drilldown_shows_comment_toxicity_and_stance(self):
+        from apps.analytics import comment_intel
+
+        root = self.mention("pemkab resmikan jalan", sentiment=Mention.SENTIMENT_NEUTRAL)
+        comment = Mention.objects.create(
+            project=self.project, platform=self.platform, author_handle="@k",
+            content_snippet="bohong, ini pencitraan",
+            sentiment=Mention.SENTIMENT_NEGATIVE, emotion=Mention.EMOTION_ANGER,
+            posted_at=timezone.now(), content_type=Mention.CONTENT_COMMENT,
+            parent=root,
+        )
+        comment_intel.enrich(comment)
+
+        response = self.client.get(reverse("analytics:feed"))
+        self.assertContains(response, "Analisis komentar")
+        self.assertContains(response, "Tidak setuju")
+
     def test_an_unknown_evidence_kind_shows_the_normal_feed(self):
         self.mention(target=self.own)
         response = self.client.get(f"{reverse('analytics:feed')}?bukti=mengarang")

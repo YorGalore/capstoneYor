@@ -189,6 +189,32 @@
           {% endif %}
           {% endfor %}
 
+          {% if m.drivers.all %}
+          <div class="feed-review-head feed-attribution-head">
+            <span>Alasan keluhan</span>
+          </div>
+          {% for link in m.drivers.all %}
+          <div class="feed-driver" title="{{ link.rationale }}">
+            <span class="feed-driver-name" style="border-color: {{ link.driver.color }}">{{ link.driver.name }}</span>
+            <span class="feed-model">{{ link.get_source_display }} · {{ link.confidence }}</span>
+            {% if link.evidence_span %}
+            <blockquote class="feed-attribution-span">“{{ link.evidence_span|truncatechars:120 }}”</blockquote>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% endif %}
+
+          {% if m.toxicity_label %}
+          <div class="feed-review-head feed-attribution-head">
+            <span>Analisis komentar</span>
+          </div>
+          <div class="feed-comment-intel">
+            <span class="feed-toxicity tox-{{ m.toxicity_label }}">{{ m.get_toxicity_label_display }}</span>
+            {% if m.stance %}<span class="feed-stance">{{ m.get_stance_display }}</span>{% endif %}
+            <span class="feed-model">{{ m.comment_intel_model }}</span>
+          </div>
+          {% endif %}
+
           <div class="feed-review-head feed-attribution-head">
             <span>Sasaran kritik</span>
           </div>

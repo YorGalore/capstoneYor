@@ -394,7 +394,7 @@ def driver_summary(project, days=30, limit=8):
             mention__is_political=False,
         )
         .values("driver_id", "driver__name", "driver__color")
-        .annotate(n=Count("mention_id", distinct=True), avg=Avg("confidence"))
+        .annotate(n=Count("mention_id", distinct=True))
         .order_by("-n")[:limit]
     )
 

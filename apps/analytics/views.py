@@ -150,7 +150,9 @@ def feed(request):
     project = get_active_project(request)
     mentions = scope_to_tenant(
         Mention.objects.select_related("platform", "author", "parent")
-        .prefetch_related("actor_sentiments__actor", "attributions__target"),
+        .prefetch_related(
+            "actor_sentiments__actor", "attributions__target", "drivers__driver"
+        ),
         request,
     ).order_by("-posted_at")
 

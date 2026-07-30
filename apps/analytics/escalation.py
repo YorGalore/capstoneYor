@@ -196,9 +196,12 @@ def _engagement_growth(current, previous):
 def _influencer(current, project):
     from .models import Author
 
+    # Percentile over authors, not over distinct follower counts: deduplicating
+    # first would let a handful of outliers set the threshold for a base of
+    # thousands of similar accounts.
     followers = sorted(
         Author.objects.filter(mentions__project=project, follower_count__gt=0)
-        .values_list("follower_count", flat=True).distinct()
+        .values_list("follower_count", flat=True)
     )
     if not followers:
         return Signal(
