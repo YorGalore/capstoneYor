@@ -1,7 +1,7 @@
 # Early Warning & Decision Support — Design
 
 **Date:** 2026-07-30
-**Status:** Design, pending review
+**Status:** Implemented — see §11 for deviations found during build
 **Scope:** Five additive capabilities layered on the existing PANTAU platform
 
 ---
@@ -472,7 +472,39 @@ its sentiment and a `tidak_jelas` attribution rather than not landing at all.
 Scheduled recomputation (threads, escalation) is idempotent and safe to re-run
 after a partial failure.
 
-## 11. Deferred, deliberately
+## 11. As built — deviations from this design
+
+All five slices are implemented. Four things differ from the design above, each
+found while building:
+
+1. **The deterministic tier matches level catch-alls, not just named entities.**
+   As originally designed, the rule tier attributed only to entities matched by
+   name — and the only entities a tenant configures are its *own* agencies. On
+   the Kulon Progo demo corpus that produced "100% of negative sentiment is aimed
+   at the Pemkab", inverting the feature's entire purpose whenever no LLM is
+   configured. Catch-all keywords ("pemerintah pusat", "gubernur") now match too,
+   with a named entity suppressing the generic bucket for its own level to avoid
+   double-counting. Covered by a named regression test.
+
+2. **Unattributable negative sentiment is recorded as neutral, not negative.**
+   A furious post naming nobody lands on `tidak_jelas` with neutral sentiment, so
+   it cannot pad the negative-attribution denominator with sentiment that has no
+   target.
+
+3. **`drivers` is its own page-permission entry**, rather than reusing
+   `taxonomy`. It is an operational tool page, so it stays denied by default
+   (FR-1A.1) and a tenant admin grants it — the same posture as `taxonomy`.
+
+4. **Two scheduler jobs added** rather than folding the periodic work into
+   existing ones: `analyse_threads` (180 min) and `score_escalation` (60 min).
+   Escalation runs hourly because a tier change is only useful while acting is
+   still cheap.
+
+Quote posts are modelled (`Mention.CONTENT_QUOTE`, treated as reactive content
+for stance and toxicity), but their *collection* remains deferred per §5.2 — the
+comment actors still run with replies disabled.
+
+## 12. Deferred, deliberately
 
 - Attribution and driver sections in Laporan / PDF export.
 - Reply-depth and quote-post collection (crawler work, §5.2).
