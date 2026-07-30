@@ -228,6 +228,22 @@ class AssessmentTest(EscalationTestBase):
                 self.incident.events.filter(description__contains="Skor eskalasi").exists()
             )
 
+    def test_assessment_history_stays_bounded(self):
+        """Scoring runs hourly per open incident, so unpruned history would grow
+        by ~720 rows per incident per month for no analytical gain."""
+        self.mention()
+        for _ in range(escalation.MAX_HISTORY + 5):
+            escalation.assess_incident(self.incident)
+        self.assertEqual(self.incident.escalations.count(), escalation.MAX_HISTORY)
+
+    def test_pruning_keeps_the_newest_assessment(self):
+        self.mention()
+        for _ in range(escalation.MAX_HISTORY + 3):
+            escalation.assess_incident(self.incident)
+        latest = escalation.latest_for(self.incident)
+        newest_id = self.incident.escalations.order_by("-computed_at", "-id").first().id
+        self.assertEqual(latest.id, newest_id)
+
     def test_assess_project_skips_closed_incidents(self):
         self.mention()
         self.incident.status = Incident.STATUS_CLOSED

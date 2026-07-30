@@ -558,8 +558,25 @@ def assess_incident(incident, window_days=DEFAULT_WINDOW_DAYS, weights=None):
         window_end=until,
         model="escalation-v1",
     )
+    _prune_history(incident)
     _apply_to_incident(incident, assessment)
     return assessment
+
+
+# Scoring runs hourly per open incident, so keeping every run would add ~720 rows
+# per incident per month for no analytical gain. This is enough history to show a
+# trend and to audit a recent tier change, and the tier changes themselves are
+# recorded permanently on the incident timeline.
+MAX_HISTORY = 48
+
+
+def _prune_history(incident):
+    stale = list(
+        incident.escalations.order_by("-computed_at", "-id")
+        .values_list("id", flat=True)[MAX_HISTORY:]
+    )
+    if stale:
+        EscalationAssessment.objects.filter(id__in=stale).delete()
 
 
 def _apply_to_incident(incident, assessment):
