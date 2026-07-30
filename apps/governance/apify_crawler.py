@@ -13,6 +13,7 @@ import hashlib
 import http.client
 import json
 import math
+import re
 import urllib.error
 import urllib.request
 from collections import Counter
@@ -57,6 +58,11 @@ APIFY_RUN_URL = "https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-i
 RUN_TIMEOUT_SECONDS = 300
 MAX_TOTAL_CHARGE_USD = 2
 
+# Apify addresses an Actor in a URL as `username~actor-name`; the console shows the
+# same pair as `username/actor-name`, which is not a valid API path (an extra path
+# segment makes the endpoint itself disappear: HTTP 404 `page-not-found`).
+ACTOR_REFERENCE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*~[A-Za-z0-9][A-Za-z0-9_.-]*")
+
 
 class ApifyCollectionError(RuntimeError):
     """Raised when an Apify actor run cannot return a trustworthy dataset."""
@@ -68,6 +74,32 @@ def supported_platforms():
 
 def default_max_results(platform):
     return ACTOR_CONFIG[platform]["default_max"]
+
+
+def normalize_actor_id(actor_id):
+    """Return `username~actor-name` for a usable Actor reference, else "".
+
+    The console's `username/actor-name` form is accepted and converted. Anything
+    without the owner half — an opaque object ID like `culc72xb7MP3EbaeX`, a bare
+    name, or a human note left in the column — is rejected: Apify resolves those
+    by ID, so they silently stop existing when an Actor is renamed or removed and
+    every run then fails with HTTP 404 `record-not-found` / "Actor was not found".
+    A pinned public reference stays addressable across those changes.
+    """
+    candidate = (actor_id or "").strip().replace("/", "~")
+    return candidate if ACTOR_REFERENCE_RE.fullmatch(candidate) else ""
+
+
+def resolve_actor_id(platform, actor_id=None):
+    """Prefer a usable per-project override, else the platform's pinned default.
+
+    `PlatformIntegration.actor_id` overrides the default so a tenant can point at
+    their own Actor, but a row seeded by an older release holds an object ID that
+    no longer resolves. Falling back here keeps collection working on databases
+    that predate the pinned references (the stored rows are repaired by migration
+    `0012_repair_apify_actor_references`).
+    """
+    return normalize_actor_id(actor_id) or ACTOR_CONFIG[platform]["actor_id"]
 
 
 def _first(item, *keys, default=None):
@@ -455,7 +487,6 @@ def collect(
     if start_date and end_date and start_date > end_date:
         raise ValueError("Tanggal awal koleksi historis melewati tanggal akhir.")
 
-    cfg = ACTOR_CONFIG[platform]
     run_input = build_actor_input(
         platform,
         keywords,
@@ -464,7 +495,7 @@ def collect(
         end_date=end_date,
     )
     items = _run_and_fetch_items(
-        actor_id or cfg["actor_id"],
+        resolve_actor_id(platform, actor_id),
         run_input,
         token,
         max_items=max_results,

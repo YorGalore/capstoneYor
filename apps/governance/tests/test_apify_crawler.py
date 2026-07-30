@@ -169,6 +169,53 @@ class CollectTest(TestCase):
         self.assertEqual([row["url"] for row in results], ["https://x.com/u/in"])
 
 
+class ActorReferenceTest(TestCase):
+    def test_console_path_is_normalized_to_the_api_reference_form(self):
+        self.assertEqual(
+            ac.normalize_actor_id("apify/instagram-scraper"), "apify~instagram-scraper"
+        )
+        self.assertEqual(
+            ac.normalize_actor_id("  apify~instagram-scraper  "),
+            "apify~instagram-scraper",
+        )
+
+    def test_separatorless_identifiers_are_rejected(self):
+        # Opaque object IDs are what Apify answers `record-not-found` /
+        # "Actor was not found" for once the actor is renamed or deleted.
+        for value in ["culc72xb7MP3EbaeX", "instagram-scraper", "", None,
+                      "scraper internal v2.4.1"]:
+            self.assertEqual(ac.normalize_actor_id(value), "", value)
+
+    def test_resolve_prefers_a_valid_override_over_the_pinned_default(self):
+        self.assertEqual(
+            ac.resolve_actor_id("instagram", "myteam/custom-scraper"),
+            "myteam~custom-scraper",
+        )
+
+    def test_resolve_falls_back_to_the_pinned_default_for_unusable_overrides(self):
+        for value in ["culc72xb7MP3EbaeX", "apify/instagram-scraper/extra", "", None]:
+            self.assertEqual(
+                ac.resolve_actor_id("instagram", value),
+                ac.ACTOR_CONFIG["instagram"]["actor_id"],
+                value,
+            )
+
+    def test_every_pinned_default_is_a_valid_reference(self):
+        for platform, cfg in ac.ACTOR_CONFIG.items():
+            self.assertEqual(
+                ac.normalize_actor_id(cfg["actor_id"]), cfg["actor_id"], platform
+            )
+
+    def test_collect_never_calls_a_separatorless_actor_reference(self):
+        with mock.patch.object(ac, "_run_and_fetch_items", return_value=[]) as runner:
+            ac.collect(
+                "instagram", ["pangan"], token="tok", actor_id="culc72xb7MP3EbaeX"
+            )
+        self.assertEqual(
+            runner.call_args.args[0], ac.ACTOR_CONFIG["instagram"]["actor_id"]
+        )
+
+
 class ApifyNetworkBoundaryTest(TestCase):
     def test_transport_failure_raises_typed_collection_error(self):
         with mock.patch.object(
