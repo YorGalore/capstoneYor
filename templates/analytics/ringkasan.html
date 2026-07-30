@@ -106,7 +106,113 @@
       <div class="pantau-bg-{{ item.key }}" style="width: {{ item.pct }}%"></div>
     {% endfor %}
   </div>
+  {% if attribution.total %}
+    <p class="pantau-attribution-lead">
+      Dari seluruh sentimen negatif, hanya
+      {% include "analytics/_metric.html" with metric=attribution.own_government %}
+      yang benar-benar ditujukan kepada pemerintah daerah ini.
+    </p>
+  {% endif %}
 </div>
+
+{% if attribution.total %}
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Sasaran Kritik</div>
+    <span class="pantau-muted">
+      {{ attribution.total }} baris atribusi — satu sebutan dapat menyasar lebih dari satu pihak
+    </span>
+  </div>
+  <div class="pantau-attribution-tree">
+    {% for level in attribution.levels %}
+      <div class="pantau-attribution-level">
+        <div class="pantau-attribution-row">
+          <span class="pantau-attribution-name">{{ level.label }}</span>
+          <div class="pantau-progress"><div class="pantau-progress-fill" style="width: {{ level.metric.value }}%"></div></div>
+          <span class="pantau-attribution-share">
+            {% include "analytics/_metric.html" with metric=level.metric %}
+          </span>
+        </div>
+        {% for entity in level.entities %}
+          {% if level.entities|length > 1 %}
+            <div class="pantau-attribution-row pantau-attribution-child">
+              <span class="pantau-attribution-name">{{ entity.name }}</span>
+              <span class="pantau-attribution-share">
+                {% include "analytics/_metric.html" with metric=entity.metric %}
+              </span>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if drivers.drivers %}
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Mengapa Negatif</div>
+    <span class="pantau-muted">
+      {{ drivers.labelled }} dari {{ drivers.total_negative }} sebutan negatif berlabel alasan
+      ({{ drivers.coverage_pct }}%)
+      {% if drivers.pending_candidates %}
+        · <a class="mono-link" href="{% url 'analytics:driver_review' %}">{{ drivers.pending_candidates }} usulan alasan baru →</a>
+      {% endif %}
+    </span>
+  </div>
+  {% for driver in drivers.drivers %}
+  <div class="pantau-issue-row">
+    <div class="pantau-issue-main">
+      <span class="pantau-issue-name">{{ driver.name }}</span>
+      <div class="pantau-progress">
+        <div class="pantau-progress-fill" style="width: {{ driver.metric.value }}%; background: {{ driver.color }}"></div>
+      </div>
+    </div>
+    <div class="pantau-issue-meta">
+      {% include "analytics/_metric.html" with metric=driver.metric %}
+    </div>
+  </div>
+  {% endfor %}
+  {% if drivers.coverage_pct < 60 %}
+  <p class="pantau-muted">
+    Cakupan label {{ drivers.coverage_pct }}%: persentase menggambarkan keluhan yang
+    sudah berlabel, bukan seluruh keluhan negatif.
+  </p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if threads.threads %}
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Diskusi yang Berbalik</div>
+    <span class="pantau-muted">
+      {{ threads.diverging_count }} dari {{ threads.thread_count }} diskusi jauh lebih negatif
+      daripada posting induknya
+    </span>
+  </div>
+  {% for thread in threads.threads %}
+  <div class="thread-row">
+    <div class="thread-main">
+      <span class="thread-snippet">{{ thread.root.content_snippet|truncatechars:110 }}</span>
+      <span class="pantau-muted">
+        {{ thread.root.platform.display_name }} · {{ thread.insight.comment_count }} komentar ·
+        {{ thread.insight.toxicity_pct }}% toksik · {{ thread.insight.disagreement_pct }}% menolak
+      </span>
+    </div>
+    <div class="thread-metrics">
+      <span title="Selisih negativitas komentar terhadap posting">
+        Divergensi {% include "analytics/_metric.html" with metric=thread.divergence %}
+      </span>
+      <span title="Pergeseran opini antara paruh awal dan akhir diskusi">
+        Pergeseran {% include "analytics/_metric.html" with metric=thread.shift %}
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 
 <div class="pantau-grid-2">
   <div class="pantau-card">

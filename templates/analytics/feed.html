@@ -100,6 +100,13 @@
       </div>
     </div>
 
+    {% if evidence_ref %}
+    <div class="feed-evidence-notice">
+      <span>Menampilkan sebutan pendukung di balik satu angka KPI.</span>
+      <a href="{% url 'analytics:feed' %}">Tampilkan semua sebutan</a>
+    </div>
+    {% endif %}
+
     <div class="feed-stream">
       {% for m in page_obj %}
       <article class="feed-item sentiment-{{ m.sentiment }}">
@@ -181,6 +188,41 @@
           </form>
           {% endif %}
           {% endfor %}
+
+          <div class="feed-review-head feed-attribution-head">
+            <span>Sasaran kritik</span>
+          </div>
+          {% for attribution in m.attributions.all %}
+          <div class="feed-attribution" title="{{ attribution.rationale }}">
+            <span class="feed-attribution-name">{{ attribution.target.name }}</span>
+            <span class="pantau-dot-{{ attribution.sentiment }}">{{ attribution.get_sentiment_display }}</span>
+            <span class="feed-model">{{ attribution.get_source_display }} · {{ attribution.confidence }}</span>
+            {% if attribution.evidence_span %}
+            <blockquote class="feed-attribution-span">“{{ attribution.evidence_span|truncatechars:120 }}”</blockquote>
+            {% endif %}
+          </div>
+          {% empty %}
+          <div class="feed-readonly">Belum dianalisis sasarannya.</div>
+          {% endfor %}
+          {% if analyst_profile.role != "viewer" %}
+          <form method="post" action="{% url 'analytics:correct_attribution' m.pk %}" class="feed-correction-form">
+            {% csrf_token %}
+            <input type="hidden" name="next_query" value="{{ filter_query }}">
+            <label class="sr-only" for="attr-target-{{ m.pk }}">Sasaran kritik untuk {{ m.author_handle }}</label>
+            <select class="pantau-input" id="attr-target-{{ m.pk }}" name="target">
+              {% for target in attribution_targets %}
+              <option value="{{ target.pk }}">{{ target.name }}</option>
+              {% endfor %}
+            </select>
+            <label class="sr-only" for="attr-sentiment-{{ m.pk }}">Sentimen terhadap sasaran</label>
+            <select class="pantau-input" id="attr-sentiment-{{ m.pk }}" name="sentiment">
+              {% for key, label in sentiment_choices %}
+              <option value="{{ key }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">Simpan sasaran</button>
+          </form>
+          {% endif %}
         </aside>
       </article>
       {% empty %}

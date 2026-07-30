@@ -132,6 +132,36 @@ def _run_send_brief(project):
     return f"Brief {brief_date}: {delivery.get_status_display().lower()} — {delivery.detail}"
 
 
+def _run_analyse_threads(project):
+    """Recompute thread-level comment intelligence.
+
+    Scheduled rather than done per comment: divergence and opinion shift are
+    properties of a whole conversation, and a conversation is not finished when
+    its first reply lands.
+    """
+    from apps.analytics import comment_intel
+
+    scored = comment_intel.backfill(project)
+    threads = comment_intel.recompute_threads(project)
+    return f"{scored} komentar dinilai, {threads} diskusi dianalisis"
+
+
+def _run_score_escalation(project):
+    from apps.analytics import escalation
+
+    assessments = escalation.assess_project(project)
+    tiers = {}
+    for assessment in assessments:
+        tiers[assessment.tier] = tiers.get(assessment.tier, 0) + 1
+    if not assessments:
+        return "Tidak ada insiden terbuka untuk dinilai"
+    summary = ", ".join(
+        f"{count} {dict(assessment.TIER_CHOICES)[tier].lower()}"
+        for tier, count in sorted(tiers.items())
+    )
+    return f"{len(assessments)} insiden dinilai — {summary}"
+
+
 HANDLERS = {
     ScheduledJob.JOB_COLLECT: _run_collect,
     ScheduledJob.JOB_EVALUATE_ALERTS: _run_evaluate_alerts,
@@ -140,6 +170,8 @@ HANDLERS = {
     ScheduledJob.JOB_PURGE_RETENTION: _run_purge_retention,
     ScheduledJob.JOB_ENRICH_AUTHORS: _run_enrich_authors,
     ScheduledJob.JOB_SEND_BRIEF: _run_send_brief,
+    ScheduledJob.JOB_ANALYSE_THREADS: _run_analyse_threads,
+    ScheduledJob.JOB_SCORE_ESCALATION: _run_score_escalation,
 }
 
 # Jobs the kill switch stops. Halting collection must not also blind the analysts:

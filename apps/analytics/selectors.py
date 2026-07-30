@@ -7,9 +7,11 @@ from django.utils import timezone
 
 from apps.core.models import Platform, Province
 
+from .metrics import EvidenceRef, Metric, confidence_stats, own_government_q
 from .models import (
-    ActorSentimentAssessment, Alert, Author, Camp, DailyBrief, GovernmentProgram,
-    Issue, Mention, PoliticalActor,
+    ActorSentimentAssessment, Alert, Author, Camp, DailyBrief, DriverCandidate,
+    GovernmentProgram, Issue, Mention, MentionAttribution, MentionDriver,
+    PoliticalActor, ThreadInsight,
 )
 
 SENTIMENT_LABELS = OrderedDict([
@@ -232,6 +234,274 @@ def _ringkasan_insight(*, timeline, total_mentions, positive_pct, negative_pct,
         "headline": headline,
         "detail": ", ".join(detail_parts).capitalize() + ".",
         "volume_change_pct": volume_change_pct,
+    }
+
+
+def attribution_summary(project, days=30, sentiment=Mention.SENTIMENT_NEGATIVE):
+    """Who the sentiment in a window is actually directed at.
+
+    Answers the question a bare "60% negatif" cannot: how much of that negativity
+    is about *us*. Computed over attribution rows rather than mentions, because a
+    post blaming both the central and the regency government genuinely belongs to
+    both — so the shares here and the mention counts elsewhere use different
+    denominators, and every returned Metric says so in its ``method``.
+    """
+    since = timezone.now() - timezone.timedelta(days=days)
+    rows = MentionAttribution.objects.filter(
+        mention__project=project,
+        mention__posted_at__gte=since,
+        mention__is_political=False,
+        sentiment=sentiment,
+    ).select_related("target", "target__parent")
+
+    total = rows.count()
+    if not total:
+        return {
+            "total": 0,
+            "levels": [],
+            "own_government": Metric(
+                value=0, unit="percent",
+                label="ditujukan ke pemerintah daerah ini",
+                method="tidak ada atribusi pada periode ini",
+                evidence=EvidenceRef("attribution", {"own_government": "1", "sentiment": sentiment}),
+            ),
+            "sentiment": sentiment,
+        }
+
+    # Roll every attribution up to its display level: an entity target reports
+    # under its own level, and the tenant's OPD children also aggregate into the
+    # "is this us?" number via own_government_q.
+    by_level = OrderedDict()
+    for row in rows:
+        target = row.target
+        bucket = by_level.setdefault(
+            target.level,
+            {
+                "level": target.level,
+                "label": target.get_level_display(),
+                "rank": target.level_rank,
+                "count": 0,
+                "confidences": [],
+                "entities": {},
+            },
+        )
+        bucket["count"] += 1
+        bucket["confidences"].append(row.confidence)
+        entity = bucket["entities"].setdefault(
+            target.id,
+            {"id": target.id, "name": target.name, "count": 0, "confidences": []},
+        )
+        entity["count"] += 1
+        entity["confidences"].append(row.confidence)
+
+    levels = []
+    for bucket in sorted(by_level.values(), key=lambda b: b["rank"]):
+        confidence, low_pct = confidence_stats(bucket["confidences"])
+        entities = []
+        for entity in sorted(bucket["entities"].values(), key=lambda e: -e["count"]):
+            e_conf, e_low = confidence_stats(entity["confidences"])
+            entities.append({
+                "name": entity["name"],
+                "metric": Metric(
+                    value=round((entity["count"] / bucket["count"]) * 100),
+                    unit="percent",
+                    label=f"{entity['name']} (dari {bucket['label'].lower()})",
+                    method=(
+                        f"atribusi {SENTIMENT_LABELS[sentiment].lower()} ke "
+                        f"{entity['name']} ÷ atribusi {SENTIMENT_LABELS[sentiment].lower()} "
+                        f"ke {bucket['label'].lower()}"
+                    ),
+                    evidence=EvidenceRef(
+                        "attribution", {"target": entity["id"], "sentiment": sentiment}
+                    ),
+                    contributing=entity["count"],
+                    confidence=e_conf,
+                    low_confidence_pct=e_low,
+                ),
+            })
+        levels.append({
+            "level": bucket["level"],
+            "label": bucket["label"],
+            "metric": Metric(
+                value=round((bucket["count"] / total) * 100),
+                unit="percent",
+                label=bucket["label"],
+                method=(
+                    f"atribusi {SENTIMENT_LABELS[sentiment].lower()} ke "
+                    f"{bucket['label'].lower()} ÷ seluruh atribusi "
+                    f"{SENTIMENT_LABELS[sentiment].lower()} ({total} baris atribusi, "
+                    "satu sebutan dapat menyasar lebih dari satu pihak)"
+                ),
+                evidence=EvidenceRef(
+                    "attribution", {"level": bucket["level"], "sentiment": sentiment}
+                ),
+                contributing=bucket["count"],
+                confidence=confidence,
+                low_confidence_pct=low_pct,
+            ),
+            "entities": entities,
+        })
+
+    own_rows = rows.filter(own_government_q(prefix="")).distinct()
+    own_count = own_rows.count()
+    own_conf, own_low = confidence_stats(
+        list(own_rows.values_list("confidence", flat=True))
+    )
+    own_metric = Metric(
+        value=round((own_count / total) * 100),
+        unit="percent",
+        label="ditujukan ke pemerintah daerah ini",
+        method=(
+            f"atribusi {SENTIMENT_LABELS[sentiment].lower()} ke pemerintah daerah ini "
+            f"dan instansi di bawahnya ÷ seluruh atribusi "
+            f"{SENTIMENT_LABELS[sentiment].lower()} ({total} baris atribusi)"
+        ),
+        evidence=EvidenceRef(
+            "attribution", {"own_government": "1", "sentiment": sentiment}
+        ),
+        contributing=own_count,
+        confidence=own_conf,
+        low_confidence_pct=own_low,
+    )
+
+    return {
+        "total": total,
+        "levels": levels,
+        "own_government": own_metric,
+        "sentiment": sentiment,
+    }
+
+
+def driver_summary(project, days=30, limit=8):
+    """Why the negative sentiment exists, ranked, each drillable to its evidence.
+
+    Shares are over *labelled negative mentions*, not all mentions: the question
+    is "of the complaints we have, what are they about", and mixing in unlabelled
+    or non-negative content would answer a different one.
+    """
+    since = timezone.now() - timezone.timedelta(days=days)
+    negative = Mention.objects.filter(
+        project=project, posted_at__gte=since, is_political=False,
+        sentiment=Mention.SENTIMENT_NEGATIVE,
+    )
+    total_negative = negative.count()
+    labelled = negative.filter(drivers__isnull=False).distinct().count()
+
+    rows = (
+        MentionDriver.objects.filter(
+            mention__project=project,
+            mention__posted_at__gte=since,
+            mention__is_political=False,
+        )
+        .values("driver_id", "driver__name", "driver__color")
+        .annotate(n=Count("mention_id", distinct=True), avg=Avg("confidence"))
+        .order_by("-n")[:limit]
+    )
+
+    drivers_out = []
+    for row in rows:
+        confidences = list(
+            MentionDriver.objects.filter(
+                driver_id=row["driver_id"],
+                mention__project=project,
+                mention__posted_at__gte=since,
+            ).values_list("confidence", flat=True)
+        )
+        confidence, low_pct = confidence_stats(confidences)
+        drivers_out.append({
+            "name": row["driver__name"],
+            "color": row["driver__color"],
+            "metric": Metric(
+                value=round((row["n"] / labelled) * 100) if labelled else 0,
+                unit="percent",
+                label=f"keluhan tentang {row['driver__name'].lower()}",
+                method=(
+                    f"sebutan negatif berlabel \"{row['driver__name']}\" ÷ seluruh "
+                    f"sebutan negatif yang sudah berlabel alasan ({labelled} sebutan)"
+                ),
+                evidence=EvidenceRef("driver", {"driver": row["driver_id"]}),
+                contributing=row["n"],
+                confidence=confidence,
+                low_confidence_pct=low_pct,
+            ),
+        })
+
+    coverage = round((labelled / total_negative) * 100) if total_negative else 0
+    return {
+        "drivers": drivers_out,
+        "total_negative": total_negative,
+        "labelled": labelled,
+        # Stated plainly rather than hidden: a reason breakdown covering 40% of
+        # complaints is a different claim from one covering 95%.
+        "coverage_pct": coverage,
+        "pending_candidates": DriverCandidate.objects.filter(
+            project=project, promoted_to__isnull=True, dismissed=False,
+        ).count(),
+    }
+
+
+def thread_summary(project, days=30, limit=6):
+    """Threads where the comment section diverges most from the post.
+
+    Sorted by divergence rather than volume: a busy thread that agrees with its
+    post needs no attention, and a quiet one that has turned does.
+    """
+    since = timezone.now() - timezone.timedelta(days=days)
+    insights = list(
+        ThreadInsight.objects.filter(
+            root_mention__project=project, root_mention__posted_at__gte=since
+        )
+        .select_related("root_mention", "root_mention__platform")
+        .order_by("-divergence_pp")[:limit]
+    )
+
+    threads = []
+    for insight in insights:
+        threads.append({
+            "insight": insight,
+            "root": insight.root_mention,
+            "divergence": Metric(
+                value=insight.divergence_pp,
+                unit="points",
+                label="selisih negativitas komentar terhadap posting",
+                method=(
+                    f"negativitas komentar ({insight.comment_negative_pct}%) − "
+                    f"negativitas posting induk, dari {insight.comment_count} komentar"
+                ),
+                evidence=EvidenceRef("thread", {"root": insight.root_mention_id}),
+                contributing=insight.comment_count,
+                # Divergence is counted from stored sentiment labels rather than
+                # inferred fresh, so its reliability is the comment coverage of
+                # the intelligence stage, not a model score.
+                confidence=(
+                    round(insight.analysed_comment_count / insight.comment_count, 3)
+                    if insight.comment_count else 0.0
+                ),
+            ),
+            "shift": Metric(
+                value=insight.opinion_shift_pp,
+                unit="points",
+                label="pergeseran opini dalam diskusi",
+                method=(
+                    "negativitas paruh akhir − paruh awal komentar, "
+                    "diurutkan berdasarkan waktu"
+                ),
+                evidence=EvidenceRef("thread", {"root": insight.root_mention_id}),
+                contributing=insight.comment_count,
+                confidence=(
+                    round(insight.analysed_comment_count / insight.comment_count, 3)
+                    if insight.comment_count else 0.0
+                ),
+            ),
+        })
+
+    analysed = ThreadInsight.objects.filter(
+        root_mention__project=project, root_mention__posted_at__gte=since
+    )
+    return {
+        "threads": threads,
+        "thread_count": analysed.count(),
+        "diverging_count": analysed.filter(divergence_pp__gte=25).count(),
     }
 
 
@@ -1428,8 +1698,9 @@ def incident_board(request, window="7", opd_slug="", severity=""):
     if severity:
         queryset = queryset.filter(severity=severity)
 
-    confirmed = list(queryset.filter(is_confirmed=True))
-    candidates = list(queryset.filter(is_confirmed=False))
+    queryset = queryset.prefetch_related("escalations")
+    confirmed = _attach_escalation(list(queryset.filter(is_confirmed=True)))
+    candidates = _attach_escalation(list(queryset.filter(is_confirmed=False)))
 
     return {
         "confirmed": confirmed,
@@ -1463,3 +1734,88 @@ def incident_detail(request, incident_id):
         .filter(pk=incident_id)
         .first()
     )
+
+
+def _attach_escalation(incidents):
+    """Attach each incident's newest escalation assessment for template use.
+
+    Sorting the board by escalation score is done in Python rather than SQL: the
+    board is at most a few dozen rows, and a window function over the assessment
+    table would obscure the far more important property that an incident *without*
+    an assessment still has to appear, ranked by its existing severity.
+    """
+    for incident in incidents:
+        assessments = list(incident.escalations.all())
+        incident.escalation = (
+            max(assessments, key=lambda a: a.computed_at) if assessments else None
+        )
+    incidents.sort(
+        key=lambda i: (
+            -(i.escalation.score if i.escalation else -1),
+            i.severity_rank,
+            -i.mention_count,
+        )
+    )
+    return incidents
+
+
+def incident_attribution(incident):
+    """Who the mentions behind one incident are actually blaming.
+
+    Turns attribution into routing: the dominant OPD-level target becomes the
+    suggested assignment, so the board proposes the dinas the public is naming
+    rather than leaving an operator to infer it from the incident title.
+    """
+    rows = (
+        MentionAttribution.objects.filter(
+            mention__incidents=incident, sentiment=Mention.SENTIMENT_NEGATIVE
+        )
+        .select_related("target", "target__opd", "target__parent")
+    )
+    total = rows.count()
+    if not total:
+        return {"total": 0, "targets": [], "suggested_opd": None}
+
+    tally = {}
+    for row in rows:
+        entry = tally.setdefault(
+            row.target.id,
+            {"target": row.target, "count": 0, "confidences": []},
+        )
+        entry["count"] += 1
+        entry["confidences"].append(row.confidence)
+
+    targets = []
+    for entry in sorted(tally.values(), key=lambda e: -e["count"]):
+        target = entry["target"]
+        confidence, low_pct = confidence_stats(entry["confidences"])
+        targets.append({
+            "name": target.name,
+            "is_own_government": target.counts_as_own_government,
+            "metric": Metric(
+                value=round((entry["count"] / total) * 100),
+                unit="percent",
+                label=f"kritik negatif ke {target.name}",
+                method=(
+                    f"atribusi negatif ke {target.name} ÷ seluruh atribusi negatif "
+                    f"pada sebutan insiden ini ({total} baris)"
+                ),
+                evidence=EvidenceRef(
+                    "attribution",
+                    {"target": target.id, "sentiment": Mention.SENTIMENT_NEGATIVE},
+                ),
+                contributing=entry["count"],
+                confidence=confidence,
+                low_confidence_pct=low_pct,
+            ),
+        })
+
+    suggested = next(
+        (
+            entry["target"].opd
+            for entry in sorted(tally.values(), key=lambda e: -e["count"])
+            if entry["target"].opd is not None
+        ),
+        None,
+    )
+    return {"total": total, "targets": targets, "suggested_opd": suggested}

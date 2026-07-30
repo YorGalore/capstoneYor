@@ -14,6 +14,12 @@
   </div>
   <h1 class="incident-detail-title">{{ incident.title }}</h1>
   <div class="incident-detail-stats">
+    {% if escalation %}
+    <div class="incident-stat escalation-stat tier-{{ escalation.tier }}">
+      <span class="incident-stat-value">{{ escalation.score }}</span>
+      <span class="incident-stat-label">Skor Eskalasi · {{ escalation.get_tier_display }}</span>
+    </div>
+    {% endif %}
     <div class="incident-stat">
       <span class="incident-stat-value">{{ incident.mention_count }}</span>
       <span class="incident-stat-label">Sebutan</span>
@@ -140,14 +146,104 @@
 
     <div class="incident-action-group">
       <span class="incident-action-label">Tugaskan ke OPD</span>
+      {% if attribution.suggested_opd %}
+      <p class="incident-attribution-hint">
+        Warga paling banyak menyebut <strong>{{ attribution.suggested_opd.name }}</strong> pada insiden ini.
+        Penugasan tetap keputusan pejabat berwenang.
+      </p>
+      {% endif %}
       <form method="post" action="{% url 'analytics:insiden_assign' incident.pk %}" class="incident-action-row">
         {% csrf_token %}
         <select name="opd">
-          {% for opd in opds %}<option value="{{ opd.pk }}" {% if incident.assigned_opd_id == opd.pk %}selected{% endif %}>{{ opd.name }}</option>{% endfor %}
+          {% for opd in opds %}<option value="{{ opd.pk }}" {% if incident.assigned_opd_id == opd.pk %}selected{% elif not incident.assigned_opd_id and attribution.suggested_opd.pk == opd.pk %}selected{% endif %}>{{ opd.name }}</option>{% endfor %}
         </select>
         <button type="submit" class="pantau-btn-outline">Tugaskan</button>
       </form>
     </div>
+
+    <div class="incident-action-group">
+      <span class="incident-action-label">Potensi eskalasi</span>
+      {% if escalation %}
+      <div class="escalation-panel tier-{{ escalation.tier }}">
+        <div class="escalation-head">
+          <span class="escalation-score">{{ escalation.score }}<span>/100</span></span>
+          <span class="escalation-tier">{{ escalation.get_tier_display }}</span>
+          <span class="pantau-muted">
+            keyakinan {{ escalation.confidence }} ·
+            {{ escalation.available_signal_count }}/{{ escalation.signals|length }} sinyal berdata
+          </span>
+        </div>
+
+        {% if escalation.unavailable_signals %}
+        <p class="escalation-missing">
+          Tidak dihitung karena tidak ada data:
+          {{ escalation.unavailable_signals|join:", " }}.
+          Skor dinormalisasi terhadap sinyal yang tersedia, sehingga ketiadaan data
+          menurunkan keyakinan — bukan menurunkan skor.
+        </p>
+        {% endif %}
+
+        <table class="escalation-signals">
+          <thead><tr><th>Sinyal</th><th>Ukuran</th><th>Kontribusi</th><th>Bukti</th></tr></thead>
+          <tbody>
+            {% for signal in escalation.signals %}
+            <tr{% if not signal.available %} class="is-unavailable"{% endif %}>
+              <td>{{ signal.label }}</td>
+              <td class="mono">{% if signal.available %}{{ signal.raw }}{% else %}—{% endif %}</td>
+              <td class="mono">{% if signal.available %}{{ signal.contribution }}{% else %}tidak ada data{% endif %}</td>
+              <td>
+                {% if signal.evidence_kind %}
+                <a class="mono-link" href="{% url 'analytics:feed' %}?bukti={{ signal.evidence_kind }}">Lihat →</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% if signal.note %}
+            <tr class="escalation-note"><td colspan="4">{{ signal.note }}</td></tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <details class="escalation-narrative">
+          <summary>Mengapa skor ini, dampak bila diabaikan, dan rekomendasi</summary>
+          <div class="escalation-narrative-body">
+            <h4>Mengapa</h4>
+            <div>{{ escalation.why|linebreaks }}</div>
+            <h4>Dampak bila diabaikan</h4>
+            <div>{{ escalation.impact_if_ignored|linebreaks }}</div>
+            <h4>Rekomendasi tindakan</h4>
+            <div>{{ escalation.recommended_response|linebreaks }}</div>
+          </div>
+        </details>
+        <span class="pantau-muted">Dihitung {{ escalation.computed_at|date:"d M Y H:i" }}</span>
+      </div>
+      {% else %}
+      <p class="incident-attribution-hint">Belum ada penilaian eskalasi untuk insiden ini.</p>
+      {% endif %}
+      {% if analyst_profile.role != "viewer" %}
+      <form method="post" action="{% url 'analytics:insiden_escalation' incident.pk %}" class="incident-action-row">
+        {% csrf_token %}
+        <button type="submit" class="pantau-btn-outline">Hitung ulang skor</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if attribution.total %}
+    <div class="incident-action-group">
+      <span class="incident-action-label">Sasaran kritik</span>
+      <p class="incident-attribution-hint">
+        {{ attribution.total }} baris atribusi negatif pada sebutan insiden ini.
+      </p>
+      <ul class="incident-attribution-list">
+        {% for target in attribution.targets %}
+        <li{% if target.is_own_government %} class="is-own"{% endif %}>
+          <span>{{ target.name }}</span>
+          {% include "analytics/_metric.html" with metric=target.metric %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
 
     <div class="incident-action-group">
       <span class="incident-action-label">Ubah status</span>

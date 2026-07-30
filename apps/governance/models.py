@@ -289,6 +289,8 @@ class ScheduledJob(models.Model):
     JOB_PURGE_RETENTION = "purge_retention"
     JOB_ENRICH_AUTHORS = "enrich_authors"
     JOB_SEND_BRIEF = "send_brief"
+    JOB_ANALYSE_THREADS = "analyse_threads"
+    JOB_SCORE_ESCALATION = "score_escalation"
     JOB_CHOICES = [
         (JOB_COLLECT, "Koleksi data"),
         (JOB_EVALUATE_ALERTS, "Evaluasi peringatan"),
@@ -297,6 +299,8 @@ class ScheduledJob(models.Model):
         (JOB_PURGE_RETENTION, "Purge retensi"),
         (JOB_ENRICH_AUTHORS, "Normalisasi penulis"),
         (JOB_SEND_BRIEF, "Distribusi brief final"),
+        (JOB_ANALYSE_THREADS, "Analisis diskusi komentar"),
+        (JOB_SCORE_ESCALATION, "Skor potensi eskalasi"),
     ]
 
     STATUS_OK = "ok"

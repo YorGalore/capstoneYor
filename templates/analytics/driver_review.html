@@ -1,0 +1,84 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}Alasan Keluhan{% endblock %}
+
+{% block content %}
+<div class="pantau-page-head">
+  <h1 class="pantau-page-title">Alasan Keluhan</h1>
+  <p class="pantau-page-sub">
+    Mengapa sentimen negatif muncul, dan usulan alasan baru yang menunggu keputusan Anda.
+    Model hanya mengusulkan; penambahan alasan adalah keputusan analis.
+  </p>
+</div>
+
+{% if summary %}
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Alasan dominan</div>
+    <span class="pantau-muted">
+      {{ summary.labelled }} dari {{ summary.total_negative }} sebutan negatif sudah berlabel
+      ({{ summary.coverage_pct }}%)
+    </span>
+  </div>
+  {% for driver in summary.drivers %}
+  <div class="pantau-issue-row">
+    <div class="pantau-issue-main">
+      <span class="pantau-issue-name">{{ driver.name }}</span>
+      <div class="pantau-progress">
+        <div class="pantau-progress-fill" style="width: {{ driver.metric.value }}%; background: {{ driver.color }}"></div>
+      </div>
+    </div>
+    <div class="pantau-issue-meta">
+      {% include "analytics/_metric.html" with metric=driver.metric %}
+    </div>
+  </div>
+  {% empty %}
+  <div class="pantau-empty">Belum ada sebutan negatif yang berlabel alasan.</div>
+  {% endfor %}
+  {% if summary.coverage_pct < 60 and summary.total_negative %}
+  <p class="pantau-muted">
+    Cakupan label masih {{ summary.coverage_pct }}%. Persentase di atas menggambarkan
+    keluhan yang sudah berlabel, bukan seluruh keluhan negatif.
+  </p>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="pantau-card">
+  <div class="pantau-card-header">
+    <div class="pantau-card-title">Usulan alasan baru</div>
+    <span class="pantau-muted">
+      Model hanya boleh mengusulkan. Alasan baru berlaku setelah Anda menyetujuinya.
+    </span>
+  </div>
+  {% for candidate in candidates %}
+  <div class="driver-candidate{% if candidate.count < review_threshold %} is-early{% endif %}">
+    <div class="driver-candidate-main">
+      <span class="driver-candidate-phrase">{{ candidate.phrase }}</span>
+      <span class="pantau-muted">
+        muncul {{ candidate.count }}× · pertama {{ candidate.first_seen_at|date:"d M Y" }}
+        {% if candidate.count < review_threshold %} · belum cukup berulang{% endif %}
+      </span>
+    </div>
+    {% if analyst_profile.role != "viewer" %}
+    <div class="driver-candidate-actions">
+      <form method="post" action="{% url 'analytics:driver_promote' candidate.pk %}">
+        {% csrf_token %}
+        <label class="sr-only" for="name-{{ candidate.pk }}">Nama alasan</label>
+        <input class="pantau-input" id="name-{{ candidate.pk }}" name="name"
+               value="{{ candidate.phrase }}" maxlength="150">
+        <button type="submit" class="pantau-btn-outline">Jadikan alasan</button>
+      </form>
+      <form method="post" action="{% url 'analytics:driver_dismiss' candidate.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="pantau-btn-quiet">Tolak</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% empty %}
+  <div class="pantau-empty">
+    Tidak ada usulan yang menunggu. Semua keluhan cocok dengan alasan yang sudah dikonfigurasi.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

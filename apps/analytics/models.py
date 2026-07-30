@@ -57,9 +57,32 @@ class Author(models.Model):
 class Mention(models.Model):
     CONTENT_POST = "post"
     CONTENT_COMMENT = "comment"
+    CONTENT_QUOTE = "quote"
     CONTENT_CHOICES = [
         (CONTENT_POST, "Posting/Artikel"),
         (CONTENT_COMMENT, "Komentar/Balasan"),
+        (CONTENT_QUOTE, "Kutipan/Quote post"),
+    ]
+    # Content that reacts to a parent, and so carries a stance toward it. A quote
+    # post is a comment that happens to live on its author's own timeline.
+    REACTIVE_CONTENT_TYPES = (CONTENT_COMMENT, CONTENT_QUOTE)
+
+    TOXICITY_CLEAN = "bersih"
+    TOXICITY_HARSH = "kasar"
+    TOXICITY_TOXIC = "toksik"
+    TOXICITY_CHOICES = [
+        (TOXICITY_CLEAN, "Bersih"),
+        (TOXICITY_HARSH, "Kasar"),
+        (TOXICITY_TOXIC, "Toksik"),
+    ]
+
+    STANCE_AGREE = "setuju"
+    STANCE_DISAGREE = "tidak_setuju"
+    STANCE_NEUTRAL = "netral"
+    STANCE_CHOICES = [
+        (STANCE_AGREE, "Setuju"),
+        (STANCE_DISAGREE, "Tidak setuju"),
+        (STANCE_NEUTRAL, "Netral"),
     ]
 
     SENTIMENT_POSITIVE = "positive"
@@ -131,6 +154,21 @@ class Mention(models.Model):
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="comments"
     )
     reported_comment_count = models.PositiveIntegerField(default=0)
+    # Attribution enrichment provenance. Nullable because attribution runs as its
+    # own stage after ingestion: a mention collected before the stage existed, or
+    # while the provider was down, is legitimately un-attributed until backfilled.
+    attributed_at = models.DateTimeField(null=True, blank=True)
+    attribution_model = models.CharField(max_length=50, blank=True)
+    # Comment intelligence. Null rather than 0.0 by default: "not analysed" and
+    # "analysed and found clean" are different facts, and averaging the former as
+    # zero would understate toxicity across a partially-enriched corpus.
+    toxicity_score = models.FloatField(null=True, blank=True)
+    toxicity_label = models.CharField(
+        max_length=10, choices=TOXICITY_CHOICES, blank=True
+    )
+    stance = models.CharField(max_length=15, choices=STANCE_CHOICES, blank=True)
+    stance_confidence = models.FloatField(default=0.0)
+    comment_intel_model = models.CharField(max_length=50, blank=True)
     political_actors = models.ManyToManyField(
         "PoliticalActor", blank=True, related_name="mentions"
     )
@@ -400,6 +438,275 @@ class ActorSentimentAssessment(models.Model):
 
     def __str__(self):
         return f"{self.mention_id} / {self.actor.name}: {self.sentiment}"
+
+
+class AttributionTarget(models.Model):
+    """Who criticism in a mention can be *directed at*, per project.
+
+    Distinct from PoliticalActor, which answers a different question — "which
+    tracked political actor appears in this text" — and lives behind the FR-29
+    neutrality/political-monitoring gate. Attributing a pothole complaint to Dinas
+    PUPR must not drag routine service monitoring into that regime, so the two
+    registries stay separate and coexist on the same mention.
+
+    The tree is deliberately capped at two levels (a catch-all level bucket, and
+    concrete entities beneath it). That keeps "is this aimed at us?" a single
+    parent hop rather than a recursive descent, and nothing downstream routes on
+    sub-sub-agency precision.
+    """
+
+    LEVEL_PUSAT = "pusat"
+    LEVEL_PROVINSI = "provinsi"
+    LEVEL_KABUPATEN = "kabupaten"
+    LEVEL_OPD = "opd"
+    LEVEL_PEJABAT = "pejabat"
+    LEVEL_NON_PEMERINTAH = "non_pemerintah"
+    LEVEL_TIDAK_JELAS = "tidak_jelas"
+    LEVEL_CHOICES = [
+        (LEVEL_PUSAT, "Pemerintah Pusat"),
+        (LEVEL_PROVINSI, "Pemerintah Provinsi"),
+        (LEVEL_KABUPATEN, "Pemerintah Kabupaten/Kota"),
+        (LEVEL_OPD, "Instansi/OPD"),
+        (LEVEL_PEJABAT, "Pejabat publik"),
+        (LEVEL_NON_PEMERINTAH, "Non-pemerintah"),
+        (LEVEL_TIDAK_JELAS, "Tidak jelas"),
+    ]
+
+    # Display order for the attribution tree. Alphabetical ordering would scatter
+    # the government levels; readers expect them ranked by tier of government.
+    LEVEL_ORDER = {
+        LEVEL_KABUPATEN: 0,
+        LEVEL_OPD: 1,
+        LEVEL_PEJABAT: 2,
+        LEVEL_PROVINSI: 3,
+        LEVEL_PUSAT: 4,
+        LEVEL_NON_PEMERINTAH: 5,
+        LEVEL_TIDAK_JELAS: 6,
+    }
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="attribution_targets"
+    )
+    name = models.CharField(max_length=200)
+    level = models.CharField(max_length=20, choices=LEVEL_CHOICES)
+    parent = models.ForeignKey(
+        "self", on_delete=models.CASCADE, null=True, blank=True, related_name="children"
+    )
+    # String reference: OPD is declared further down this module.
+    opd = models.ForeignKey(
+        "OPD", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="attribution_targets",
+    )
+    keywords = models.JSONField(default=list, blank=True)
+    handles = models.JSONField(default=list, blank=True)
+    # A level-level bucket. Always offered as a candidate even when no entity name
+    # matched, so implicit blame ("jalan ini udah 3 tahun dibiarin") can still be
+    # attributed at level granularity instead of collapsing into Unknown.
+    is_catch_all = models.BooleanField(default=False)
+    # Marks the tenant's own government — the numerator of "only X% of negative
+    # sentiment is actually directed at us".
+    is_own_government = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("project", "name")
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def level_rank(self):
+        return self.LEVEL_ORDER.get(self.level, 99)
+
+    @property
+    def counts_as_own_government(self):
+        """Whether criticism of this target lands on the tenant.
+
+        True for the tenant's own node and anything directly beneath it — a
+        complaint about Dinas PUPR is a complaint about the Pemkab that runs it.
+        """
+        if self.is_own_government:
+            return True
+        return bool(self.parent and self.parent.is_own_government)
+
+
+class MentionAttribution(models.Model):
+    """The sentiment one mention expresses *toward* one target.
+
+    A single post can praise the central government while blaming the regency, so
+    a mention carries as many of these as it has targets. Every mention ends up
+    with at least one — worst case the `tidak_jelas` catch-all — which is what
+    keeps attribution shares summing to 100% with no silent unattributed
+    remainder.
+    """
+
+    SOURCE_AUTO = "auto"
+    SOURCE_MANUAL = "manual"
+    SOURCE_CHOICES = [(SOURCE_AUTO, "Otomatis"), (SOURCE_MANUAL, "Manual")]
+
+    mention = models.ForeignKey(
+        Mention, on_delete=models.CASCADE, related_name="attributions"
+    )
+    target = models.ForeignKey(
+        AttributionTarget, on_delete=models.CASCADE, related_name="attributions"
+    )
+    sentiment = models.CharField(max_length=20, choices=Mention.SENTIMENT_CHOICES)
+    confidence = models.FloatField(default=0.0)
+    # The verbatim substring that carries the attribution, so a reviewer can see
+    # what the model actually read rather than taking the label on trust.
+    evidence_span = models.CharField(max_length=300, blank=True)
+    rationale = models.CharField(max_length=300, blank=True)
+    model = models.CharField(max_length=50, blank=True)
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_AUTO)
+    reviewed_by = models.CharField(max_length=150, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("mention", "target")
+        ordering = ["target__name"]
+        indexes = [
+            models.Index(fields=["sentiment"]),
+        ]
+
+    def __str__(self):
+        return f"{self.mention_id} → {self.target.name}: {self.sentiment}"
+
+
+class NegativeDriver(models.Model):
+    """A *reason* behind negative sentiment, as opposed to a topic.
+
+    The Issue taxonomy answers "what is this about"; a driver answers "why are
+    they angry about it". Those diverge in practice — two posts both labelled
+    "Jalan" can be about a pothole and about a procurement scandal, and they route
+    to different responses.
+
+    Per project, so a tenant governs its own reason vocabulary.
+    """
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="negative_drivers"
+    )
+    name = models.CharField(max_length=150)
+    slug = models.SlugField()
+    keywords = models.JSONField(default=list, blank=True)
+    color = models.CharField(max_length=7, default="#C6483F")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("project", "slug")
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class MentionDriver(models.Model):
+    """One reason a mention is negative. A complaint can carry several — a flood
+    post is often both `banjir` and `respons lambat`."""
+
+    SOURCE_AUTO = "auto"
+    SOURCE_MANUAL = "manual"
+    SOURCE_CHOICES = [(SOURCE_AUTO, "Otomatis"), (SOURCE_MANUAL, "Manual")]
+
+    mention = models.ForeignKey(
+        Mention, on_delete=models.CASCADE, related_name="drivers"
+    )
+    driver = models.ForeignKey(
+        NegativeDriver, on_delete=models.CASCADE, related_name="mention_links"
+    )
+    confidence = models.FloatField(default=0.0)
+    evidence_span = models.CharField(max_length=300, blank=True)
+    rationale = models.CharField(max_length=300, blank=True)
+    model = models.CharField(max_length=50, blank=True)
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_AUTO)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("mention", "driver")
+        ordering = ["-confidence"]
+
+    def __str__(self):
+        return f"{self.mention_id} → {self.driver.name}"
+
+
+class DriverCandidate(models.Model):
+    """A recurring complaint that fits none of the configured drivers.
+
+    This is how a narrative nobody anticipated surfaces without letting the model
+    silently invent taxonomy. The model may only *propose* a phrase here; an
+    analyst decides whether it becomes a real driver. That human gate is what
+    keeps the reason vocabulary governed while still catching the new thing.
+    """
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="driver_candidates"
+    )
+    phrase = models.CharField(max_length=120)
+    count = models.PositiveIntegerField(default=0)
+    sample_mention_ids = models.JSONField(default=list, blank=True)
+    first_seen_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+    promoted_to = models.ForeignKey(
+        NegativeDriver, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="promoted_from",
+    )
+    dismissed = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ("project", "phrase")
+        ordering = ["-count", "-last_seen_at"]
+
+    @property
+    def is_open(self):
+        return self.promoted_to_id is None and not self.dismissed
+
+    def __str__(self):
+        return f"{self.phrase} ({self.count})"
+
+
+class ThreadInsight(models.Model):
+    """What a discussion did to the post that started it.
+
+    A post-only dashboard misses the case that matters most: a calm official
+    statement whose comment section is furious. Divergence is that case as a
+    number, and opinion shift is the early-warning version of it — sentiment
+    turning *within* a thread while it is still running.
+
+    Recomputed on a schedule rather than per-comment: these are properties of a
+    conversation, and a conversation is not finished when its first reply lands.
+    """
+
+    root_mention = models.OneToOneField(
+        Mention, on_delete=models.CASCADE, related_name="thread_insight"
+    )
+    comment_count = models.PositiveIntegerField(default=0)
+    reply_depth_max = models.PositiveSmallIntegerField(default=0)
+    post_sentiment = models.CharField(max_length=20, choices=Mention.SENTIMENT_CHOICES)
+    comment_negative_pct = models.PositiveSmallIntegerField(default=0)
+    # Comment negativity minus the post's own, in percentage points. Positive means
+    # the crowd is angrier than the post that provoked it.
+    divergence_pp = models.SmallIntegerField(default=0)
+    # Late-half minus early-half comment negativity, in points. Positive means
+    # opinion turned against the subject while the thread ran.
+    opinion_shift_pp = models.SmallIntegerField(default=0)
+    toxicity_pct = models.PositiveSmallIntegerField(default=0)
+    disagreement_pct = models.PositiveSmallIntegerField(default=0)
+    # Comments per hour across the thread's active span.
+    intensity = models.FloatField(default=0.0)
+    # [{driver_id, name, count, sample_mention_ids}] — the complaints that recur
+    # across this thread, reusing the driver taxonomy.
+    recurring_complaints = models.JSONField(default=list, blank=True)
+    analysed_comment_count = models.PositiveIntegerField(default=0)
+    computed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-divergence_pp"]
+        indexes = [models.Index(fields=["-divergence_pp"])]
+
+    def __str__(self):
+        return f"Thread {self.root_mention_id}: {self.comment_count} komentar"
 
 
 class GovernmentProgram(models.Model):
@@ -742,6 +1049,100 @@ class Incident(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class EscalationAssessment(models.Model):
+    """How likely an incident is to become a public crisis if left alone.
+
+    Replaces a bare severity tier with a multi-signal score that shows its work:
+    which signals fired, how much each contributed, and — critically — which
+    signals had no data at all.
+
+    ``confidence`` is data sufficiency, not model certainty. A project collecting
+    one platform has no cross-platform signal; a project not collecting comments
+    has no toxicity signal. Scoring those as zero would systematically understate
+    risk, so the score is normalised over available weight only and confidence
+    falls instead. A confident-looking number computed from three of eight signals
+    is worse than no number.
+    """
+
+    TIER_LOW = "low"
+    TIER_WATCH = "watch"
+    TIER_HIGH = "high_risk"
+    TIER_CRITICAL = "critical"
+    TIER_CHOICES = [
+        (TIER_LOW, "Rendah"),
+        (TIER_WATCH, "Pantau"),
+        (TIER_HIGH, "Risiko Tinggi"),
+        (TIER_CRITICAL, "Kritis"),
+    ]
+
+    TIER_RANK = {TIER_CRITICAL: 0, TIER_HIGH: 1, TIER_WATCH: 2, TIER_LOW: 3}
+
+    # How an escalation tier maps onto the incident severity the board already
+    # orders by, so adding escalation does not fork the ranking.
+    TIER_TO_SEVERITY = {
+        TIER_CRITICAL: "critical",
+        TIER_HIGH: "high",
+        TIER_WATCH: "medium",
+        TIER_LOW: "low",
+    }
+
+    incident = models.ForeignKey(
+        Incident, on_delete=models.CASCADE, related_name="escalations",
+        null=True, blank=True,
+    )
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="escalations"
+    )
+    score = models.PositiveSmallIntegerField(default=0)
+    tier = models.CharField(max_length=20, choices=TIER_CHOICES, default=TIER_LOW)
+    # [{key, label, raw, normalized, weight, contribution, available, note,
+    #   evidence_kind, evidence_params}] — the full working, persisted so a past
+    # score stays reproducible after weights are retuned.
+    signals = models.JSONField(default=list, blank=True)
+    confidence = models.FloatField(default=0.0)
+    available_signal_count = models.PositiveSmallIntegerField(default=0)
+    why = models.TextField(blank=True)
+    impact_if_ignored = models.TextField(blank=True)
+    recommended_response = models.TextField(blank=True)
+    # Regulatory grounding for the recommendation, same contract as the incident
+    # draft response: retrieved passages kept beside the text for verification.
+    regulatory_context = models.JSONField(default=list, blank=True)
+    window_start = models.DateTimeField()
+    window_end = models.DateTimeField()
+    model = models.CharField(max_length=50, blank=True)
+    computed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-computed_at"]
+        indexes = [
+            models.Index(fields=["project", "-computed_at"]),
+            models.Index(fields=["-score"]),
+        ]
+
+    @property
+    def severity(self):
+        return self.TIER_TO_SEVERITY[self.tier]
+
+    @property
+    def tier_rank(self):
+        return self.TIER_RANK[self.tier]
+
+    @property
+    def unavailable_signals(self):
+        return [s["label"] for s in self.signals if not s.get("available")]
+
+    @property
+    def top_signals(self):
+        return sorted(
+            [s for s in self.signals if s.get("available")],
+            key=lambda s: s.get("contribution", 0),
+            reverse=True,
+        )
+
+    def __str__(self):
+        return f"{self.get_tier_display()} ({self.score})"
 
 
 class IncidentEvent(models.Model):

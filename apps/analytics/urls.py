@@ -12,6 +12,7 @@ urlpatterns = [
     path("umpan/", views.feed, name="feed"),
     path("umpan/<int:mention_id>/koreksi-sentimen/", views.correct_sentiment, name="correct_sentiment"),
     path("umpan/<int:mention_id>/aktor/<int:assessment_id>/koreksi-sentimen/", views.correct_actor_sentiment, name="correct_actor_sentiment"),
+    path("umpan/<int:mention_id>/koreksi-atribusi/", views.correct_attribution, name="correct_attribution"),
     path("war-room/", views.war_room, name="war_room"),
     path("war-room/<int:issue_id>/aksi/", views.log_response, name="log_response"),
     path("narasi/", views.narasi, name="narasi"),
@@ -39,4 +40,8 @@ urlpatterns = [
     path("insiden/<int:incident_id>/catat/", views.insiden_note, name="insiden_note"),
     path("insiden/<int:incident_id>/tanggapan/susun/", views.insiden_response_generate, name="insiden_response_generate"),
     path("insiden/<int:incident_id>/tanggapan/simpan/", views.insiden_response_save, name="insiden_response_save"),
+    path("insiden/<int:incident_id>/eskalasi/", views.insiden_escalation, name="insiden_escalation"),
+    path("alasan/", views.driver_review, name="driver_review"),
+    path("alasan/<int:candidate_id>/promosikan/", views.driver_promote, name="driver_promote"),
+    path("alasan/<int:candidate_id>/tolak/", views.driver_dismiss, name="driver_dismiss"),
 ]

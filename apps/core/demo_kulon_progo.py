@@ -998,5 +998,29 @@ def seed_kulon_progo_demo():
     _seed_incident_board(project)
     _seed_narrative_mentions(project, province, regency, live_issue)
     _seed_coordination_cluster(project)
+    _seed_intelligence(project)
     _seed_reviewable_brief(project)
     return tenant, project
+
+
+def _seed_intelligence(project):
+    """Run the early-warning enrichment stages over the demo corpus.
+
+    Without this the new panels render empty on a fresh install and the features
+    look broken rather than unconfigured. Every stage here is idempotent, so a
+    reseed refreshes rather than duplicates.
+
+    Deliberately ordered: attribution first (drivers consult it to decide whether
+    a mention carries a complaint), then comment analysis, then escalation, which
+    consumes all three.
+    """
+    from apps.analytics import attribution, comment_intel, drivers, escalation
+
+    attribution.ensure_registry(project, own_government_name="Pemkab Kulon Progo")
+    drivers.ensure_drivers(project)
+
+    attribution.backfill(project)
+    drivers.backfill(project)
+    comment_intel.backfill(project)
+    comment_intel.recompute_threads(project)
+    escalation.assess_project(project)

@@ -20,10 +20,15 @@ from apps.core.selectors import get_active_project, scope_to_tenant
 from apps.governance import regulatory
 from apps.governance.neutrality import NEUTRALITY_NOTICE, require_political_monitoring
 from apps.governance.services import record_audit_entry
-from . import briefs, exports, incidents, media_report_pdf, selectors, taxonomy
+from . import (
+    attribution, briefs, drivers, escalation, exports, incidents, media_report_pdf,
+    selectors, taxonomy,
+)
+from .metrics import EvidenceRef, resolve_evidence
 from .models import (
-    ActorSentimentAssessment, BrowserPushSubscription, DailyBrief, DailyBriefIssue,
-    Issue, IssueMergeHistory, LabelCorrection, Mention, PoliticalIssue, ResponseAction,
+    ActorSentimentAssessment, AttributionTarget, BrowserPushSubscription, DailyBrief,
+    DailyBriefIssue, Issue, IssueMergeHistory, LabelCorrection, Mention, PoliticalIssue,
+    ResponseAction,
 )
 
 
@@ -136,12 +141,23 @@ def export_mentions(request):
 @require_page("feed")
 def feed(request):
     """Raw mention feed, filterable by platform/sentiment/author/date (FR-3.1),
-    tenant-scoped (FR-1.2)."""
+    tenant-scoped (FR-1.2).
+
+    Also the landing point for every KPI drill-down: a `?bukti=` reference from
+    any metric on any screen resolves here, through the one shared resolver, so a
+    number can never link to evidence its own definition does not reproduce.
+    """
+    project = get_active_project(request)
     mentions = scope_to_tenant(
         Mention.objects.select_related("platform", "author", "parent")
-        .prefetch_related("actor_sentiments__actor"),
+        .prefetch_related("actor_sentiments__actor", "attributions__target"),
         request,
     ).order_by("-posted_at")
+
+    evidence_ref = EvidenceRef.from_params(request.GET)
+    if evidence_ref is not None and project is not None:
+        evidence_ids = resolve_evidence(project, evidence_ref).values("pk")
+        mentions = mentions.filter(pk__in=evidence_ids)
 
     mentions, filters = _filtered_mentions(mentions, request.GET)
 
@@ -157,7 +173,53 @@ def feed(request):
         "filters": filters,
         "filter_query": filter_query,
         "export_query": f"{filter_query}&" if filter_query else "",
+        "evidence_ref": evidence_ref,
+        "attribution_targets": (
+            AttributionTarget.objects.filter(project=project, is_active=True)
+            .order_by("name") if project else []
+        ),
     })
+
+
+@require_page("feed")
+@require_writer_role
+@require_POST
+def correct_attribution(request, mention_id):
+    """Correct who a mention's criticism is aimed at.
+
+    Attribution is the number a government reader is most likely to challenge, so
+    the correction path is first-class: the fix is recorded as tuning feedback and
+    is protected from being reverted by the next automatic re-run.
+    """
+    mention = get_object_or_404(
+        scope_to_tenant(Mention.objects.all(), request), pk=mention_id
+    )
+    target = get_object_or_404(
+        AttributionTarget.objects.filter(project=mention.project),
+        pk=request.POST.get("target") or 0,
+    )
+    by = request.user.get_full_name() or request.user.username
+
+    if request.POST.get("action") == "hapus":
+        attribution.remove(mention, target, by)
+        messages.success(request, "Atribusi dihapus dan dicatat sebagai koreksi manual.")
+        return redirect(_feed_redirect(request))
+
+    sentiment = request.POST.get("sentiment", "")
+    if sentiment not in {key for key, _label in Mention.SENTIMENT_CHOICES}:
+        messages.error(request, "Nilai sentimen tidak valid.")
+        return redirect(_feed_redirect(request))
+
+    attribution.correct(mention, target, sentiment, by)
+    messages.success(request, "Atribusi diperbarui dan dicatat sebagai koreksi manual.")
+    return redirect(_feed_redirect(request))
+
+
+def _feed_redirect(request):
+    """Return to the feed keeping the filters the correction was made under."""
+    query = request.POST.get("next_query", "")
+    base = reverse("analytics:feed")
+    return f"{base}?{query}" if query else base
 
 
 @require_page("feed")
@@ -229,6 +291,9 @@ def ringkasan(request):
         "active_nav": "ringkasan",
         "summary": summary,
         "alerts": alerts,
+        "attribution": selectors.attribution_summary(project) if project else None,
+        "drivers": selectors.driver_summary(project) if project else None,
+        "threads": selectors.thread_summary(project) if project else None,
         "can_export": user_can_access(request.user, "export"),
     })
 
@@ -649,7 +714,92 @@ def insiden_detail(request, incident_id):
         "opds": OPD.objects.filter(project=incident.project, is_active=True),
         "status_choices": Incident.STATUS_CHOICES,
         "allowed_status_choices": allowed_status_choices,
+        "attribution": selectors.incident_attribution(incident),
+        "escalation": escalation.latest_for(incident),
     })
+
+
+@require_page("drivers")
+def driver_review(request):
+    """Reasons the model proposed that fit no configured driver.
+
+    The human gate on taxonomy growth: the model may only suggest a phrase here,
+    an analyst decides whether it becomes a real driver. That is what lets an
+    unanticipated narrative surface without the model quietly writing its own
+    vocabulary.
+    """
+    project = get_active_project(request)
+    candidates = (
+        drivers.DriverCandidate.objects.filter(
+            project=project, promoted_to__isnull=True, dismissed=False
+        ).order_by("-count")
+        if project else []
+    )
+    return render(request, "analytics/driver_review.html", {
+        "active_nav": "drivers",
+        "candidates": candidates,
+        "review_threshold": drivers.CANDIDATE_REVIEW_THRESHOLD,
+        "drivers": (
+            drivers.NegativeDriver.objects.filter(project=project, is_active=True)
+            if project else []
+        ),
+        "summary": selectors.driver_summary(project) if project else None,
+    })
+
+
+def _get_candidate(request, candidate_id):
+    project = get_active_project(request)
+    return get_object_or_404(
+        drivers.DriverCandidate.objects.filter(project=project), pk=candidate_id
+    )
+
+
+@require_page("drivers")
+@require_writer_role
+@require_POST
+def driver_promote(request, candidate_id):
+    candidate = _get_candidate(request, candidate_id)
+    by = request.user.get_full_name() or request.user.username
+    driver = drivers.promote_candidate(
+        candidate, name=request.POST.get("name") or None, by=by
+    )
+    record_audit_entry(
+        actor_label=by,
+        action="Mempromosikan usulan alasan keluhan",
+        target=f"{candidate.phrase} → {driver.name}",
+    )
+    messages.success(request, f"\"{driver.name}\" ditambahkan sebagai alasan keluhan.")
+    return redirect("analytics:driver_review")
+
+
+@require_page("drivers")
+@require_writer_role
+@require_POST
+def driver_dismiss(request, candidate_id):
+    candidate = _get_candidate(request, candidate_id)
+    drivers.dismiss_candidate(candidate)
+    record_audit_entry(
+        actor_label=request.user.get_full_name() or request.user.username,
+        action="Menolak usulan alasan keluhan",
+        target=candidate.phrase,
+    )
+    messages.success(request, "Usulan ditolak dan tidak akan muncul kembali.")
+    return redirect("analytics:driver_review")
+
+
+@require_page("insiden")
+@require_writer_role
+@require_POST
+def insiden_escalation(request, incident_id):
+    """Recompute an incident's escalation score on demand."""
+    incident = _get_incident(request, incident_id)
+    assessment = escalation.assess_incident(incident)
+    messages.success(
+        request,
+        f"Skor eskalasi diperbarui: {assessment.score}/100 "
+        f"({assessment.get_tier_display()}).",
+    )
+    return redirect("analytics:insiden_detail", incident_id=incident.pk)
 
 
 @require_page("insiden")

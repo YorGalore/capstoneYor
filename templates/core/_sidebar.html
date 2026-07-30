@@ -22,8 +22,10 @@
     <div class="pantau-nav-group-label">Analisis</div>
     {% if can_view_taxonomy %}
     <a class="pantau-nav-item{% if active_nav == 'taxonomy' %} active{% endif %}" href="{% url 'analytics:taxonomy' %}">Taksonomi Isu</a>
+    <a class="pantau-nav-item{% if active_nav == 'drivers' %} active{% endif %}" href="{% url 'analytics:driver_review' %}">Alasan Keluhan</a>
     {% else %}
     <span class="pantau-nav-item disabled" title="Akses dibatasi">Taksonomi Isu</span>
+    <span class="pantau-nav-item disabled" title="Akses dibatasi">Alasan Keluhan</span>
     {% endif %}
     <a class="pantau-nav-item{% if active_nav == 'narasi' %} active{% endif %}" href="{% url 'analytics:narasi' %}">Narasi Politik</a>
     <a class="pantau-nav-item{% if active_nav == 'koordinasi' %} active{% endif %}" href="{% url 'coordination:koordinasi' %}">Deteksi Koordinasi</a>

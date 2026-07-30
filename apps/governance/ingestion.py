@@ -5,11 +5,15 @@ Interim sentiment/emotion come from the lexicon scorer in `scraping` until the
 NLP Analytics service lands (Workstream C); the classifier is swappable behind
 this boundary.
 """
+import logging
+
 from django.db import transaction
 
-from apps.analytics import actors, taxonomy
+from apps.analytics import actors, attribution, comment_intel, drivers, taxonomy
 from apps.analytics.models import Author, Mention
 from apps.analytics.nlp import default_pipeline
+
+logger = logging.getLogger(__name__)
 
 
 def _author_for(platform, handle):
@@ -26,6 +30,11 @@ def ingest_items(project, platform, items):
     created = 0
     duplicates = 0
     classifier = default_pipeline()
+    # Built once per batch: each pipeline construction re-reads runtime settings
+    # and would otherwise repeat that work for every item ingested.
+    attributor = attribution.default_pipeline()
+    driver_pipeline = drivers.default_pipeline()
+    comment_pipeline = comment_intel.default_pipeline()
     for item in items:
         external_id = item.get("external_id")
         if external_id and Mention.objects.filter(external_id=external_id).exists():
@@ -72,6 +81,23 @@ def ingest_items(project, platform, items):
         # configured government-program rules, while the mention is ingested.
         actors.tag_mention(mention)
         actors.tag_program(mention)
+        # Decide who the sentiment is aimed at. Enrichment failure must never
+        # cost us the mention itself — a post that lands with sentiment but no
+        # attribution is recoverable by backfill; one that never lands is not.
+        try:
+            attribution.attribute(mention, pipeline=attributor)
+        except Exception:
+            logger.exception("Attribution failed for mention %s", mention.pk)
+        # Drivers run after attribution: a post can be negative toward one entity
+        # while positive overall, and that still needs a reason attached.
+        try:
+            drivers.label(mention, pipeline=driver_pipeline)
+        except Exception:
+            logger.exception("Driver labeling failed for mention %s", mention.pk)
+        try:
+            comment_intel.enrich(mention, pipeline=comment_pipeline)
+        except Exception:
+            logger.exception("Comment enrichment failed for mention %s", mention.pk)
         created += 1
     return {"created": created, "duplicates": duplicates}
 

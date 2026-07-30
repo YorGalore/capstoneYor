@@ -196,6 +196,46 @@ class KulonProgoDemoSeedTest(TestCase):
         self.assertGreaterEqual(brief.issues.count(), 1)
         self.assertTrue(brief.issues.filter(title="Dugaan Pungli Garongan").exists())
 
+    def test_demo_populates_the_early_warning_features(self):
+        """A fresh install must not show empty attribution/driver/escalation
+        panels — an unconfigured feature is indistinguishable from a broken one."""
+        from apps.analytics import selectors
+        from apps.analytics.models import (
+            AttributionTarget, EscalationAssessment, MentionDriver, NegativeDriver,
+        )
+
+        _tenant, project = seed_kulon_progo_demo()
+
+        self.assertTrue(
+            AttributionTarget.objects.filter(
+                project=project, is_own_government=True
+            ).exists()
+        )
+        self.assertTrue(NegativeDriver.objects.filter(project=project).exists())
+        self.assertTrue(
+            MentionDriver.objects.filter(mention__project=project).exists()
+        )
+
+        attribution_summary = selectors.attribution_summary(project)
+        self.assertGreater(attribution_summary["total"], 0)
+        self.assertTrue(attribution_summary["levels"])
+
+        driver_summary = selectors.driver_summary(project)
+        self.assertTrue(driver_summary["drivers"])
+
+        self.assertTrue(
+            EscalationAssessment.objects.filter(project=project).exists()
+        )
+
+    def test_demo_attribution_shows_criticism_aimed_elsewhere(self):
+        """The headline claim the feature exists to make: not all negativity is
+        about us. A demo where 100% lands on the regency would misrepresent it."""
+        from apps.analytics import selectors
+
+        _tenant, project = seed_kulon_progo_demo()
+        summary = selectors.attribution_summary(project)
+        self.assertLess(summary["own_government"].value, 100)
+
     def test_seed_is_idempotent(self):
         _tenant, project = seed_kulon_progo_demo()
         first = {

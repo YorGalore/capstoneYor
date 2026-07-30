@@ -79,6 +79,12 @@
         </span>
       </span>
       <span class="incident-card-right">
+        {% if incident.escalation %}
+          <span class="escalation-chip tier-{{ incident.escalation.tier }}"
+                title="Skor eskalasi {{ incident.escalation.score }}/100, keyakinan {{ incident.escalation.confidence }}">
+            {{ incident.escalation.score }} · {{ incident.escalation.get_tier_display }}
+          </span>
+        {% endif %}
         <span class="severity-chip">{{ incident.get_severity_display }}</span>
         {% if incident.assigned_opd %}
           <span class="incident-opd-chip">{{ incident.assigned_opd.abbr|default:incident.assigned_opd }}</span>
@@ -108,6 +114,12 @@
         </span>
       </span>
       <span class="incident-card-right">
+        {% if incident.escalation %}
+          <span class="escalation-chip tier-{{ incident.escalation.tier }}"
+                title="Skor eskalasi {{ incident.escalation.score }}/100, keyakinan {{ incident.escalation.confidence }}">
+            {{ incident.escalation.score }} · {{ incident.escalation.get_tier_display }}
+          </span>
+        {% endif %}
         <span class="severity-chip">{{ incident.get_severity_display }}</span>
         <span class="incident-opd-chip is-unassigned">Kandidat</span>
       </span>

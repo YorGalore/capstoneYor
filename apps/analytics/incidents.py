@@ -80,6 +80,85 @@ def _location(candidate):
     return candidate.get("regency_name") or "wilayah yang belum teridentifikasi"
 
 
+# How many reasons to name before the list stops being a summary.
+MAX_ROOT_CAUSE_DRIVERS = 3
+
+
+def driver_breakdown(mention_ids, limit=MAX_ROOT_CAUSE_DRIVERS):
+    """The dominant reasons behind a set of mentions, with their shares.
+
+    Kept separate from the narrative composer so the escalation engine and the
+    incident detail can both read the same measured breakdown rather than parsing
+    it back out of prose.
+    """
+    from .models import MentionDriver
+
+    if not mention_ids:
+        return []
+    rows = (
+        MentionDriver.objects.filter(mention_id__in=mention_ids)
+        .values("driver__name")
+        .annotate(n=Count("mention_id", distinct=True))
+        .order_by("-n")[:limit]
+    )
+    labelled = (
+        MentionDriver.objects.filter(mention_id__in=mention_ids)
+        .values("mention_id").distinct().count()
+    )
+    return [
+        {
+            "name": row["driver__name"],
+            "count": row["n"],
+            "pct": round((row["n"] / labelled) * 100) if labelled else 0,
+        }
+        for row in rows
+    ]
+
+
+def _compose_root_cause(candidate, snippets):
+    """State the measured reasons behind an incident, or say plainly that none
+    were measured.
+
+    Previously this always emitted the same "penyebab belum diverifikasi"
+    placeholder regardless of what the data showed. Now it reports the driver
+    labels actually attached to the incident's mentions — while keeping the
+    instruction to verify in the field, because a clustered complaint is evidence
+    of what people *say* the cause is, not proof of the cause.
+    """
+    breakdown = driver_breakdown(candidate.get("mention_ids") or [])
+    if breakdown:
+        lines = [
+            DRAFT_BANNER,
+            "",
+            "Alasan keluhan yang terukur dari percakapan warga:",
+        ]
+        for driver in breakdown:
+            lines.append(
+                f"- **{driver['name']}** — {driver['pct']}% dari keluhan berlabel "
+                f"({driver['count']} sebutan)"
+            )
+        lines.append("")
+        lines.append(
+            "Angka di atas menggambarkan apa yang warga sampaikan, bukan hasil "
+            "verifikasi teknis. Konfirmasi lapangan oleh OPD terkait tetap wajib "
+            "sebelum penyebab dinyatakan resmi."
+        )
+        return "\n".join(lines)
+
+    if snippets:
+        return (
+            f"{DRAFT_BANNER}\n\n"
+            "Penyebab belum diverifikasi dan belum ada label alasan yang terukur. "
+            "Indikasi awal berdasarkan kutipan warga di atas perlu dikonfirmasi "
+            "melalui pemeriksaan lapangan oleh OPD terkait."
+        )
+    return (
+        f"{DRAFT_BANNER}\n\n"
+        "Penyebab belum dapat disimpulkan: tidak tersedia kutipan percakapan "
+        "yang memadai. Jangan mengarang penyebab; lakukan verifikasi lapangan."
+    )
+
+
 def compose_incident_narrative(candidate):
     """Compose the four narrative fields for one incident candidate.
 
@@ -103,18 +182,7 @@ def compose_incident_narrative(candidate):
         for snippet in snippets[:MAX_SNIPPETS]:
             summary_lines.append(f"- \"{snippet}\"")
 
-    if snippets:
-        root_cause = (
-            f"{DRAFT_BANNER}\n\n"
-            "Penyebab belum diverifikasi. Indikasi awal berdasarkan kutipan warga "
-            "di atas perlu dikonfirmasi melalui pemeriksaan lapangan oleh OPD terkait."
-        )
-    else:
-        root_cause = (
-            f"{DRAFT_BANNER}\n\n"
-            "Penyebab belum dapat disimpulkan: tidak tersedia kutipan percakapan "
-            "yang memadai. Jangan mengarang penyebab; lakukan verifikasi lapangan."
-        )
+    root_cause = _compose_root_cause(candidate, snippets)
 
     impact = (
         f"{DRAFT_BANNER}\n\n"

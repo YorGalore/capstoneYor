@@ -28,6 +28,12 @@ DEFAULT_SCHEDULES = [
     (ScheduledJob.JOB_ENRICH_AUTHORS, 360, True),
     # Cheap no-op until a human finalizes a brief; then it distributes exactly once.
     (ScheduledJob.JOB_SEND_BRIEF, 60, True),
+    # Thread analytics are only meaningful once a discussion has had time to run,
+    # so a tighter cadence would mostly recompute the same numbers.
+    (ScheduledJob.JOB_ANALYSE_THREADS, 180, True),
+    # Escalation is the early-warning signal: it has to run often enough that a
+    # tier change reaches an operator while acting is still cheap.
+    (ScheduledJob.JOB_SCORE_ESCALATION, 60, True),
 ]
 
 # feed_url is left blank for sources with no known public RSS feed — the

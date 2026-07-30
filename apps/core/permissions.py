@@ -31,6 +31,7 @@ PAGES = [
     ("pengawasan", "Pengawasan"),
     ("brief", "Sorotan"),
     ("taxonomy", "Taksonomi Isu"),
+    ("drivers", "Alasan Keluhan"),
     ("export", "Ekspor Data"),
     ("permission_matrix", "Matriks Izin Halaman"),
     ("runtime_settings", "Pengaturan Dev/Ops"),

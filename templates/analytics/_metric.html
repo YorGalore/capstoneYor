@@ -1,0 +1,34 @@
+{% comment %}
+A number that shows its work. Renders the value plus a disclosure carrying the
+method that produced it, how many rows are behind it, the model's confidence, and
+a link to the supporting mentions.
+
+Usage: {% include "analytics/_metric.html" with metric=some_metric %}
+{% endcomment %}
+<span class="pantau-metric">
+  <span class="pantau-metric-value">{{ metric.display_value }}</span>
+  <details class="pantau-metric-why">
+    <summary title="Dari mana angka ini berasal?" aria-label="Penjelasan angka">?</summary>
+    <div class="pantau-metric-panel">
+      <div class="pantau-metric-label">{{ metric.label }}</div>
+      <dl>
+        <dt>Cara hitung</dt>
+        <dd>{{ metric.method }}</dd>
+        <dt>Data pendukung</dt>
+        <dd>{{ metric.contributing }} baris</dd>
+        <dt>Keyakinan model</dt>
+        <dd>
+          <span class="pantau-conf pantau-conf-{{ metric.confidence_band|slugify }}">{{ metric.confidence_band }}</span>
+          {% if metric.contributing %}
+            ({{ metric.confidence }}{% if metric.low_confidence_pct %} · {{ metric.low_confidence_pct }}% label lemah{% endif %})
+          {% endif %}
+        </dd>
+      </dl>
+      {% if metric.evidence_query %}
+        <a class="mono-link" href="{% url 'analytics:feed' %}?{{ metric.evidence_query }}">Lihat sebutan pendukung →</a>
+      {% else %}
+        <span class="pantau-muted">Tidak ada bukti yang dapat ditelusuri.</span>
+      {% endif %}
+    </div>
+  </details>
+</span>
