@@ -28,6 +28,13 @@ services:
       # fallbacks only; Compose reads their values from the server's gitignored .env.
       APIFY_API_TOKEN: ${APIFY_API_TOKEN:-}
       APIFY_KEY: ${APIFY_KEY:-}
+      NLP_API_URL: ${NLP_API_URL:-}
+      NLP_API_KEY: ${NLP_API_KEY:-}
+      NLP_MODEL: ${NLP_MODEL:-}
+      NLP_TIMEOUT_SECONDS: ${NLP_TIMEOUT_SECONDS:-30}
+      WEBPUSH_VAPID_PUBLIC_KEY: ${WEBPUSH_VAPID_PUBLIC_KEY:-}
+      WEBPUSH_VAPID_PRIVATE_KEY: ${WEBPUSH_VAPID_PRIVATE_KEY:-}
+      WEBPUSH_VAPID_CONTACT: ${WEBPUSH_VAPID_CONTACT:-}
       # There is no TLS terminator in this compose file, so the https redirect and the
       # Secure cookie flags all have to come off together — otherwise the app is either
       # unreachable over http://localhost or silently unable to hold a session. Behind a
@@ -55,6 +62,13 @@ services:
       DJANGO_BEHIND_TLS: ${DJANGO_BEHIND_TLS:-0}
       APIFY_API_TOKEN: ${APIFY_API_TOKEN:-}
       APIFY_KEY: ${APIFY_KEY:-}
+      NLP_API_URL: ${NLP_API_URL:-}
+      NLP_API_KEY: ${NLP_API_KEY:-}
+      NLP_MODEL: ${NLP_MODEL:-}
+      NLP_TIMEOUT_SECONDS: ${NLP_TIMEOUT_SECONDS:-30}
+      WEBPUSH_VAPID_PUBLIC_KEY: ${WEBPUSH_VAPID_PUBLIC_KEY:-}
+      WEBPUSH_VAPID_PRIVATE_KEY: ${WEBPUSH_VAPID_PRIVATE_KEY:-}
+      WEBPUSH_VAPID_CONTACT: ${WEBPUSH_VAPID_CONTACT:-}
       # The web container owns migrations and seeding; the scheduler waits for the schema
       # rather than racing to apply it.
       RUN_MIGRATIONS: "0"
